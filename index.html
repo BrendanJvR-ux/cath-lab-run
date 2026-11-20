@@ -291,7 +291,7 @@ function proj(p,B){const q=sub(p,ISO);return [CX+dot(q,B.r)*SCALE,CY-dot(q,B.u)*
 function contraction(ph){return ph>0.13&&ph<0.5?Math.pow(Math.sin(Math.PI*(ph-0.13)/0.37),1.2):0}
 
 /* ---------- catheter ---------- */
-const CATH={JL:{label:'JL4',home:-70,tol:20,sys:'L'},JR:{label:'JR4',home:20,tol:14,sys:'R'}};
+const CATH={JL:{label:'JL4',home:-45,tol:32,sys:'L'},JR:{label:'JR4',home:55,tol:26,sys:'R'}};
 function angDiff(a,b){let d=(a-b)%360;if(d>180)d-=360;if(d<-180)d+=360;return Math.abs(d)}
 function cathState(c){
   const out={u:0,eng:null,deep:false,pts:null,tip:null,region:''};
@@ -305,9 +305,9 @@ function cathState(c){
   }
   const u=(c.s-S_ROOT)/22;out.u=u;
   const th=c.th*D2R,dir=[Math.cos(th),0,Math.sin(th)];
-  let tip=add(ROOT,add(mul(dir,12.5*Math.min(u,1)),[0,4*Math.min(u,1),0]));
+  const reach=Math.min(1,0.45+u);let tip=add(ROOT,add(mul(dir,14*reach),[0,4*reach,0]));
   const C=CATH[c.type];
-  if(u>=0.85&&angDiff(c.th,OSTANG[C.sys])<C.tol){out.eng=C.sys;out.deep=u>1.3;tip=add(OST[C.sys],mul(OSTDIR[C.sys],Math.max(0,u-1)*11))}
+  if(u>=0.7&&angDiff(c.th,OSTANG[C.sys])<C.tol){out.eng=C.sys;out.deep=u>1.45;tip=add(OST[C.sys],mul(OSTDIR[C.sys],Math.max(0,u-1)*11))}
   const ctrl=add(ROOT,add(mul(dir,c.type==='JL'?-8:-3),[0,c.type==='JL'?17:9,0]));
   for(let i=1;i<=20;i++){const t=i/20,a=(1-t)*(1-t),b=2*(1-t)*t,cc=t*t;pts.push([a*base[0]+b*ctrl[0]+cc*tip[0],a*base[1]+b*ctrl[1]+cc*tip[1],a*base[2]+b*ctrl[2]+cc*tip[2]])}
   out.pts=pts;out.tip=tip;
@@ -602,10 +602,12 @@ function tick(dt){
   if(S.exch>0){S.exch-=dt;if(S.exch<=0){c.type=c.type==='JL'?'JR':'JL';c.th=CATH[c.type].home;toast(`${CATH[c.type].label} in the descending aorta.`)}}
   else if(!S.complication){
     let moved=false;const fine=c.s>S_ROOT-30;
-    if(down('ArrowUp','KeyW')){c.s=Math.min(S_ROOT+22*1.6,c.s+(fine?16:95)*dt);moved=true}
-    if(down('ArrowDown','KeyS')){c.s=Math.max(0,c.s-(fine?16:95)*dt);moved=true}
-    if(down('ArrowRight','KeyD')){c.th+=75*dt;moved=true}
-    if(down('ArrowLeft','KeyA')){c.th-=75*dt;moved=true}
+    if(down('ArrowUp','KeyW')){c.s=Math.min(S_ROOT+22*1.6,c.s+(fine?26:110)*dt);moved=true}
+    if(down('ArrowDown','KeyS')){c.s=Math.max(0,c.s-(fine?26:110)*dt);moved=true}
+    if(down('ArrowRight','KeyD')){c.th+=130*dt;moved=true}
+    if(down('ArrowLeft','KeyA')){c.th-=130*dt;moved=true}
+    // near the ostium the tip tends to drop in on its own, as a preshaped Judkins does
+    {const C=CATH[c.type],c0=cathState(c);if(!c0.eng&&c0.u>=0.55&&!down('ArrowLeft','KeyA','ArrowRight','KeyD')){const diff=((OSTANG[C.sys]-c.th+540)%360)-180;if(Math.abs(diff)<C.tol+30)c.th+=Math.sign(diff)*Math.min(Math.abs(diff),55*dt)}}
     if(c.th>180)c.th-=360;if(c.th<-180)c.th+=360;
     const imaging=down('Space','KeyF')||!!S.cine;
     if(moved&&!imaging&&c.s>120){S.blind+=dt;if(S.blind>0.6&&Math.floor((S.blind-dt)/2)!==Math.floor(S.blind/2))toast('Moving the catheter without fluoro. Step on the pedal.',true)}
