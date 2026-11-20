@@ -55,11 +55,11 @@ const BALLOON_LENS=[12,15,20];
 
 /* Difficulty. tol = engagement window (deg) per system, seek = how far (deg) beyond the window the tip
    is pulled into the ostium (0 = no help), deep = how far past the ostium (u) before damping,
-   budgetX scales each case's contrast budget, map = show the coronary sketch, tokenX scales coffee tokens. */
+   budgetX scales each case's contrast budget (null = no limit), map = show the coronary sketch, tokenX scales coffee tokens. */
 const DIFFICULTY={
-  easy:{label:'Easy',blurb:'Wide engagement windows and the tip drops into the ostia. A coronary map fills in as you inject. 50% more contrast.',tol:{L:45,R:40},seek:70,seekSpeed:90,deep:1.5,budgetX:1.5,map:true,tokenX:1},
-  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Tokens ×1.5.',tol:{L:28,R:22},seek:25,seekSpeed:45,deep:1.42,budgetX:1,map:false,tokenX:1.5},
-  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, the catheter damps sooner, 25% less contrast. Tokens ×2.',tol:{L:16,R:12},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,map:false,tokenX:2},
+  easy:{label:'Easy',blurb:'Wide engagement windows and the tip drops into the ostia. A coronary map fills in as you inject. No contrast limit.',tol:{L:45,R:40},seek:70,seekSpeed:90,deep:1.5,budgetX:null,map:true,tokenX:1,level:1},
+  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Tokens ×1.5.',tol:{L:28,R:22},seek:25,seekSpeed:45,deep:1.42,budgetX:1,map:false,tokenX:1.5,level:2},
+  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, the catheter damps sooner, 25% less contrast. Tokens ×2.',tol:{L:16,R:12},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,map:false,tokenX:2,level:3},
 };
 
 /* ECG lead that shows ischaemia in each vessel's territory: V3 anterior (LAD), V5 lateral (circumflex), II inferior (RCA). */
@@ -74,6 +74,23 @@ const AVATARS=[
   {skin:'#e7b896',hair:'#b9883e',style:'short',scrub:'#a86a5c',cap:'#d9a441'},
   {skin:'#5e3a26',hair:'#0f0b09',style:'crop',scrub:'#3f7f8f',cap:'#4f7fa8'},
   {skin:'#d7a57d',hair:'#8a8a8a',style:'bald',scrub:'#6f8a4f',cap:null},
+  // shop avatars
+  {skin:'#f3cdb0',hair:'#c2462e',style:'long',scrub:'#2f3e5c',cap:'#c94f6d',shop:'av6'},
+  {skin:'#6b4430',hair:'#e6e1d8',style:'crop',scrub:'#8c2f39',cap:null,shop:'av7'},
+  {skin:'#e0ac86',hair:'#1f2a44',style:'bun',scrub:'#1d6b5f',cap:'#f2a53b',shop:'av8'},
+];
+
+/* Coffee-token shop. kind: perk (always on once bought), lut (monitor look, pick one), avatar. */
+const SHOP=[
+  {id:'torque',kind:'perk',name:'Torque device',price:25,desc:'Finer control of the catheter: every engagement window is 6° wider.'},
+  {id:'wire',kind:'perk',name:'Hydrophilic wire',price:15,desc:'Crosses lesions twice as fast.'},
+  {id:'lowdose',kind:'perk',name:'Low-dose fluoro',price:30,desc:'Fluoro and cine give 30% less air kerma.'},
+  {id:'injector',kind:'perk',name:'Power injector',price:35,desc:'Contrast budgets are 25% bigger on Medium and Hard.'},
+  {id:'warm',kind:'lut',name:'Warm film monitor',price:20,desc:'An amber, film-style look for the X-ray image.',filter:'sepia(.45) saturate(1.25) contrast(1.05)'},
+  {id:'cool',kind:'lut',name:'Cool blue monitor',price:20,desc:'A blue-tinted look for the X-ray image.',filter:'sepia(.35) hue-rotate(175deg) saturate(1.4) contrast(1.05)'},
+  {id:'av6',kind:'avatar',name:'Operator: red hair, pink cap',price:15,desc:'A new avatar for your operator.',avatar:6},
+  {id:'av7',kind:'avatar',name:'Operator: silver crop',price:15,desc:'A new avatar for your operator.',avatar:7},
+  {id:'av8',kind:'avatar',name:'Operator: amber cap',price:15,desc:'A new avatar for your operator.',avatar:8},
 ];
 
 /* Cases add themselves here (see cases/*.js). */

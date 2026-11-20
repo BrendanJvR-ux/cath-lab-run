@@ -20,20 +20,33 @@ Then open http://localhost:8767/ (the game) or http://localhost:8767/tests/tests
 |---|---|
 | `cases/*.js` | **Editable case files**: patient, history, task, contrast budget, baseline ECG, and each lesion's vessel, position, length, severity and eccentricity. |
 | `config/config.js` | Anatomy (coronary tree, aorta), coronary flow speed, Judkins catheters, C-arm presets, grading buckets, stent and balloon sizes, difficulty settings, ECG territories and avatars. |
-| `js/sim.js` | Geometry, catheter position and engagement, lesion appearance per projection, stent and balloon outcome rules, IVUS cross-sections, the easy-mode coronary map, and the X-ray image renderer (including wire, balloon and stent struts). No game state. |
+| `js/sim.js` | Geometry, catheter position and engagement, lesion appearance per projection, stent and balloon outcome rules, the easy-mode coronary map, and the X-ray image renderer (including wire, balloon and stent struts). No game state. |
 | `js/game.js` | Menu, operator profile and coffee tokens, game state, controls, cine runs and review, the PCI tools, the three-lead ECG and pressure strip, the main loop and scoring. |
 | `css/style.css` | Layout and look. |
-| `tests/tests.html` | Automated checks: cases load, catheter engagement and deep-seating, eccentric lesions per view, contrast rendering, stent and balloon rules, IVUS geometry, difficulty windows, ECG territories and the coronary map. |
+| `tests/tests.html` | Automated checks: cases load, catheter engagement and deep-seating, eccentric lesions per view, contrast rendering, stent and balloon rules, difficulty windows, shop items, ECG territories and the coronary map. |
 
 To add a case, copy a file in `cases/`, edit it, and add a `<script>` line for it in `index.html` and `tests/tests.html`.
 
 ## Menu, operators and coffee tokens
 
-Create an operator (name and one of six avatars), then pick a difficulty and a case. Each report pays coffee tokens: one per 10 points, ×1.5 on Medium and ×2 on Hard, none after a complication. Tokens and your best score per case and difficulty are saved in this browser (`localStorage`) and banked for later.
+Create an operator (name and one of six avatars), then pick a difficulty and a case. Each report pays coffee tokens: one per 10 points, ×1.5 on Medium and ×2 on Hard, none after a complication. Tokens, purchases and your best score per case and difficulty are saved in this browser (`localStorage`).
+
+### Coffee cart (shop)
+
+| Item | Tokens | Effect |
+|---|---|---|
+| Torque device | 25 | Every engagement window 6° wider |
+| Hydrophilic wire | 15 | Crosses lesions twice as fast |
+| Low-dose fluoro | 30 | 30% less air kerma |
+| Power injector | 35 | Contrast budgets 25% bigger on Medium and Hard |
+| Warm film / Cool blue monitor | 20 each | A different look for the X-ray image; switch between owned looks in the cart |
+| Three extra avatars | 15 each | Pick them in Change operator |
+
+Items are defined in `SHOP` in `config/config.js`.
 
 | Difficulty | Engagement window (left / right) | Help finding the ostia | Contrast budget | Extras |
 |---|---|---|---|---|
-| Easy | 45° / 40° | Tip drops in from up to 70° further | ×1.5 | Coronary map in the top left fills in as you inject |
+| Easy | 45° / 40° | Tip drops in from up to 70° further | No limit | Coronary map in the top left fills in as you inject |
 | Medium | 28° / 22° | Gentle pull | ×1 | Tokens ×1.5 |
 | Hard | 16° / 12° | None, and the catheter damps sooner | ×0.75 | Tokens ×2 |
 
@@ -48,7 +61,6 @@ Create an operator (name and one of six avatars), then pick a difficulty and a c
 | Choose views | The C-arm rotates in 3D (LAO/RAO, cranial/caudal). Some lesions are eccentric, so they look tight in one projection and mild in another. |
 | Report | Replay a run, click the narrowing and grade it (<50%, 50–69%, 70–89%, ≥90%). |
 | Wire | With the guide engaged, press Wire it next to a marked lesion and hold fluoro while a 0.014" wire crosses. |
-| IVUS | Pull an IVUS catheter back through the lesion: the cross-section shows lumen, plaque and the external elastic membrane, with the minimum lumen area, reference diameters and disease length to size your devices. |
 | Balloon | Plain balloon angioplasty: 8–12 atm. Alone it recoils to about 30–45%. Use it to predilate a subtotal (≥90%) lesion before stenting, or to post-dilate a stent. Oversizing by more than 0.5 mm causes a dissection. |
 | Stent | Pick a diameter and length (the 6F guide is 2 mm wide for scale), nudge the markers around the narrowing, then hold Inflate to deploy at 12–14 atm. Take a final shot, remove the wire, finish. |
 | ECG | Three leads follow the coronary territories: V3 anterior (LAD), V5 lateral (circumflex), II inferior (RCA). An inflated balloon raises ST in that territory's lead with reciprocal depression elsewhere. Case 2 starts with inferior T-wave inversion in II, case 3 with lateral inversion in V5. |

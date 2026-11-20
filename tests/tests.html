@@ -99,12 +99,8 @@ test('Oversized balloon flags a dissection; post-dilating a stent improves it',(
   ok(balloonOutcome(L,{vid:L.vid,ld:L.at,len:15,diam:ref+1,atm:12}).over,'should be oversized');
   const st={...L,stented:true,cur:0.12};const o=balloonOutcome(st,{vid:L.vid,ld:L.at,len:15,diam:3.5,atm:16});ok(o.post&&o.residual<0.12,'post-dilation');
 });
-test('IVUS shows a smaller lumen and more plaque at the lesion than in normal vessel',()=>{
-  const L=prepLesions(CASES[0].lesions)[0];
-  const at=lumenProfile(L.vid,L.at,[L],[]),away=lumenProfile(L.vid,L.at+30,[L],[]);
-  ok(at.lumenR<away.lumenR*0.5&&at.plaque>0.7&&away.plaque===0);
-  return `lumen ${(2*at.lumenR).toFixed(1)} mm at the lesion vs ${(2*away.lumenR).toFixed(1)} mm downstream`;
-});
+test('Easy has no contrast limit; Medium and Hard do',()=>{ok(DIFFICULTY.easy.budgetX===null);ok(DIFFICULTY.medium.budgetX===1&&DIFFICULTY.hard.budgetX<1)});
+test('Every shop avatar exists and every shop item has a price',()=>{for(const it of SHOP){ok(it.price>0,it.id);if(it.kind==='avatar')ok(AVATARS[it.avatar]&&AVATARS[it.avatar].shop===it.id,it.id)}return SHOP.length+' items'});
 test('Every vessel has an ECG territory lead',()=>{for(const v of VESSELS)ok(LEADS.includes(TERRITORY[v.id]),v.id+' has no lead');return 'LAD→V3, circumflex→V5, RCA→II'});
 test('The coronary map covers every vessel',()=>{const ids=new Set(MAP_SEGS.map(s=>s.v.id));for(const v of VESSELS)ok(ids.has(v.id),v.id);ok(mapKey(VBY.LAD,VBY.LAD.len)==='LAD:2');return MAP_SEGS.length+' segments'});
 test('Contrast darkens the image where the coronaries are',()=>{

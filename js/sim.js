@@ -98,14 +98,6 @@ function balloonOutcome(L,b){
   if(!covered)res=Math.max(res,before*0.8);
   return {residual:Math.min(before,res),refD,diff,covered,over,under,lowP,post:!!L.stented};
 }
-/* True cross-section at a point, for IVUS: lumen and external elastic membrane radius (mm), plaque direction. */
-function lumenProfile(vid,ld,lesions,stents){
-  const r=refDiam(vid,ld)/2;let red=0,pk=0,ecc=null;
-  for(const L of lesions){if(L.vid!==vid)continue;const dd=Math.abs(ld-L.at),h=L.len/2+2;if(dd<h){const k=0.5*(1+Math.cos(Math.PI*dd/h));const now=(L.cur!=null?L.cur:L.sev)*k;if(L.sev*k>pk){pk=L.sev*k;ecc=L.e}red=Math.max(red,now)}}
-  const stent=(stents||[]).find(s=>s.vid===vid&&Math.abs(ld-s.ld)<=s.len/2);
-  let lumenR=r*(1-red);if(stent)lumenR=Math.max(lumenR,Math.min(stent.diam/2*0.95,r*(1-red)));
-  return {lumenR,eemR:r*(1.1+0.3*pk),plaque:pk,ecc,stent:!!stent,refR:r};
-}
 function segLabel(v,ld){if(v.id==='LM')return 'left main';const f=ld/v.len;return (f<0.33?'proximal ':f<0.66?'mid ':'distal ')+v.name}
 
 /* ---------- static image layers ---------- */
@@ -210,37 +202,8 @@ function drawPCI(pci,projV){
   if(b){const q=seg(b.vid,b.ld,b.len);if(q.length>1){
     if(b.inflate>0.02){dctx.beginPath();q.forEach((p,i)=>i?dctx.lineTo(p[0],p[1]):dctx.moveTo(p[0],p[1]));dctx.lineWidth=b.diam*SCALE*(0.3+0.7*Math.min(1,b.inflate));dctx.strokeStyle=grey(0.5);dctx.stroke()}
     for(const p of [q[0],q[q.length-1]]){dctx.beginPath();dctx.arc(p[0],p[1],2.6,0,7);dctx.fillStyle=grey(0.22);dctx.fill()}}}
-  if(pci.ivus){const P=PV[pci.ivus.vid],v=P.v;let i=0;while(i<v.n-1&&v.ld[i]<pci.ivus.ld)i++;dctx.beginPath();dctx.arc(P.xs[i],P.ys[i],2.4,0,7);dctx.fillStyle=grey(0.2);dctx.fill()}
   const w=pci.wire;
   if(w){const q=chain(w.vid);const n=Math.max(2,Math.round(q.length*w.frac));dctx.beginPath();for(let i=0;i<n;i++)i?dctx.lineTo(q[i][0],q[i][1]):dctx.moveTo(q[i][0],q[i][1]);dctx.lineWidth=1.5;dctx.strokeStyle=grey(0.3);dctx.stroke()}
-}
-
-/* ---------- IVUS cross-section ---------- */
-const ivusSpeckle=[];for(let n=0;n<3;n++){const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');const id=g.createImageData(256,256);for(let i=0;i<id.data.length;i+=4){const v=Math.random()<0.5?90+Math.random()*165:255;id.data[i]=id.data[i+1]=id.data[i+2]=v;id.data[i+3]=255}g.putImageData(id,0,0);ivusSpeckle.push(c)}
-function drawIVUS(ctx,prof,k,frame){
-  const Wd=ctx.canvas.width,C=Wd/2,PX=Wd/10; // 10 mm field of view
-  const pulse=1+0.03*k,lr=prof.lumenR*PX*pulse,er=prof.eemR*PX;
-  let ang=0.8;if(prof.ecc)ang=Math.atan2(prof.ecc[1],prof.ecc[0]+prof.ecc[2]*0.5);
-  const off=(prof.eemR-prof.lumenR)*PX*0.55*Math.min(1,prof.plaque*1.4);
-  const ex=C+Math.cos(ang)*off,ey=C+Math.sin(ang)*off;
-  ctx.globalCompositeOperation='source-over';ctx.fillStyle='#000';ctx.fillRect(0,0,Wd,Wd);
-  const ad=ctx.createRadialGradient(ex,ey,er,ex,ey,er+3*PX);ad.addColorStop(0,'rgb(170,170,170)');ad.addColorStop(0.35,'rgb(110,110,110)');ad.addColorStop(1,'rgb(0,0,0)');
-  ctx.fillStyle=ad;ctx.beginPath();ctx.arc(ex,ey,er+3*PX,0,7);ctx.fill();
-  ctx.fillStyle='rgb(25,25,25)';ctx.beginPath();ctx.arc(ex,ey,er+0.12*PX,0,7);ctx.fill();
-  ctx.fillStyle=`rgb(${Math.round(95+60*prof.plaque)},${Math.round(95+60*prof.plaque)},${Math.round(95+60*prof.plaque)})`;ctx.beginPath();ctx.arc(ex,ey,er,0,7);ctx.fill();
-  ctx.fillStyle='rgb(150,150,150)';ctx.beginPath();ctx.arc(C,C,lr+1.6,0,7);ctx.fill();
-  ctx.fillStyle='rgb(30,30,30)';ctx.beginPath();ctx.arc(C,C,lr,0,7);ctx.fill();
-  ctx.globalCompositeOperation='multiply';ctx.drawImage(ivusSpeckle[frame%3],0,0,Wd,Wd);ctx.globalCompositeOperation='source-over';
-  if(prof.stent){for(let i=0;i<9;i++){const a=i/9*Math.PI*2+0.3,x=C+Math.cos(a)*lr,y=C+Math.sin(a)*lr;
-    ctx.fillStyle='rgba(0,0,0,0.75)';ctx.beginPath();ctx.moveTo(x,y);ctx.arc(C,C,lr+4*PX,a-0.06,a+0.06);ctx.closePath();ctx.fill();
-    ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(C,C,lr,a-0.07,a+0.07);ctx.stroke()}}
-  // imaging catheter on the wire, wire artefact, ring-down
-  const cx=C-0.25*PX,cy=C+0.15*PX;
-  ctx.fillStyle='rgba(0,0,0,0.8)';ctx.beginPath();ctx.moveTo(cx+0.6*PX,cy-0.3*PX);ctx.arc(cx,cy,6*PX,-0.62,-0.38);ctx.closePath();ctx.fill();
-  ctx.fillStyle='#000';ctx.beginPath();ctx.arc(cx,cy,0.5*PX,0,7);ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,0.58*PX,0,7);ctx.stroke();
-  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(cx+0.62*PX,cy-0.3*PX,2.2,0,7);ctx.fill();
-  ctx.fillStyle='rgba(240,240,240,0.9)';for(let i=1;i<10;i++){ctx.fillRect(10+i*PX-1,Wd-14,2,6);ctx.fillRect(8,10+i*PX-1,6,2)}
 }
 
 /* ---------- coronary map sketch (easy mode) ---------- */

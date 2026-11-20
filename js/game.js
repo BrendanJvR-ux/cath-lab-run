@@ -6,9 +6,10 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 
 /* ---------- operator profile (saved on this device only) ---------- */
 const STORE='cathlabrun.profile.v1';
-function loadProfile(){try{const p=JSON.parse(localStorage.getItem(STORE)||'null');if(p&&typeof p.name==='string'&&p.name)return {tokens:0,best:{},diff:'easy',avatar:0,...p}}catch(e){}return null}
+function loadProfile(){try{const p=JSON.parse(localStorage.getItem(STORE)||'null');if(p&&typeof p.name==='string'&&p.name)return {tokens:0,best:{},diff:'easy',avatar:0,owned:[],lut:null,...p}}catch(e){}return null}
 function saveProfile(){try{localStorage.setItem(STORE,JSON.stringify(profile))}catch(e){}}
 let profile=loadProfile();
+const owns=id=>!!(profile&&profile.owned&&profile.owned.includes(id));
 
 function avatarSVG(i,size){
   const a=AVATARS[i]||AVATARS[0];
@@ -25,22 +26,40 @@ function renderWho(){const w=$('who');if(!profile){w.hidden=true;return}w.hidden
 
 /* ---------- menu ---------- */
 let menuView='home',draft=null;
+const LEVEL_BARS=n=>`<span class="lvl" aria-hidden="true">${[1,2,3].map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}</span>`;
+/* A two-beat strip of the case's baseline ECG (the lead with T-wave inversion if there is one). */
+function miniECG(c){
+  const lead=(c.ecg&&c.ecg.twi&&c.ecg.twi[0])||'II',twi=!!(c.ecg&&c.ecg.twi);let d='';
+  for(let i=0;i<=140;i++){const ph=(i/70+0.55)%1,x=i*1.2,y=19-ecgAt(ph,0,twi,1)*14;d+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)}
+  return `<svg class="mini" viewBox="0 0 170 30" aria-hidden="true"><path d="${d}" fill="none" stroke="#5fe08c" stroke-width="1.3"/><text x="164" y="9" text-anchor="end">${lead}</text></svg>`;
+}
+const ICONS={
+  torque:'<circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M5 5l2.5 2.5M16.5 16.5L19 19"/><path d="M17 8a6 6 0 0 1 0 8" />',
+  wire:'<path d="M2 16c3-8 5 6 8-2s5 6 8-2 3 2 4 1"/>',
+  lowdose:'<circle cx="12" cy="12" r="2"/><path d="M12 4a8 8 0 0 1 6.9 4l-4.5 2.6M5.1 8A8 8 0 0 1 12 4M5.1 16a8 8 0 0 0 6.9 4M18.9 16a8 8 0 0 1-6.9 4"/><path d="M4 21L20 3"/>',
+  injector:'<path d="M14 3l7 7M17.5 6.5L8 16l-3 1 1-3 9.5-9.5M3 21l3-3M11 9l4 4"/>',
+  warm:'<rect x="3" y="4" width="18" height="13" rx="1.5" fill="#c98b4b" stroke="none"/><path d="M8 21h8M12 17v4"/>',
+  cool:'<rect x="3" y="4" width="18" height="13" rx="1.5" fill="#5b88b8" stroke="none"/><path d="M8 21h8M12 17v4"/>',
+};
+function shopIcon(it){if(it.kind==='avatar')return avatarSVG(it.avatar,44);return `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[it.id]}</svg>`}
+function applyLut(){const it=SHOP.find(x=>x.id===(profile&&profile.lut));img.style.filter=it&&owns(it.id)?it.filter:''}
 function showMenu(view){
   menuView=view||(profile?'home':'profile');S=null;
-  $('resultOv').hidden=true;$('startOv').hidden=false;$('reviewbar').hidden=true;$('ivusOv').hidden=true;$('mapCan').hidden=true;$('monitor').classList.remove('withmap');
-  demoFrame();syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
+  $('resultOv').hidden=true;$('startOv').hidden=false;$('reviewbar').hidden=true;$('mapCan').hidden=true;$('monitor').classList.remove('withmap');
+  applyLut();demoFrame();syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   $('caseHead').innerHTML='<h2>Patient</h2><b>No case loaded</b><p>Pick a case on the monitor to begin.</p>';$('status').textContent='Catheter in the femoral sheath.';$('status').className='status';
   renderMenu();
 }
 function renderMenu(){
-  const ov=$('startOv');
+  const ov=$('startOv');ov.dataset.view=menuView;
   if(menuView==='profile'){
     if(!draft)draft={name:profile?profile.name:'',avatar:profile?profile.avatar:0};
+    const avail=AVATARS.map((a,i)=>({a,i})).filter(x=>!x.a.shop||owns(x.a.shop));
     ov.innerHTML=`<h1>${profile?'Edit operator':'Create your operator'}</h1>
       <p>Your name and avatar appear on the console and your reports. They're saved in this browser only.</p>
       <label class="field" for="opName"><span>Name</span><input id="opName" maxlength="24" autocomplete="off" placeholder="Dr …" value="${esc(draft.name)}"></label>
-      <div class="grouplabel">Avatar</div>
-      <div class="avatars">${AVATARS.map((_,i)=>`<button class="av${i===draft.avatar?' sel':''}" data-av="${i}" aria-label="Avatar ${i+1}">${avatarSVG(i,56)}</button>`).join('')}</div>
+      <div class="grouplabel">Avatar${AVATARS.length>avail.length?' · more in the shop':''}</div>
+      <div class="avatars">${avail.map(({i})=>`<button class="av${i===draft.avatar?' sel':''}" data-av="${i}" aria-label="Avatar ${i+1}">${avatarSVG(i,56)}</button>`).join('')}</div>
       <div class="row"><button class="btn primary" data-act="saveop" ${draft.name.trim()?'':'disabled'}>Save operator</button>${profile?'<button class="btn" data-act="home">Cancel</button>':''}</div>`;
     const inp=$('opName');inp.addEventListener('input',()=>{draft.name=inp.value;ov.querySelector('[data-act="saveop"]').disabled=!inp.value.trim()});
     return;
@@ -49,44 +68,88 @@ function renderMenu(){
     const d=profile.diff;
     ov.innerHTML=`<h1>Choose a case</h1>
       <div class="grouplabel">Difficulty</div>
-      <div class="diffs">${Object.entries(DIFFICULTY).map(([k,v])=>`<button class="diff${k===d?' sel':''}" data-diff="${k}"><b>${v.label}</b><span>${v.blurb}</span></button>`).join('')}</div>
-      <div class="cases">${CASES.map((c,i)=>{const b=profile.best[d+'-'+i];return `<button class="case" data-ci="${i}"><span>CASE ${i+1} · ${c.pt}${b!=null?` · BEST ${b}`:''}</span><b>${c.title}</b><em>${c.task}</em></button>`}).join('')}</div>
+      <div class="diffs">${Object.entries(DIFFICULTY).map(([k,v])=>`<button class="diff${k===d?' sel':''}" data-diff="${k}"><b>${LEVEL_BARS(v.level)}${v.label}</b><span>${v.blurb}</span></button>`).join('')}</div>
+      <div class="cases">${CASES.map((c,i)=>{const b=profile.best[d+'-'+i];return `<button class="case" data-ci="${i}"><span>CASE ${i+1} · ${c.pt}${b!=null?` · BEST ${b}`:''}</span><b>${c.title}</b>${miniECG(c)}<em>${c.task}</em></button>`}).join('')}</div>
       <div class="row"><button class="btn" data-act="home">Back</button></div>`;
     return;
   }
-  ov.innerHTML=`<h1>Cath Lab Run</h1>
-    <p>You have a 6F sheath in the right femoral artery. Drive the catheter to the aortic root, engage each coronary ostium, record cine runs in useful projections, then mark, measure and treat the stenosis. Keep contrast and radiation low.</p>
-    <div class="opcard">${avatarSVG(profile.avatar,64)}<div><b>${esc(profile.name)}</b><span>${CUP} ${profile.tokens} coffee tokens banked · ${DIFFICULTY[profile.diff].label}</span></div><button class="btn" data-act="editop">Change operator</button></div>
-    <div class="row"><button class="btn primary big" data-act="play">Start a case</button></div>
+  if(menuView==='shop'){
+    const lutRow=`<button class="lutpick${!profile.lut?' sel':''}" data-lut="">Standard monitor</button>${SHOP.filter(x=>x.kind==='lut'&&owns(x.id)).map(x=>`<button class="lutpick${profile.lut===x.id?' sel':''}" data-lut="${x.id}">${x.name.replace(' monitor','')}</button>`).join('')}`;
+    ov.innerHTML=`<div class="shophead"><h1>Coffee cart</h1><span class="tokens big">${CUP} ${profile.tokens} tokens</span></div>
+      <p>Spend the tokens you earn on cases. Gear works on every case once bought.</p>
+      <div class="shop">${SHOP.map(it=>{const own=owns(it.id),need=it.price-profile.tokens;
+        const cta=own?(it.kind==='lut'?(profile.lut===it.id?'<span class="owned">In use</span>':`<button class="btn" data-lut="${it.id}">Use</button>`):`<span class="owned">${it.kind==='avatar'?'Owned · pick it in Change operator':'Owned'}</span>`)
+          :`<button class="btn primary" data-buy="${it.id}" ${need>0?'disabled':''}>${CUP} ${it.price}</button>${need>0?`<span class="need">${need} more</span>`:''}`;
+        return `<div class="item${own?' own':''}"><div class="ic ${it.kind}">${shopIcon(it)}</div><div class="txt"><b>${it.name}</b><span>${it.desc}</span></div><div class="cta">${cta}</div></div>`}).join('')}</div>
+      <div class="grouplabel">Monitor look</div><div class="row">${lutRow}</div>
+      <div class="row"><button class="btn" data-act="home">Back</button></div>`;
+    return;
+  }
+  ov.innerHTML=`<div class="hero"><canvas id="heroCan" aria-hidden="true"></canvas><div class="herotxt"><span class="kicker">Coronary angiography · PCI</span><h1>Cath Lab Run</h1><p>Drive the catheter to the aortic root, engage each coronary, record cine runs in the right projections, then find, grade and treat the stenosis.</p></div></div>
+    <div class="opcard">${avatarSVG(profile.avatar,64)}<div><b>${esc(profile.name)}</b><span>${CUP} ${profile.tokens} coffee tokens · ${DIFFICULTY[profile.diff].label}</span></div><button class="btn" data-act="editop">Change operator</button></div>
+    <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button></div>
     <div class="keys">
       <div><kbd>Space</kbd> hold for fluoro (live X-ray)</div><div><kbd>C</kbd> start / stop a cine run</div>
       <div><kbd>J</kbd> hold to inject contrast</div><div><kbd>↑</kbd><kbd>↓</kbd> advance / withdraw</div>
       <div><kbd>←</kbd><kbd>→</kbd> torque counter-clockwise / clockwise</div><div><kbd>B</kbd> hold to inflate a balloon or stent</div>
       <div><kbd>1</kbd>–<kbd>7</kbd> C-arm presets</div>
     </div>
-    <p class="fine">Coffee tokens are earned from each case score and banked for later. Teaching game with simplified anatomy and physics. Not a clinical training device.</p>`;
+    <p class="fine">Teaching game with simplified anatomy and physics. Not a clinical training device.</p>`;
+  sizeHero();
 }
 $('startOv').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const d=b.dataset;
   if(d.av!=null){draft.name=($('opName')||{}).value||draft.name;draft.avatar=+d.av;renderMenu();return}
   if(d.diff){profile.diff=d.diff;saveProfile();renderMenu();renderWho();return}
   if(d.ci!=null){startCase(+d.ci);return}
-  if(d.act==='saveop'){const n=($('opName').value||'').trim().slice(0,24);if(!n)return;profile=profile?{...profile,name:n,avatar:draft.avatar}:{name:n,avatar:draft.avatar,tokens:0,best:{},diff:'easy'};draft=null;saveProfile();renderWho();menuView='home';renderMenu()}
+  if(d.buy){const it=SHOP.find(x=>x.id===d.buy);if(!it||owns(it.id)||profile.tokens<it.price)return;profile.tokens-=it.price;profile.owned=[...(profile.owned||[]),it.id];if(it.kind==='lut')profile.lut=it.id;saveProfile();renderWho();applyLut();renderMenu();toast(`Bought: ${it.name}.`);return}
+  if(d.lut!=null){profile.lut=d.lut||null;saveProfile();applyLut();renderMenu();return}
+  if(d.act==='saveop'){const n=($('opName').value||'').trim().slice(0,24);if(!n)return;profile=profile?{...profile,name:n,avatar:draft.avatar}:{name:n,avatar:draft.avatar,tokens:0,best:{},diff:'easy',owned:[],lut:null};draft=null;saveProfile();renderWho();menuView='home';renderMenu()}
   else if(d.act==='editop'){draft=null;menuView='profile';renderMenu()}
   else if(d.act==='play'){menuView='play';renderMenu()}
+  else if(d.act==='shop'){menuView='shop';renderMenu()}
   else if(d.act==='home'){draft=null;menuView='home';renderMenu()}
 });
 $('who').addEventListener('click',()=>{if(!S||S.done)showMenu('home')});
+
+/* ---------- menu hero: a beating heart with contrast pulsing down the coronaries ---------- */
+const HERO_VIEW=basis(28,12);let heroGeo=null;
+function sizeHero(){const c=$('heroCan');if(!c)return;const r=Math.min(2,window.devicePixelRatio||1);c.width=Math.round(c.clientWidth*r);c.height=Math.round(c.clientHeight*r);heroGeo=null}
+function drawHero(t){
+  const c=$('heroCan');if(!c||!c.width)return;const g=c.getContext('2d'),Wd=c.width,Hd=c.height;
+  if(!heroGeo){let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const v of VESSELS)for(const p of v.p){const q=proj(p,HERO_VIEW);x0=Math.min(x0,q[0]);x1=Math.max(x1,q[0]);y0=Math.min(y0,q[1]);y1=Math.max(y1,q[1])}
+    const sc=Math.min(Wd*0.42/(x1-x0),Hd*0.62/(y1-y0)),cx=Wd*(Wd>Hd*1.6?0.72:0.62),cy=Hd*0.58;heroGeo={f:q=>[cx+(q[0]-(x0+x1)/2)*sc,cy+(q[1]-(y0+y1)/2)*sc],mm:sc*SCALE}}
+  const {f,mm}=heroGeo,ph=(t*1.15)%1,k=contraction(ph),P=p=>f(proj(motion(p,k),HERO_VIEW));
+  g.clearRect(0,0,Wd,Hd);
+  const bg=g.createRadialGradient(Wd*0.68,Hd*0.55,10,Wd*0.68,Hd*0.55,Wd*0.6);bg.addColorStop(0,'rgba(120,38,30,0.35)');bg.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=bg;g.fillRect(0,0,Wd,Hd);
+  // aorta: root, arch and the top of the descending aorta
+  g.lineCap='round';g.lineJoin='round';
+  const ao=AO.p.filter((q,i)=>AO.ld[i]>AO.len-230).map(P);
+  g.beginPath();ao.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]));g.lineWidth=24*mm;g.strokeStyle='#6e2622';g.stroke();g.lineWidth=16*mm;g.strokeStyle='#8a3530';g.stroke();
+  // heart body
+  const h=P(HC),hb=g.createRadialGradient(h[0]-12*mm,h[1]-14*mm,4*mm,h[0],h[1],70*mm);hb.addColorStop(0,'#9b3b32');hb.addColorStop(0.6,'#6a221f');hb.addColorStop(1,'#3a1213');
+  g.fillStyle=hb;g.beginPath();g.ellipse(h[0],h[1]+4*mm,(58-3*k)*mm,(50-3*k)*mm,0.62,0,7);g.fill();
+  const rt=P(ROOT);g.beginPath();g.ellipse(rt[0]-18*mm,rt[1]+10*mm,24*mm,20*mm,-0.3,0,7);g.fill();
+  // coronaries with a travelling contrast pulse
+  for(const v of VESSELS){const pts=v.p.map(P);
+    for(let i=0;i<v.n-1;i++){const d=v.base+v.ld[i],w=Math.max(1,2*v.r[i]*mm*0.9);
+      g.beginPath();g.moveTo(pts[i][0],pts[i][1]);g.lineTo(pts[i+1][0],pts[i+1][1]);g.lineWidth=w+1.5;g.strokeStyle='rgba(30,8,8,0.55)';g.stroke();
+      const pulse=Math.pow(0.5+0.5*Math.sin(t*3.2-d*0.06),6);g.lineWidth=w;g.strokeStyle=`rgba(${Math.round(225+30*pulse)},${Math.round(150+60*pulse)},${Math.round(110-40*pulse)},${0.55+0.45*pulse})`;g.stroke()}}
+}
+window.addEventListener('resize',()=>{if(!S&&menuView==='home')sizeHero()});
 
 /* ---------- state ---------- */
 let S=null;
 const keys={};
 function newState(ci){
-  const D=DIFFICULTY[profile.diff]||DIFFICULTY.easy,c=CASES[ci];
-  return {ci,c,D,diff:profile.diff,budget:Math.round(c.budget*D.budgetX),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,type:'JL'},exch:0,
+  const base=DIFFICULTY[profile.diff]||DIFFICULTY.easy,c=CASES[ci];
+  // shop perks adjust a copy of the difficulty settings
+  const D={...base,tol:{...base.tol}};if(owns('torque')){D.tol.L+=6;D.tol.R+=6}
+  const bx=D.budgetX==null?null:D.budgetX*(owns('injector')?1.25:1);
+  return {ci,c,D,diff:profile.diff,budget:bx==null?null:Math.round(c.budget*bx),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,type:'JL'},exch:0,
     cL:0,cR:0,cRoot:0,hist:{L:[],R:[],root:[]},histN:0,contrast:0,ak:0,ftime:0,ctime:0,blind:0,wasted:0,
     cine:null,runs:[],marks:[],pending:null,review:null,imgAcc:0,frame:0,deepInj:0,rcaInj:0,complication:null,done:false,
-    sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],ivusUsed:new Set(),ivusNote:null,mapped:new Set(),
+    sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),
     st:{II:0,V3:0,V5:0},twi:new Set((c.ecg&&c.ecg.twi)||[])};
 }
 const histAt=(arr,t)=>{if(t<0||!arr.length)return 0;const i=Math.floor(t*50);return i<arr.length?arr[i]:arr[arr.length-1]};
@@ -105,9 +168,9 @@ $('sB').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.b=+e.targ
 
 function startCase(ci){
   S=newState(ci);
-  $('startOv').hidden=true;$('resultOv').hidden=true;$('ivusOv').hidden=true;closeReview();
+  $('startOv').hidden=true;$('resultOv').hidden=true;closeReview();
   const c=S.c;$('caseHead').innerHTML=`<h2>Patient · case ${ci+1} · ${S.D.label}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${c.task}</p>`;
-  ictx.fillStyle='#000';ictx.fillRect(0,0,W,W);
+  ictx.fillStyle='#000';ictx.fillRect(0,0,W,W);applyLut();
   $('mapCan').hidden=!S.D.map;$('monitor').classList.toggle('withmap',S.D.map);if(S.D.map)drawMap($('mapCan').getContext('2d'),S.mapped);
   syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   toast('Sheath in the right femoral artery. Hold Space for fluoro and advance.');
@@ -144,7 +207,6 @@ $('bExch').addEventListener('click',()=>{
 function toggleCine(){
   if(!S||S.done||S.complication)return;
   if(S.review)closeReview();
-  if(S.pci&&S.pci.stage==='ivus')return;
   if(S.cine){stopCine();return}
   S.cine={id:S.runs.length+1,a:S.a,b:S.b,frames:[],t0:S.clock,lesState:S.lesions.map(L=>({...L}))};
 }
@@ -159,7 +221,7 @@ function stopCine(){
 /* ---------- review ---------- */
 function openReview(id){
   if(!S)return;const run=S.runs.find(r=>r.id===id);if(!run)return;
-  if(S.cine)stopCine();if(S.pci&&S.pci.stage==='ivus')return;
+  if(S.cine)stopCine();
   S.review={run,idx:0,playing:true,acc:0};
   $('reviewbar').hidden=false;$('rvSlider').max=run.frames.length-1;$('rvPlay').textContent='Pause';renderRuns();
 }
@@ -247,23 +309,21 @@ function drawHemo(){
   hctx.fillStyle='#ff6a63';hctx.fillText(`${sp}/${dp} (${Math.round(dp+(sp-dp)/3)})`,w-8*dpr,pTop+10*dpr);hctx.textAlign='left';
 }
 
-/* ---------- PCI: wire, IVUS, balloon, stent ---------- */
-const ivusLd=P=>clamp(P.ld+18-P.ivus*36,0,VBY[P.vid].len);
+/* ---------- PCI: wire, balloon, stent ---------- */
 function pciRender(){
   if(!S)return null;const P=S.pci;
   return {stents:S.stents.map(s=>({vid:s.vid,ld:s.ld,len:s.len,diam:s.diam})),
     wire:P&&P.wire>0?{vid:P.vid,frac:Math.min(1,P.wire)}:null,
-    balloon:P&&P.stage==='positioned'?{vid:P.vid,ld:P.ld,len:P.len,diam:P.diam,inflate:P.atm/14}:null,
-    ivus:P&&P.stage==='ivus'?{vid:P.vid,ld:ivusLd(P)}:null};
+    balloon:P&&P.stage==='positioned'?{vid:P.vid,ld:P.ld,len:P.len,diam:P.diam,inflate:P.atm/14}:null};
 }
 function canTreat(m){const sys=VBY[m.vid].sys;return !!(S&&S.cs&&S.cs.eng===sys&&!S.cs.deep&&!S.complication&&!S.done)}
 function startPCI(mi){
   const m=S.marks[mi];if(!canTreat(m)){toast(`Engage the ${VBY[m.vid].sys==='L'?'left':'right'} coronary first.`);return}
-  S.pci={vid:m.vid,ld:m.ld,mark:m.ld,label:m.label,stage:'wire',wire:0,kind:null,diam:3.0,len:18,atm:0,maxAtm:0,ivus:0,ivusAuto:false};
+  S.pci={vid:m.vid,ld:m.ld,mark:m.ld,label:m.label,stage:'wire',wire:0,kind:null,diam:3.0,len:18,atm:0,maxAtm:0};
   toast('Hold fluoro while the wire crosses the lesion.');renderPCI(true);
 }
 function applyDevice(){
-  const P=S.pci,dev={vid:P.vid,ld:P.ld,len:P.len,diam:P.diam,atm:Math.round(P.maxAtm),label:segLabel(VBY[P.vid],P.ld),hits:[],t:S.clock,ivus:S.ivusUsed.has(P.vid)};
+  const P=S.pci,dev={vid:P.vid,ld:P.ld,len:P.len,diam:P.diam,atm:Math.round(P.maxAtm),label:segLabel(VBY[P.vid],P.ld),hits:[],t:S.clock};
   if(P.kind==='stent'){
     for(const L of S.lesions){const o=stentOutcome(L,dev);if(o){L.cur=o.residual;L.stented=true;dev.hits.push({L,o})}}
     S.stents.push(dev);toast(`Stent deployed: ${P.diam.toFixed(1)} × ${P.len} mm at ${dev.atm} atm.`);
@@ -291,12 +351,11 @@ function renderPCI(force){
     h=`<div class="pending"><div>Crossing the ${P.label} with a 0.014" wire. Hold fluoro. <b id="pciWire" class="pci-read">0%</b></div><div class="row"><button class="btn" data-cancel="1">Cancel</button></div></div>`;
   }else if(P.stage==='tools'){
     h=`<div class="pending"><div>Wire across the ${P.label}. Choose a device:</div>
-      <div class="tools"><button class="btn" data-tool="ivus"><b>IVUS</b><span>Measure the vessel and lesion</span></button><button class="btn" data-tool="balloon"><b>Balloon</b><span>Angioplasty, pre- or post-dilation</span></button><button class="btn" data-tool="stent"><b>Stent</b><span>Drug-eluting stent</span></button></div>
+      <div class="tools"><button class="btn" data-tool="balloon"><b>Balloon</b><span>Angioplasty, pre- or post-dilation</span></button><button class="btn" data-tool="stent"><b>Stent</b><span>Drug-eluting stent</span></button></div>
       <div class="row"><button class="btn" data-finish="1">Remove wire</button></div></div>`;
   }else if(P.stage==='size'){
     const isS=P.kind==='stent';
     h=`<div class="pending"><div>Choose the ${isS?'stent':'balloon'} for the ${P.label}. For scale, the 6F guide is 2 mm wide.</div>
-      ${S.ivusNote&&S.ivusNote.vid===P.vid?`<div class="ivusnote">IVUS: ${S.ivusNote.text}</div>`:''}
       <div class="grouplabel">Diameter (mm)</div>${sizeChips(isS?STENT_DIAMS:BALLOON_DIAMS,P.diam,'d',v=>v.toFixed(1))}
       <div class="grouplabel">Length (mm)</div>${sizeChips(isS?STENT_LENS:BALLOON_LENS,P.len,'l',v=>v)}
       <div class="row"><button class="btn primary" data-pos="1">Position ${isS?'stent':'balloon'}</button><button class="btn" data-back="1">Back</button></div></div>`;
@@ -304,34 +363,18 @@ function renderPCI(force){
     h=`<div class="pending"><div>${P.diam.toFixed(1)} × ${P.len} mm ${P.kind} across the ${P.label}. Line the markers up around the narrowing, then hold Inflate. ${P.kind==='stent'?'Deploy at 12–14 atm.':'Inflate to 8–12 atm.'}</div>
       <div class="row"><button class="btn" data-nudge="-2">◀ Proximal</button><button class="btn" data-nudge="2">Distal ▶</button></div>
       <div class="row"><button class="hold" data-hold="1"><span>Inflate</span><kbd>B</kbd></button><b id="pciAtm" class="pci-read">0.0 atm</b><button class="btn" data-back="1">Back</button></div></div>`;
-  }else if(P.stage==='ivus'){
-    h=`<div class="pending"><div>IVUS pullback in the ${P.label}. Scrub along the vessel with the slider on the monitor.</div><div class="row"><button class="btn primary" data-ivusdone="1">Done</button></div></div>`;
   }
   el.innerHTML=h+log;
 }
-function openIVUS(){
-  const P=S.pci;P.stage='ivus';P.ivus=0;P.ivusAuto=true;S.ivusUsed.add(P.vid);
-  let mla=1e9;const ext=[];
-  for(let k=0;k<=72;k++){const ld=clamp(P.ld+18-k*0.5,0,VBY[P.vid].len);const pr=lumenProfile(P.vid,ld,S.lesions,S.stents);const a=Math.PI*pr.lumenR*pr.lumenR;if(a<mla)mla=a;if(1-(pr.lumenR*pr.lumenR)/(pr.eemR*pr.eemR)>0.5)ext.push(ld)}
-  const vlen=VBY[P.vid].len,dRef=refDiam(P.vid,clamp(P.ld+18,0,vlen)),pRef=refDiam(P.vid,clamp(P.ld-18,0,vlen));
-  const len=ext.length?Math.max(...ext)-Math.min(...ext):0;
-  S.ivusNote={vid:P.vid,text:`MLA ${mla.toFixed(1)} mm² · reference lumen ${dRef.toFixed(1)} mm distal, ${pRef.toFixed(1)} mm proximal · plaque burden over 50% for about ${Math.round(len)} mm`};
-  $('ivusSum').textContent=S.ivusNote.text;$('ivusOv').hidden=false;$('ivusPos').value=0;renderPCI(true);
-}
-function closeIVUS(){$('ivusOv').hidden=true;if(S&&S.pci&&S.pci.stage==='ivus'){S.pci.stage='tools';renderPCI(true)}}
-$('ivusPos').addEventListener('input',e=>{if(S&&S.pci&&S.pci.stage==='ivus'){S.pci.ivus=+e.target.value/100;S.pci.ivusAuto=false}});
-$('ivusDone').addEventListener('click',closeIVUS);
 $('pci').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b||!S||S.done)return;const P=S.pci,d=b.dataset;
   if(d.treat!=null)startPCI(+d.treat);
   else if(d.cancel){S.pci=null;toast('Wire withdrawn.')}
-  else if(d.tool==='ivus'){openIVUS();return}
   else if(d.tool){P.kind=d.tool;P.stage='size';P.diam=d.tool==='stent'?3.0:2.5;P.len=d.tool==='stent'?18:15}
   else if(d.d)P.diam=+d.d;else if(d.l)P.len=+d.l;
   else if(d.pos){P.stage='positioned';toast(`${P.kind==='stent'?'Stent':'Balloon'} delivered over the wire. Markers show its ends.`)}
   else if(d.back){P.stage=P.stage==='positioned'?'size':'tools';P.atm=0;P.maxAtm=0}
   else if(d.nudge){const v=VBY[P.vid];P.ld=clamp(P.ld+ +d.nudge,P.len/2,v.len-2)}
-  else if(d.ivusdone){closeIVUS();return}
   else if(d.finish){S.pci=null;toast('Wire removed.')}
   renderPCI(true);
 });
@@ -347,6 +390,7 @@ function demoFrame(){
 function loop(now){
   const dt=Math.min(0.05,(now-last)/1000);last=now;
   if(S&&!S.done)tick(dt);else{const p0=demoPhase;demoPhase=(demoPhase+dt*72/60)%1;hemoStep(dt,p0,demoPhase,false)}
+  if(!S&&menuView==='home'&&!$('startOv').hidden)drawHero(now/1000);
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true}
   drawHemo();updateUI();
   requestAnimationFrame(loop);
@@ -389,19 +433,13 @@ function tick(dt){
   S.clock+=dt;
   if(inj&&cs.u<=0&&S.wasted>1&&toastT<=0)toast('Injecting outside the aortic root wastes contrast.');
   if(inj&&cs.u>0&&!cs.eng&&toastT<=0)toast('Non-selective injection: contrast is refluxing into the aortic root.');
-  if(S.deepInj>0.45&&!S.complication){S.complication='Injection through a damped catheter caused an ostial dissection.';if(S.cine)stopCine();S.pci=null;$('ivusOv').hidden=true;toast('Ostial dissection. Stop and report.',true);renderMarks();renderPCI(true)}
+  if(S.deepInj>0.45&&!S.complication){S.complication='Injection through a damped catheter caused an ostial dissection.';if(S.cine)stopCine();S.pci=null;toast('Ostial dissection. Stop and report.',true);renderMarks();renderPCI(true)}
   // bradycardia with RCA injection
   if(S.cR>0.7)S.rcaInj+=dt;else S.rcaInj=Math.max(0,S.rcaInj-dt*1.5);
   S.hrT=S.rcaInj>1.6?46:72;
-  // PCI: wire crossing (under X-ray), IVUS pullback, balloon inflation
+  // PCI: wire crossing (under X-ray) and balloon inflation
   const P=S.pci,xray=down('Space','KeyF')||!!S.cine;
-  if(P&&P.stage==='wire'&&xray){P.wire+=dt*0.5;if(P.wire>=1){P.wire=1;P.stage='tools';toast('Wire is across. Choose a device.');renderPCI(true)}}
-  if(P&&P.stage==='ivus'){
-    if(P.ivusAuto){P.ivus=Math.min(1,P.ivus+dt/4);$('ivusPos').value=Math.round(P.ivus*100);if(P.ivus>=1)P.ivusAuto=false}
-    const ld=ivusLd(P),pr=lumenProfile(P.vid,ld,S.lesions,S.stents);drawIVUS($('ivusCan').getContext('2d'),pr,contraction(S.phase),S.frame++);
-    const la=Math.PI*pr.lumenR*pr.lumenR,ea=Math.PI*pr.eemR*pr.eemR,off=Math.round(ld-P.mark);
-    $('ivusRead').textContent=`${off===0?'At the mark':Math.abs(off)+' mm '+(off>0?'distal':'proximal')}\nLumen ${(2*pr.lumenR).toFixed(1)} mm · ${la.toFixed(1)} mm²\nEEM ${(2*pr.eemR).toFixed(1)} mm · plaque ${Math.round((1-la/ea)*100)}%${pr.stent?'\nStent struts apposed':''}`;
-  }
+  if(P&&P.stage==='wire'&&xray){P.wire+=dt*(owns('wire')?1:0.5);if(P.wire>=1){P.wire=1;P.stage='tools';toast('Wire is across. Choose a device.');renderPCI(true)}}
   if(P&&P.stage==='positioned'){
     if(down('KeyB')){P.atm=Math.min(18,P.atm+7*dt);P.maxAtm=Math.max(P.maxAtm,P.atm);if(P.atm>=16.5&&!P.warned){P.warned=true;toast('Above the 16 atm rated burst pressure.',true)}if(P.atm>4&&!P.pain){P.pain=true;toast(`Balloon up. Chest pain, ST rising in ${P.vid==='LM'?'V3 and V5':TERRITORY[P.vid]}.`)}}
     else if(P.atm>0){if(P.maxAtm>=4)applyDevice();else{P.atm=Math.max(0,P.atm-20*dt);if(P.atm===0)P.maxAtm=0}}
@@ -416,10 +454,11 @@ function tick(dt){
   const p=pressAt(S.phase,damped);S.beatMax=Math.max(S.beatMax,p);S.beatMin=Math.min(S.beatMin,p);
   if(S.phase<ph0){S.sysP=S.beatMax;S.diaP=S.beatMin;S.beatMax=0;S.beatMin=999}
   // imaging
-  const fl=down('Space','KeyF')&&!S.complication;const imaging=(fl||!!S.cine)&&!(P&&P.stage==='ivus');
+  const fl=down('Space','KeyF')&&!S.complication;const imaging=fl||!!S.cine;
   if(imaging&&S.review)closeReview();
   const f=1/Math.pow(Math.cos(S.a*D2R)*Math.cos(S.b*D2R),1.5);
-  if(S.cine){S.ak+=165/60*dt*f;S.ctime+=dt}else if(fl){S.ak+=17/60*dt*f;S.ftime+=dt}
+  const doseX=owns('lowdose')?0.7:1;
+  if(S.cine){S.ak+=165/60*dt*f*doseX;S.ctime+=dt}else if(fl){S.ak+=17/60*dt*f*doseX;S.ftime+=dt}
   S.imgAcc+=dt;
   if(S.review){if(S.review.playing){S.review.acc+=dt;if(S.review.acc>=1/15){S.review.acc=0;S.review.idx=(S.review.idx+1)%S.review.run.frames.length;drawReview()}}}
   else if(imaging&&S.imgAcc>=1/15){
@@ -450,14 +489,14 @@ function updateUI(){
   uiAcc++;if(uiAcc%6)return;
   $('rdFT').querySelector('b').textContent=fmtT(S.ftime);
   $('rdAK').querySelector('b').innerHTML=`${Math.round(S.ak)}<small>mGy</small>`;$('rdAK').classList.toggle('hot',S.ak>800);
-  $('rdCM').querySelector('b').innerHTML=`${Math.round(S.contrast)}<small>/ ${S.budget} mL</small>`;$('rdCM').classList.toggle('hot',S.contrast>S.budget);
+  $('rdCM').querySelector('b').innerHTML=`${Math.round(S.contrast)}<small>${S.budget==null?'mL':'/ '+S.budget+' mL'}</small>`;$('rdCM').classList.toggle('hot',S.budget!=null&&S.contrast>S.budget);
   $('rdHD').querySelector('b').innerHTML=`${Math.round(S.hr)}<small>${Math.round(S.sysP)}/${Math.round(S.diaP)}</small>`;$('rdHD').classList.toggle('hot',S.hr<55||(S.cs&&S.cs.deep));
   $('cathType').textContent=S.exch>0?'Exchanging…':CATH[S.cath.type].label+(S.pci?' guide':'')+' · 6F';
   const other=S.cath.type==='JL'?'JR4':'JL4';const be=$('bExch');be.textContent='Exchange for '+other;be.disabled=S.exch>0||!!S.complication||!!S.pci;
   const st=$('status');const cs=S.cs||{};let cls='',msg='';
   if(S.complication){cls='danger';msg=S.complication+' Finish the study to see your report.'}
   else if(S.exch>0){msg='Exchanging catheter over a 0.035" wire…'}
-  else if(S.pci){cls='ok';msg={wire:'Crossing the lesion with a 0.014" wire. Keep fluoro on.',tools:'Wire across. Choose IVUS, a balloon or a stent.',size:'Pick the diameter and length.',positioned:'Device in place. Check its position on fluoro, then hold Inflate.',ivus:'IVUS pullback running.'}[S.pci.stage]}
+  else if(S.pci){cls='ok';msg={wire:'Crossing the lesion with a 0.014" wire. Keep fluoro on.',tools:'Wire across. Choose a balloon or a stent.',size:'Pick the diameter and length.',positioned:'Device in place. Check its position on fluoro, then hold Inflate.'}[S.pci.stage]}
   else if(cs.deep){cls='danger';msg='Pressure damped: catheter deep-seated. Withdraw slightly before you inject.'}
   else if(cs.eng){cls='ok';msg=`Engaged ${cs.eng==='L'?'left main':'right coronary'} ostium. Pressure normal. Start cine, then inject.`}
   else if(cs.u>0){cls='warn';const need=CATH[S.cath.type].sys;msg=`In the aortic root, ${CATH[S.cath.type].label} tip at ${Math.round(S.cath.th)}°. Torque to find the ${need==='L'?'left main':'right coronary'} ostium; a short test puff shows where you are.`}
@@ -471,7 +510,7 @@ function updateUI(){
 /* ---------- scoring and coffee tokens ---------- */
 $('bFinish').addEventListener('click',finish);
 function finish(){
-  if(!S||S.done)return;if(S.cine)stopCine();closeReview();S.done=true;S.pci=null;$('ivusOv').hidden=true;
+  if(!S||S.done)return;if(S.cine)stopCine();closeReview();S.done=true;S.pci=null;
   const notes=[],rows=[];
   // lesion detection
   const sig=S.lesions.filter(L=>L.sev>=0.5),minor=S.lesions.filter(L=>L.sev<0.5);
@@ -502,7 +541,7 @@ function finish(){
     const {s,o}=sh[sh.length-1],good=o.covered&&!o.under&&!o.over&&!o.lowP&&!o.noPre;tx+=perT*(good?1:0.5);
     const iss=[];if(!o.covered)iss.push('it did not cover the whole lesion');if(o.under)iss.push(`undersized for a ~${o.refD.toFixed(1)} mm vessel`);if(o.over)iss.push(`oversized for a ~${o.refD.toFixed(1)} mm vessel, with edge dissection risk`);if(o.lowP)iss.push(`deployed at only ${s.atm} atm (aim for 12–14)`);if(o.noPre)iss.push('a subtotal lesion should be predilated with a balloon first');
     const post=bh.some(x=>x.o.post);
-    notes.push({c:good?'good':'',t:`Stented ${L.label}: ${s.diam.toFixed(1)} × ${s.len} mm at ${s.atm} atm${post?', post-dilated':''}, residual ${Math.round(L.cur*100)}%.`+(iss.length?' But '+iss.join('; ')+'.':` Well sized for a ~${o.refD.toFixed(1)} mm vessel${s.ivus?', IVUS-guided':''}.`)});
+    notes.push({c:good?'good':'',t:`Stented ${L.label}: ${s.diam.toFixed(1)} × ${s.len} mm at ${s.atm} atm${post?', post-dilated':''}, residual ${Math.round(L.cur*100)}%.`+(iss.length?' But '+iss.join('; ')+'.':` Well sized for a ~${o.refD.toFixed(1)} mm vessel.`)});
   }
   for(const s of S.stents){if(!s.hits.some(h=>h.L.sev>=0.5)){tx-=8;notes.push({c:'bad',t:`Unnecessary stent in the ${s.label}: ${s.hits.length?'that lesion was not flow-limiting.':'there was no lesion there.'}`})}else if(s.hits.some(h=>h.o.over))tx-=4}
   for(const b of S.balloons){if(b.hits.some(h=>h.o.over)){tx-=4;notes.push({c:'bad',t:`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm) caused an edge dissection.`})}if(!b.hits.some(h=>h.L.sev>=0.5)){tx-=4;notes.push({c:'bad',t:`Unnecessary balloon inflation in the ${b.label}.`})}}
@@ -514,7 +553,7 @@ function finish(){
   const comp=(nL>=3?9:nL===2?6:nL===1?3:0)+(nR>=2?6:nR===1?3:0);rows.push([`Complete study (LCA ${nL} views, RCA ${nR})`,comp,15]);
   if(nL<3)notes.push({c:'',t:'A standard left system study uses at least three or four projections: RAO caudal, RAO cranial, LAO cranial and LAO caudal.'});
   if(nR<2)notes.push({c:'',t:'Image the RCA in at least two orthogonal views, for example LAO 40° and RAO 30°.'});
-  const B=S.budget;const cm=Math.round(15*clamp(1-(S.contrast-B)/(B*2),0,1));rows.push([`Contrast ${Math.round(S.contrast)} mL (budget ${B})`,cm,15]);
+  const B=S.budget;const cm=B==null?15:Math.round(15*clamp(1-(S.contrast-B)/(B*2),0,1));rows.push([`Contrast ${Math.round(S.contrast)} mL (${B==null?'no limit on Easy':'budget '+B})`,cm,15]);
   const rad=Math.round(10*clamp(1-(S.ak-400)/1000,0,1));rows.push([`Air kerma ${Math.round(S.ak)} mGy · fluoro ${fmtT(S.ftime)}`,rad,10]);
   if(S.ak>400)notes.push({c:'',t:'Steep angles and long cine runs drive dose up. Keep runs to 3–4 seconds and collimate your pedal time.'});
   const saf=10-Math.min(10,Math.round(S.blind*2));rows.push(['Safety (catheter moved under fluoro)',saf,10]);
