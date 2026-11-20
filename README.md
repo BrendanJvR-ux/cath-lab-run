@@ -77,7 +77,7 @@ Items are defined in `SHOP` in `config/config.js`.
 |---|---|
 | Lesion detection and grading (a significant lesion you imaged but didn't mark earns 30% of its share) | 35 |
 | Treatment: every ≥70% lesion stented, covered, sized within 0.4 mm smaller / 0.75 mm larger than the vessel, deployed at ≥12 atm, subtotal lesions predilated. Balloon only earns 40%. −8 per unnecessary stent, −4 per oversized or unnecessary balloon | 15 |
-| Complete study: views (LCA 3+, RCA 2+) up to 8, plus up to 7 for the share of the 28 coronary segments you opacified | 15 |
+| Complete study: views (LCA 3+, RCA 2+) up to 8, plus up to 7 for the share of the 30 coronary segments you opacified | 15 |
 | Contrast against the case budget | 15 |
 | Air kerma (full marks up to 400 mGy) | 10 |
 | Safety (catheter moved only under fluoro) | 10 |

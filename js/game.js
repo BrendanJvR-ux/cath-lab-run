@@ -176,8 +176,10 @@ const down=(...ks)=>ks.some(k=>keys[k]||keys['btn_'+k]);
 $('bExch').addEventListener('click',()=>{
   if(!S||S.done||S.exch>0)return;
   if(S.pci){toast('Finish or cancel the PCI first.');return}
-  if(S.cath.s>S_EXCH){toast('Pull the catheter back to the descending aorta before exchanging.');return}
-  S.exch=2.2;toast('Exchanging catheter over a 0.035" wire…');
+  // a long exchange wire is parked in the aorta, so this works from anywhere short of an engaged ostium
+  if(S.cs&&S.cs.eng){S.cath.s=Math.min(S.cath.s,S_ROOT);toast('Backed out of the ostium. Exchanging catheter over a 0.035" wire…')}
+  else toast('Exchanging catheter over a 0.035" wire…');
+  S.exch=1.6;
 });
 
 function toggleCine(){
@@ -375,7 +377,7 @@ function tick(dt){
   const ph0=S.phase;S.hr+=(S.hrT-S.hr)*Math.min(1,dt/1.2);S.phase=(S.phase+dt*S.hr/60)%1;
   // catheter handling
   let cs=cst(c);
-  if(S.exch>0){S.exch-=dt;if(S.exch<=0){c.type=c.type==='JL'?'JR':'JL';c.th=CATH[c.type].home;toast(`${CATH[c.type].label} in the descending aorta.`)}}
+  if(S.exch>0){S.exch-=dt;if(S.exch<=0){c.type=c.type==='JL'?'JR':'JL';c.th=CATH[c.type].home;c.s=Math.min(c.s,S_ROOT);toast(`${CATH[c.type].label} is in. Same position, ready to torque.`)}}
   else if(S.pci){if(down('ArrowUp','KeyW','ArrowDown','KeyS','ArrowLeft','KeyA','ArrowRight','KeyD')&&toastT<=0)toast('The guide is holding position over the wire. Remove the wire first.')}
   else if(!S.complication){
     let moved=false;const fine=c.s>S_ROOT-30;
@@ -475,7 +477,7 @@ function updateUI(){
   else if(cs.deep){cls='danger';msg='Pressure damped: catheter deep-seated. Withdraw slightly before you inject.'}
   else if(cs.eng){cls='ok';msg=`Engaged ${cs.eng==='L'?'left main':'right coronary'} ostium. Pressure normal. Start cine, then inject.`}
   else if(cs.u>0){cls='warn';const need=CATH[S.cath.type].sys;msg=`In the aortic root, ${CATH[S.cath.type].label} tip at ${Math.round(S.cath.th)}°. Torque to find the ${need==='L'?'left main':'right coronary'} ostium; a short test puff shows where you are.`}
-  else{msg=`${cs.region||'Femoral sheath'} · ${Math.round(S.cath.s)} mm inserted.`+(S.cath.s<S_EXCH?' Catheter exchange is possible here.':'')}
+  else{msg=`${cs.region||'Femoral sheath'} · ${Math.round(S.cath.s)} mm inserted.`}
   st.className='status '+cls;st.textContent=msg;
   document.querySelectorAll('#presets button').forEach(b=>b.disabled=!!S.cine);
   $('sA').disabled=$('sB').disabled=!!S.cine;

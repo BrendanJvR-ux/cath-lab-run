@@ -62,7 +62,8 @@ function cathState(c,D){
 
 /* ---------- lesions ---------- */
 function prepLesions(list){
-  return list.map(L=>{
+  return list.map(L0=>{
+    const L={...L0,at:L0.at*TREE_SCALE};
     const v=VBY[L.vid];let i=0;while(i<v.n-1&&v.ld[i]<L.at)i++;
     const t=norm(sub(v.p[Math.min(v.n-1,i+2)],v.p[Math.max(0,i-2)]));
     let e=norm(L.e);e=norm(sub(e,mul(t,dot(e,t))));

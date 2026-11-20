@@ -30,6 +30,12 @@ const VESSELS=[
  {id:'PLV',sys:'R',name:'posterolateral',parent:'RCA',r0:1.0,r1:0.5,ctrl:[[-8,-25,-27],[6,-21,-35],[18,-15,-40],[26,-8,-41]]},
 ];
 
+/* The tree is drawn a little larger than the raw control points: every vessel is stretched away from its
+   own ostium by TREE_SCALE (lumen radii by TREE_RSCALE). Lesion positions in the case files are scaled to match. */
+const TREE_SCALE=1.12, TREE_RSCALE=1.06;
+{const o={L:VESSELS[0].ctrl[0].slice(),R:VESSELS.find(v=>v.id==='RCA').ctrl[0].slice()};
+ for(const v of VESSELS){const c=o[v.sys];v.ctrl=v.ctrl.map(q=>q.map((x,i)=>c[i]+(x-c[i])*TREE_SCALE));v.r0*=TREE_RSCALE;v.r1*=TREE_RSCALE}}
+
 /* Coronary flow speed (mm/s) for contrast travel. */
 const FLOW={L:150,R:125};
 
