@@ -50,10 +50,16 @@ function cathState(c,D){
   }
   const u=(c.s-S_ROOT)/22;out.u=u;
   const th=c.th*D2R,dir=[Math.cos(th),0,Math.sin(th)];
-  const reach=Math.min(1,0.5+u);let tip=add(ROOT,add(mul(dir,19*reach),[0,5*reach,0]));
+  // the preformed curve opens out gradually as it leaves the aorta, so the tip never jumps
+  const sm=x=>{x=clamp(x,0,1);return x*x*(3-2*x)},open=sm(u/0.55);
+  const reach=Math.min(1,0.5+u),free=add(ROOT,add(mul(dir,19*reach),[0,5*reach,0]));
+  let tip=add(mul(base,1-open),mul(free,open));
   const C=CATH[c.type],tol=D?D.tol[C.sys]:C.tol,deepU=D?D.deep:1.5;
-  if(u>=0.55&&angDiff(c.th,OSTANG[C.sys])<tol){out.eng=C.sys;out.deep=u>deepU;tip=add(OST[C.sys],mul(OSTDIR[C.sys],Math.max(0,u-1)*11))}
-  const ctrl=add(ROOT,add(mul(dir,c.type==='JL'?-13:-6),[0,c.type==='JL'?22:12,0]));
+  if(u>=0.55&&angDiff(c.th,OSTANG[C.sys])<tol){out.eng=C.sys;out.deep=u>deepU;
+    // slide into the ostium over a few millimetres instead of snapping
+    const ost=add(OST[C.sys],mul(OSTDIR[C.sys],Math.max(0,u-1)*11)),w=sm((u-0.55)/0.3);tip=add(mul(tip,1-w),mul(ost,w))}
+  const full=add(ROOT,add(mul(dir,c.type==='JL'?-13:-6),[0,c.type==='JL'?22:12,0]));
+  const ctrl=add(mul(mul(add(base,tip),0.5),1-open),mul(full,open));
   for(let i=1;i<=20;i++){const t=i/20,a=(1-t)*(1-t),b=2*(1-t)*t,cc=t*t;pts.push([a*base[0]+b*ctrl[0]+cc*tip[0],a*base[1]+b*ctrl[1]+cc*tip[1],a*base[2]+b*ctrl[2]+cc*tip[2]])}
   out.pts=pts;out.tip=tip;
   out.region=out.eng?(out.deep?'Deep-seated':'Engaged '+(out.eng==='L'?'LMCA':'RCA')):'Aortic root';
@@ -114,13 +120,28 @@ function getBg(a,b){
   // ribs
   g.lineCap='round';
   for(let y0=170;y0>-110;y0-=25){for(const side of [-1,1]){g.beginPath();for(let k=0;k<=24;k++){const ph=k/24*2.6;const p=[side*(12+110*Math.sin(ph)),y0-40*(ph/Math.PI),-88*Math.cos(ph)];const q=proj(p,B);k?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1])}g.lineWidth=9;g.strokeStyle='rgba(0,0,0,0.075)';g.stroke();g.lineWidth=3;g.strokeStyle='rgba(0,0,0,0.05)';g.stroke()}}
-  // spine
-  for(let y=-170;y<=180;y+=27){
-    const q=proj([2,y,-84],B);const w=36*SCALE*(0.75+0.25*Math.abs(Math.cos(a*D2R))),h=21*SCALE*Math.abs(Math.cos(b*D2R))+4;
-    g.fillStyle='rgba(0,0,0,0.16)';g.beginPath();g.roundRect?g.roundRect(q[0]-w/2,q[1]-h/2,w,h,8):g.rect(q[0]-w/2,q[1]-h/2,w,h);g.fill();
-    g.fillStyle='rgba(0,0,0,0.09)';g.fillRect(q[0]-w/2,q[1]-h/2,w,3);g.fillRect(q[0]-w/2,q[1]+h/2-3,w,3);
-    for(const s of [-1,1]){const pq=proj([2+s*14,y+3,-100],B);g.beginPath();g.ellipse(pq[0],pq[1],7,9,0,0,7);g.strokeStyle='rgba(0,0,0,0.12)';g.lineWidth=3;g.stroke()}
-  }
+  // spine: vertebral bodies with cortical rims and endplates, pedicles, transverse and spinous processes
+  {const sx=0.75+0.25*Math.abs(Math.cos(a*D2R)),sy=Math.abs(Math.cos(b*D2R));
+   const P=(x,y,z)=>proj([x,y,z],B),line=(p,q,w,col)=>{g.beginPath();g.moveTo(p[0],p[1]);g.lineTo(q[0],q[1]);g.lineWidth=w;g.strokeStyle=col;g.stroke()};
+   g.lineCap='round';g.lineJoin='round';
+   for(let y=-170;y<=180;y+=27){
+    const q=P(2,y,-84),w=36*SCALE*sx,h=21*SCALE*sy+4,x0=q[0]-w/2,x1=q[0]+w/2,y0=q[1]-h/2,y1=q[1]+h/2,ws=w*0.06,r=Math.min(8,h/3);
+    // body: flared endplates and a concave waist
+    const body=()=>{g.beginPath();g.moveTo(x0+r,y0);g.lineTo(x1-r,y0);g.quadraticCurveTo(x1,y0,x1,y0+r);g.quadraticCurveTo(x1-ws,q[1],x1,y1-r);g.quadraticCurveTo(x1,y1,x1-r,y1);g.lineTo(x0+r,y1);g.quadraticCurveTo(x0,y1,x0,y1-r);g.quadraticCurveTo(x0+ws,q[1],x0,y0+r);g.quadraticCurveTo(x0,y0,x0+r,y0);g.closePath()};
+    body();g.fillStyle='rgba(0,0,0,0.13)';g.fill();g.lineWidth=2.5;g.strokeStyle='rgba(0,0,0,0.13)';g.stroke();
+    // trabecular grain, denser along the endplates
+    g.save();body();g.clip();g.lineWidth=1;g.strokeStyle='rgba(0,0,0,0.035)';
+    for(let i=1;i<9;i++){const xx=x0+w*i/9;g.beginPath();g.moveTo(xx,y0);g.lineTo(xx+(i%2?1.5:-1.5),y1);g.stroke()}
+    g.fillStyle='rgba(0,0,0,0.08)';g.fillRect(x0,y0,w,3.5);g.fillRect(x0,y1-3.5,w,3.5);g.restore();
+    // transverse processes reaching out towards the rib heads
+    for(const s of [-1,1]){const a0=P(2+s*15,y+4,-98),a1=P(2+s*31,y+6,-104);line(a0,a1,7,'rgba(0,0,0,0.085)');line(a0,a1,2,'rgba(0,0,0,0.05)')}
+    // pedicles seen end-on: oval rings with a dense cortex
+    for(const s of [-1,1]){const pq=P(2+s*13,y+4,-96);g.beginPath();g.ellipse(pq[0],pq[1],5.5*sx,8*sy+1.5,0,0,7);g.strokeStyle='rgba(0,0,0,0.16)';g.lineWidth=3;g.stroke();g.fillStyle='rgba(0,0,0,0.04)';g.fill()}
+    // laminae meeting in the midline, and the spinous process projecting down over the body below
+    {const l0=P(2-12,y+1,-106),l1=P(2+12,y+1,-106),m=P(2,y-4,-112),sp=P(2,y-15,-122);
+     g.beginPath();g.moveTo(l0[0],l0[1]);g.quadraticCurveTo(m[0],m[1]-2,l1[0],l1[1]);g.lineWidth=2.5;g.strokeStyle='rgba(0,0,0,0.07)';g.stroke();
+     g.beginPath();g.ellipse((m[0]+sp[0])/2,(m[1]+sp[1])/2,4*sx+1,Math.max(3,Math.abs(sp[1]-m[1])/2+3),0,0,7);g.fillStyle='rgba(0,0,0,0.07)';g.fill();g.strokeStyle='rgba(0,0,0,0.1)';g.lineWidth=1.5;g.stroke()}
+   }}
   // diaphragm
   g.beginPath();for(let x=-150;x<=150;x+=6){const y=-58-Math.pow((x-6)/60,2)*12+(x>20?-8:0)*Math.min(1,(x-20)/40);const q=proj([x,y,0],B);x===-150?g.moveTo(q[0],q[1]):g.lineTo(q[0],q[1])}
   g.lineTo(W+50,W+400);g.lineTo(-50,W+400);g.closePath();const dg=g.createLinearGradient(0,W*0.7,0,W);dg.addColorStop(0,'rgba(0,0,0,0.2)');dg.addColorStop(1,'rgba(0,0,0,0.28)');g.fillStyle=dg;g.fill();

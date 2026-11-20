@@ -48,6 +48,10 @@ test('JL4 engages anywhere inside its window, not outside it',()=>{
 test('JL4 never engages the RCA',()=>{ok(!inRoot('JL',OSTANG.R,1).eng)});
 test('JR4 pointed at the RCA engages the right system',()=>{ok(inRoot('JR',OSTANG.R,1).eng==='R')});
 test('Pushing past the ostium deep-seats the catheter',()=>{const c=inRoot('JR',OSTANG.R,1.58);ok(c.eng==='R'&&c.deep)});
+test('Advancing from the aorta into the root moves the tip smoothly, without jumps',()=>{
+  let worst=0;for(const type of ['JL','JR'])for(const th of [CATH.JL.home,CATH.JR.home,0,170,OSTANG.L,OSTANG.R]){let prev=null;for(let s=S_ROOT-40;s<S_ROOT+22*1.6;s+=0.5){const t=cathState({type,th,s},DIFFICULTY.easy).tip;if(prev)worst=Math.max(worst,dist3(t,prev));prev=t}}
+  ok(worst<3,'tip jumped '+worst.toFixed(1)+' mm');return `largest step ${worst.toFixed(1)} mm per 0.5 mm advanced`;
+});
 test('Catheter tip moves when torqued in the root',()=>{const a=inRoot('JL',-120,0.3).tip,b=inRoot('JL',60,0.3).tip;ok(Math.hypot(a[0]-b[0],a[2]-b[2])>10,'tip barely moved')});
 test('Lesion labels read like a report',()=>{
   const labels=CASES.map(c=>prepLesions(c.lesions).map(L=>L.label).join(', '));

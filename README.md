@@ -23,7 +23,7 @@ Then open http://localhost:8767/ (the game) or http://localhost:8767/tests/tests
 | `js/sim.js` | Geometry, catheter position and engagement, lesion appearance per projection, stent and balloon outcome rules, the easy-mode coronary map, and the X-ray image renderer (including wire, balloon and stent struts). No game state. |
 | `js/game.js` | Menu, operator profile and coffee tokens, game state, controls, cine runs and review, the PCI tools, the three-lead ECG and pressure strip, the main loop and scoring. |
 | `css/style.css` | Layout and look. |
-| `tests/tests.html` | Automated checks: cases load, catheter engagement and deep-seating, eccentric lesions per view, contrast rendering, stent and balloon rules, difficulty windows, shop items, ECG territories and the coronary map. |
+| `tests/tests.html` | Automated checks: cases load, catheter engagement, a smooth aorta-to-root path and deep-seating, eccentric lesions per view, contrast rendering, stent and balloon rules, difficulty windows, shop items, ECG territories and the coronary map. |
 
 To add a case, copy a file in `cases/`, edit it, and add a `<script>` line for it in `index.html` and `tests/tests.html`.
 

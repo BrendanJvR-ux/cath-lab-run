@@ -380,9 +380,9 @@ function tick(dt){
   if(S.exch>0){S.exch-=dt;if(S.exch<=0){c.type=c.type==='JL'?'JR':'JL';c.th=CATH[c.type].home;c.s=Math.min(c.s,S_ROOT);toast(`${CATH[c.type].label} is in. Same position, ready to torque.`)}}
   else if(S.pci){if(down('ArrowUp','KeyW','ArrowDown','KeyS','ArrowLeft','KeyA','ArrowRight','KeyD')&&toastT<=0)toast('The guide is holding position over the wire. Remove the wire first.')}
   else if(!S.complication){
-    let moved=false;const fine=c.s>S_ROOT-30;
-    if(down('ArrowUp','KeyW')){c.s=Math.min(S_ROOT+22*1.6,c.s+(fine?26:110)*dt);moved=true}
-    if(down('ArrowDown','KeyS')){c.s=Math.max(0,c.s-(fine?26:110)*dt);moved=true}
+    let moved=false;const spd=26+84*clamp((S_ROOT-10-c.s)/90,0,1); // slows smoothly approaching the root
+    if(down('ArrowUp','KeyW')){c.s=Math.min(S_ROOT+22*1.6,c.s+spd*dt);moved=true}
+    if(down('ArrowDown','KeyS')){c.s=Math.max(0,c.s-spd*dt);moved=true}
     if(down('ArrowRight','KeyD')){c.th+=170*dt;moved=true}
     if(down('ArrowLeft','KeyA')){c.th-=170*dt;moved=true}
     // near the ostium a preshaped Judkins tends to drop in on its own (more help on easier settings)
