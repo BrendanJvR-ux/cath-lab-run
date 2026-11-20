@@ -226,9 +226,9 @@ function drawMap(ctx,mapped){
     ctx.beginPath();for(let i=a;i<=b;i++){const q=f(pts[i]);i===a?ctx.moveTo(q[0],q[1]):ctx.lineTo(q[0],q[1])}
     ctx.setLineDash(on?[]:[2,3]);ctx.lineWidth=on?Math.max(1.6,v.r[a]*1.6):1.1;ctx.strokeStyle=on?'#f2a53b':'rgba(220,227,230,0.4)';ctx.stroke()}
   ctx.setLineDash([]);
-  ctx.font='600 9px "IBM Plex Mono", monospace';ctx.fillStyle='rgba(220,227,230,0.75)';
+  ctx.font='600 13px "IBM Plex Mono", monospace';ctx.fillStyle='rgba(220,227,230,0.8)';
   for(const [id,t] of [['LAD',0.55],['LCx',0.7],['RCA',0.35],['PDA',0.8],['D1',0.8],['OM1',0.9]]){const v=VBY[id],q=f(P[id][Math.floor(t*(v.n-1))]);ctx.fillText(id,q[0]+4,q[1]+3)}
-  ctx.fillStyle='rgba(220,227,230,0.9)';ctx.font='600 10px "IBM Plex Mono", monospace';ctx.fillText(`CORONARY MAP ${[...mapped].length}/${MAP_SEGS.length}`,8,14);
+  ctx.fillStyle='rgba(220,227,230,0.95)';ctx.font='600 14px "IBM Plex Mono", monospace';ctx.fillText(`MAP ${[...mapped].length}/${MAP_SEGS.length}`,8,17);
 }
 
 const angLabel=(a,b)=>(a===0?'AP':(a>0?'LAO ':'RAO ')+Math.abs(a)+'°')+(b===0?'':(b>0?' CRA ':' CAU ')+Math.abs(b)+'°');

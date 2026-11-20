@@ -99,6 +99,8 @@ test('Oversized balloon flags a dissection; post-dilating a stent improves it',(
   ok(balloonOutcome(L,{vid:L.vid,ld:L.at,len:15,diam:ref+1,atm:12}).over,'should be oversized');
   const st={...L,stented:true,cur:0.12};const o=balloonOutcome(st,{vid:L.vid,ld:L.at,len:15,diam:3.5,atm:16});ok(o.post&&o.residual<0.12,'post-dilation');
 });
+test('The right ostium has a wider window than the left on every difficulty',()=>{for(const [k,d] of Object.entries(DIFFICULTY))ok(d.tol.R>d.tol.L,k);
+  const at=(d,off)=>cathState({type:'JR',th:OSTANG.R-off,s:S_ROOT+22},DIFFICULTY[d]).eng==='R';ok(at('easy',50)&&at('medium',28)&&at('hard',15),'windows');return 'Easy 55°, Medium 32°, Hard 18°'});
 test('Easy has no contrast limit; Medium and Hard do',()=>{ok(DIFFICULTY.easy.budgetX===null);ok(DIFFICULTY.medium.budgetX===1&&DIFFICULTY.hard.budgetX<1)});
 test('Every shop avatar exists and every shop item has a price',()=>{for(const it of SHOP){ok(it.price>0,it.id);if(it.kind==='avatar')ok(AVATARS[it.avatar]&&AVATARS[it.avatar].shop===it.id,it.id)}return SHOP.length+' items'});
 test('Every vessel has an ECG territory lead',()=>{for(const v of VESSELS)ok(LEADS.includes(TERRITORY[v.id]),v.id+' has no lead');return 'LAD→V3, circumflex→V5, RCA→II'});

@@ -10,6 +10,9 @@ function loadProfile(){try{const p=JSON.parse(localStorage.getItem(STORE)||'null
 function saveProfile(){try{localStorage.setItem(STORE,JSON.stringify(profile))}catch(e){}}
 let profile=loadProfile();
 const owns=id=>!!(profile&&profile.owned&&profile.owned.includes(id));
+/* Contrast budget for a case on a difficulty (null = no limit), including the power injector. */
+function caseBudget(c,D){return D.budgetX==null?null:Math.round(c.budget*D.budgetX*(owns('injector')?1.25:1))}
+function caseTask(c,D){const b=caseBudget(c,D);return c.task+(c.budgetInTask&&b!=null?` Aim for under ${b} mL of contrast.`:'')}
 
 function avatarSVG(i,size){
   const a=AVATARS[i]||AVATARS[0];
@@ -69,7 +72,7 @@ function renderMenu(){
     ov.innerHTML=`<h1>Choose a case</h1>
       <div class="grouplabel">Difficulty</div>
       <div class="diffs">${Object.entries(DIFFICULTY).map(([k,v])=>`<button class="diff${k===d?' sel':''}" data-diff="${k}"><b>${LEVEL_BARS(v.level)}${v.label}</b><span>${v.blurb}</span></button>`).join('')}</div>
-      <div class="cases">${CASES.map((c,i)=>{const b=profile.best[d+'-'+i];return `<button class="case" data-ci="${i}"><span>CASE ${i+1} · ${c.pt}${b!=null?` · BEST ${b}`:''}</span><b>${c.title}</b>${miniECG(c)}<em>${c.task}</em></button>`}).join('')}</div>
+      <div class="cases">${CASES.map((c,i)=>{const b=profile.best[d+'-'+i];return `<button class="case" data-ci="${i}"><span>CASE ${i+1} · ${c.pt}${b!=null?` · BEST ${b}`:''}</span><b>${c.title}</b>${miniECG(c)}<em>${caseTask(c,DIFFICULTY[d])}</em></button>`}).join('')}</div>
       <div class="row"><button class="btn" data-act="home">Back</button></div>`;
     return;
   }
@@ -85,7 +88,7 @@ function renderMenu(){
       <div class="row"><button class="btn" data-act="home">Back</button></div>`;
     return;
   }
-  ov.innerHTML=`<div class="hero"><canvas id="heroCan" aria-hidden="true"></canvas><div class="herotxt"><span class="kicker">Coronary angiography · PCI</span><h1>Cath Lab Run</h1><p>Drive the catheter to the aortic root, engage each coronary, record cine runs in the right projections, then find, grade and treat the stenosis.</p></div></div>
+  ov.innerHTML=`<div class="hero"><img class="heroimg" src="assets/heart.svg" alt="Illustration of the heart from the front, with the right coronary artery, left anterior descending and circumflex arteries"><div class="herotxt"><span class="kicker">Coronary angiography · PCI</span><h1>Cath Lab Run</h1><p>Drive the catheter to the aortic root, engage each coronary, record cine runs in the right projections, then find, grade and treat the stenosis.</p></div></div>
     <div class="opcard">${avatarSVG(profile.avatar,64)}<div><b>${esc(profile.name)}</b><span>${CUP} ${profile.tokens} coffee tokens · ${DIFFICULTY[profile.diff].label}</span></div><button class="btn" data-act="editop">Change operator</button></div>
     <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button></div>
     <div class="keys">
@@ -95,7 +98,6 @@ function renderMenu(){
       <div><kbd>1</kbd>–<kbd>7</kbd> C-arm presets</div>
     </div>
     <p class="fine">Teaching game with simplified anatomy and physics. Not a clinical training device.</p>`;
-  sizeHero();
 }
 $('startOv').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const d=b.dataset;
@@ -112,31 +114,6 @@ $('startOv').addEventListener('click',e=>{
 });
 $('who').addEventListener('click',()=>{if(!S||S.done)showMenu('home')});
 
-/* ---------- menu hero: a beating heart with contrast pulsing down the coronaries ---------- */
-const HERO_VIEW=basis(28,12);let heroGeo=null;
-function sizeHero(){const c=$('heroCan');if(!c)return;const r=Math.min(2,window.devicePixelRatio||1);c.width=Math.round(c.clientWidth*r);c.height=Math.round(c.clientHeight*r);heroGeo=null}
-function drawHero(t){
-  const c=$('heroCan');if(!c||!c.width)return;const g=c.getContext('2d'),Wd=c.width,Hd=c.height;
-  if(!heroGeo){let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const v of VESSELS)for(const p of v.p){const q=proj(p,HERO_VIEW);x0=Math.min(x0,q[0]);x1=Math.max(x1,q[0]);y0=Math.min(y0,q[1]);y1=Math.max(y1,q[1])}
-    const sc=Math.min(Wd*0.42/(x1-x0),Hd*0.62/(y1-y0)),cx=Wd*(Wd>Hd*1.6?0.72:0.62),cy=Hd*0.58;heroGeo={f:q=>[cx+(q[0]-(x0+x1)/2)*sc,cy+(q[1]-(y0+y1)/2)*sc],mm:sc*SCALE}}
-  const {f,mm}=heroGeo,ph=(t*1.15)%1,k=contraction(ph),P=p=>f(proj(motion(p,k),HERO_VIEW));
-  g.clearRect(0,0,Wd,Hd);
-  const bg=g.createRadialGradient(Wd*0.68,Hd*0.55,10,Wd*0.68,Hd*0.55,Wd*0.6);bg.addColorStop(0,'rgba(120,38,30,0.35)');bg.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=bg;g.fillRect(0,0,Wd,Hd);
-  // aorta: root, arch and the top of the descending aorta
-  g.lineCap='round';g.lineJoin='round';
-  const ao=AO.p.filter((q,i)=>AO.ld[i]>AO.len-230).map(P);
-  g.beginPath();ao.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]));g.lineWidth=24*mm;g.strokeStyle='#6e2622';g.stroke();g.lineWidth=16*mm;g.strokeStyle='#8a3530';g.stroke();
-  // heart body
-  const h=P(HC),hb=g.createRadialGradient(h[0]-12*mm,h[1]-14*mm,4*mm,h[0],h[1],70*mm);hb.addColorStop(0,'#9b3b32');hb.addColorStop(0.6,'#6a221f');hb.addColorStop(1,'#3a1213');
-  g.fillStyle=hb;g.beginPath();g.ellipse(h[0],h[1]+4*mm,(58-3*k)*mm,(50-3*k)*mm,0.62,0,7);g.fill();
-  const rt=P(ROOT);g.beginPath();g.ellipse(rt[0]-18*mm,rt[1]+10*mm,24*mm,20*mm,-0.3,0,7);g.fill();
-  // coronaries with a travelling contrast pulse
-  for(const v of VESSELS){const pts=v.p.map(P);
-    for(let i=0;i<v.n-1;i++){const d=v.base+v.ld[i],w=Math.max(1,2*v.r[i]*mm*0.9);
-      g.beginPath();g.moveTo(pts[i][0],pts[i][1]);g.lineTo(pts[i+1][0],pts[i+1][1]);g.lineWidth=w+1.5;g.strokeStyle='rgba(30,8,8,0.55)';g.stroke();
-      const pulse=Math.pow(0.5+0.5*Math.sin(t*3.2-d*0.06),6);g.lineWidth=w;g.strokeStyle=`rgba(${Math.round(225+30*pulse)},${Math.round(150+60*pulse)},${Math.round(110-40*pulse)},${0.55+0.45*pulse})`;g.stroke()}}
-}
-window.addEventListener('resize',()=>{if(!S&&menuView==='home')sizeHero()});
 
 /* ---------- state ---------- */
 let S=null;
@@ -145,8 +122,7 @@ function newState(ci){
   const base=DIFFICULTY[profile.diff]||DIFFICULTY.easy,c=CASES[ci];
   // shop perks adjust a copy of the difficulty settings
   const D={...base,tol:{...base.tol}};if(owns('torque')){D.tol.L+=6;D.tol.R+=6}
-  const bx=D.budgetX==null?null:D.budgetX*(owns('injector')?1.25:1);
-  return {ci,c,D,diff:profile.diff,budget:bx==null?null:Math.round(c.budget*bx),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,type:'JL'},exch:0,
+  return {ci,c,D,diff:profile.diff,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,type:'JL'},exch:0,
     cL:0,cR:0,cRoot:0,hist:{L:[],R:[],root:[]},histN:0,contrast:0,ak:0,ftime:0,ctime:0,blind:0,wasted:0,
     cine:null,runs:[],marks:[],pending:null,review:null,imgAcc:0,frame:0,deepInj:0,rcaInj:0,complication:null,done:false,
     sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),
@@ -169,7 +145,7 @@ $('sB').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.b=+e.targ
 function startCase(ci){
   S=newState(ci);
   $('startOv').hidden=true;$('resultOv').hidden=true;closeReview();
-  const c=S.c;$('caseHead').innerHTML=`<h2>Patient · case ${ci+1} · ${S.D.label}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${c.task}</p>`;
+  const c=S.c;$('caseHead').innerHTML=`<h2>Patient · case ${ci+1} · ${S.D.label}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
   ictx.fillStyle='#000';ictx.fillRect(0,0,W,W);applyLut();
   $('mapCan').hidden=!S.D.map;$('monitor').classList.toggle('withmap',S.D.map);if(S.D.map)drawMap($('mapCan').getContext('2d'),S.mapped);
   syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
@@ -390,7 +366,6 @@ function demoFrame(){
 function loop(now){
   const dt=Math.min(0.05,(now-last)/1000);last=now;
   if(S&&!S.done)tick(dt);else{const p0=demoPhase;demoPhase=(demoPhase+dt*72/60)%1;hemoStep(dt,p0,demoPhase,false)}
-  if(!S&&menuView==='home'&&!$('startOv').hidden)drawHero(now/1000);
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true}
   drawHemo();updateUI();
   requestAnimationFrame(loop);
@@ -465,8 +440,8 @@ function tick(dt){
     S.imgAcc=0;S.frame++;
     renderImage({t:S.clock,phase:S.phase,a:S.a,b:S.b,mode:S.cine?'cine':'fluoro',frame:S.frame,lesions:S.lesions,pci:pciRender(),cath:true,cathState:cs,wire:S.exch>0,conc:(sys,t)=>histAt(S.hist[sys],t),root:histAt(S.hist.root,S.clock)});
     if(S.cine){S.cine.frames.push({t:S.clock,phase:S.phase,frame:S.frame,cath:{...c},pci:pciRender()});if(S.cine.frames.length>=90)stopCine()}
-    // coronary map (easy): any segment that filled with contrast is now mapped
-    if(D.map&&lastProj){const n0=S.mapped.size;for(const Pv of lastProj.projV){for(let i=0;i<Pv.v.n;i+=2)if(Pv.cs[i]>0.45)S.mapped.add(mapKey(Pv.v,Pv.v.ld[i]))}if(S.mapped.size!==n0)drawMap($('mapCan').getContext('2d'),S.mapped)}
+    // coronary mapping (scored on every difficulty, drawn on Easy): any segment that filled with contrast is mapped
+    if(lastProj){const n0=S.mapped.size;for(const Pv of lastProj.projV){for(let i=0;i<Pv.v.n;i+=2)if(Pv.cs[i]>0.45)S.mapped.add(mapKey(Pv.v,Pv.v.ld[i]))}if(D.map&&S.mapped.size!==n0)drawMap($('mapCan').getContext('2d'),S.mapped)}
   }
 }
 function fmtT(s){s=Math.floor(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
@@ -525,6 +500,7 @@ function finish(){
     if(L.sev>=0.5){
       if(mi>=0){used.add(mi);const m=S.marks[mi];const ok=m.bucket===bi,near=Math.abs(m.bucket-bi)===1;lesPts+=per*(ok?1:near?0.7:0.55);
         notes.push({c:ok?'good':'',t:`${Math.round(L.sev*100)}% ${L.label}: found, graded ${BUCKETS[m.bucket].k}${ok?'.':' (true range '+BUCKETS[bi].k+').'}${viewNote}`})}
+      else if(S.mapped.has(mapKey(VBY[L.vid],L.at))){lesPts+=per*0.3;notes.push({c:'',t:`Seen but not marked: the ${Math.round(L.sev*100)}% ${L.label} filled with contrast on your images (30% credit).${viewNote}`})}
       else notes.push({c:'bad',t:`Missed: ${Math.round(L.sev*100)}% ${L.label}.${viewNote}`});
     }else if(mi>=0){used.add(mi);const m=S.marks[mi];if(m.bucket===0)notes.push({c:'good',t:`${Math.round(L.sev*100)}% ${L.label}: correctly called non-significant.`});else{lesPts-=8;notes.push({c:'bad',t:`Overcalled: ${L.label} is about ${Math.round(L.sev*100)}%, you graded it ${BUCKETS[m.bucket].k}.${viewNote}`})}}
   }
@@ -550,7 +526,9 @@ function finish(){
   // study quality
   const distinct=sys=>{const v=[];for(const r of S.runs){if(r.sys!==sys)continue;if(!v.some(o=>Math.abs(o.a-r.a)<15&&Math.abs(o.b-r.b)<15))v.push(r)}return v.length};
   const nL=distinct('L'),nR=distinct('R');
-  const comp=(nL>=3?9:nL===2?6:nL===1?3:0)+(nR>=2?6:nR===1?3:0);rows.push([`Complete study (LCA ${nL} views, RCA ${nR})`,comp,15]);
+  const cov=S.mapped.size/MAP_SEGS.length,comp=(nL>=3?5:nL===2?3:nL===1?2:0)+(nR>=2?3:nR===1?2:0)+7*cov;
+  rows.push([`Complete study (LCA ${nL} views, RCA ${nR} · mapped ${S.mapped.size}/${MAP_SEGS.length} segments)`,comp,15]);
+  if(cov<0.8)notes.push({c:'',t:`You opacified ${Math.round(cov*100)}% of the coronary tree. Fill both systems fully to map all of it.`});
   if(nL<3)notes.push({c:'',t:'A standard left system study uses at least three or four projections: RAO caudal, RAO cranial, LAO cranial and LAO caudal.'});
   if(nR<2)notes.push({c:'',t:'Image the RCA in at least two orthogonal views, for example LAO 40° and RAO 30°.'});
   const B=S.budget;const cm=B==null?15:Math.round(15*clamp(1-(S.contrast-B)/(B*2),0,1));rows.push([`Contrast ${Math.round(S.contrast)} mL (${B==null?'no limit on Easy':'budget '+B})`,cm,15]);

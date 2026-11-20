@@ -37,7 +37,7 @@ const FLOW={L:150,R:125};
 const AO_CTRL=[[14,-240,-62],[14,-120,-62],[13,-20,-60],[12,60,-56],[9,100,-46],[2,118,-28],[-7,116,-8],[-12,100,6],[-11,78,8],[-6,56,5],[0,44,1],[2,36,0]];
 
 /* Judkins catheters: home = starting tip angle (deg), tol = engagement window (deg), sys = which coronary it engages. */
-const CATH={JL:{label:'JL4',home:-45,tol:45,sys:'L'},JR:{label:'JR4',home:90,tol:40,sys:'R'}};
+const CATH={JL:{label:'JL4',home:-45,tol:45,sys:'L'},JR:{label:'JR4',home:100,tol:55,sys:'R'}};
 
 /* Stenosis grading buckets offered in the report. */
 const BUCKETS=[{k:'<50%',lo:0,hi:0.5},{k:'50–69%',lo:0.5,hi:0.7},{k:'70–89%',lo:0.7,hi:0.9},{k:'≥90%',lo:0.9,hi:1.01}];
@@ -57,9 +57,9 @@ const BALLOON_LENS=[12,15,20];
    is pulled into the ostium (0 = no help), deep = how far past the ostium (u) before damping,
    budgetX scales each case's contrast budget (null = no limit), map = show the coronary sketch, tokenX scales coffee tokens. */
 const DIFFICULTY={
-  easy:{label:'Easy',blurb:'Wide engagement windows and the tip drops into the ostia. A coronary map fills in as you inject. No contrast limit.',tol:{L:45,R:40},seek:70,seekSpeed:90,deep:1.5,budgetX:null,map:true,tokenX:1,level:1},
-  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Tokens ×1.5.',tol:{L:28,R:22},seek:25,seekSpeed:45,deep:1.42,budgetX:1,map:false,tokenX:1.5,level:2},
-  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, the catheter damps sooner, 25% less contrast. Tokens ×2.',tol:{L:16,R:12},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,map:false,tokenX:2,level:3},
+  easy:{label:'Easy',blurb:'Wide engagement windows and the tip drops into the ostia. A coronary map fills in as you inject. No contrast limit.',tol:{L:45,R:55},seek:70,seekSpeed:90,deep:1.5,budgetX:null,map:true,tokenX:1,level:1},
+  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Tokens ×1.5.',tol:{L:28,R:32},seek:30,seekSpeed:45,deep:1.42,budgetX:1,map:false,tokenX:1.5,level:2},
+  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, the catheter damps sooner, 25% less contrast. Tokens ×2.',tol:{L:16,R:18},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,map:false,tokenX:2,level:3},
 };
 
 /* ECG lead that shows ischaemia in each vessel's territory: V3 anterior (LAD), V5 lateral (circumflex), II inferior (RCA). */
