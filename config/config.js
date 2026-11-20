@@ -61,11 +61,11 @@ const BALLOON_LENS=[12,15,20];
 
 /* Difficulty. tol = engagement window (deg) per system, seek = how far (deg) beyond the window the tip
    is pulled into the ostium (0 = no help), deep = how far past the ostium (u) before damping,
-   budgetX scales each case's contrast budget (null = no limit), map = show the coronary sketch, tokenX scales coffee tokens. */
+   budgetX scales each case's contrast budget (null = no limit), tokenX scales coffee tokens. */
 const DIFFICULTY={
-  easy:{label:'Easy',blurb:'Wide engagement windows and the tip drops into the ostia. A coronary map fills in as you inject. No contrast limit.',tol:{L:45,R:55},seek:70,seekSpeed:90,deep:1.5,budgetX:null,map:true,tokenX:1,level:1},
-  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Tokens ×1.5.',tol:{L:28,R:32},seek:30,seekSpeed:45,deep:1.42,budgetX:1,map:false,tokenX:1.5,level:2},
-  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, the catheter damps sooner, 25% less contrast. Tokens ×2.',tol:{L:16,R:18},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,map:false,tokenX:2,level:3},
+  easy:{label:'Easy',blurb:'Wide engagement windows and the tip drops into the ostia. No contrast limit.',tol:{L:45,R:55},seek:70,seekSpeed:90,deep:1.5,budgetX:null,tokenX:1,level:1},
+  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Tokens ×1.5.',tol:{L:28,R:32},seek:30,seekSpeed:45,deep:1.42,budgetX:1,tokenX:1.5,level:2},
+  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, the catheter damps sooner, 25% less contrast. Tokens ×2.',tol:{L:16,R:18},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,tokenX:2,level:3},
 };
 
 /* ECG lead that shows ischaemia in each vessel's territory: V3 anterior (LAD), V5 lateral (circumflex), II inferior (RCA). */

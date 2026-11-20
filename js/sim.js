@@ -5,10 +5,21 @@ function crPt(p0,p1,p2,p3,t){const t2=t*t,t3=t2*t;const f=i=>0.5*(2*p1[i]+(-p0[i
 function sample(ctrl,step){const out=[];for(let i=0;i<ctrl.length-1;i++){const p0=ctrl[Math.max(0,i-1)],p1=ctrl[i],p2=ctrl[i+1],p3=ctrl[Math.min(ctrl.length-1,i+2)];const n=Math.max(2,Math.ceil(dist3(p1,p2)/step));for(let k=0;k<n;k++)out.push(crPt(p0,p1,p2,p3,k/n))}out.push(ctrl[ctrl.length-1].slice());const ld=[0];for(let i=1;i<out.length;i++)ld.push(ld[i-1]+dist3(out[i-1],out[i]));return {p:out,ld}}
 function pointAt(S,s){const ld=S.ld;if(s<=0)return S.p[0].slice();if(s>=ld[ld.length-1])return S.p[S.p.length-1].slice();let lo=0,hi=ld.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(ld[m]<=s)lo=m;else hi=m}const f=(s-ld[lo])/(ld[hi]-ld[lo]||1);return add(S.p[lo],mul(sub(S.p[hi],S.p[lo]),f))}
 
+/* Natural tortuosity: a smooth 3D wave field nudges every vessel point by up to ~2 mm. Because it depends only
+   on position, a branch moves exactly with its parent at the join. It fades to nothing near the two ostia
+   (engagement is unchanged) and grows towards the periphery, where real coronaries are curliest. */
+const TORT_OST=[VESSELS[0].ctrl[0],VESSELS.find(v=>v.id==='RCA').ctrl[0]];
+const TORT_W=[[0.41,0.13,0.29,0.3],[0.17,0.37,-0.22,1.7],[-0.26,0.21,0.35,4.1],[0.33,-0.28,0.12,2.6],[0.09,0.44,0.19,5.3],[-0.38,-0.1,0.27,0.9]];
+function tortuous(p){
+  const d=Math.min(...TORT_OST.map(o=>dist3(p,o))),amp=clamp((d-6)/14,0,1)*(1.1+0.9*clamp((d-20)/60,0,1));
+  const w=i=>{const a=TORT_W[i],b=TORT_W[i+3];return 0.6*Math.sin(a[0]*p[0]+a[1]*p[1]+a[2]*p[2]+a[3])+0.4*Math.sin(b[0]*p[0]+b[1]*p[1]+b[2]*p[2]+b[3])};
+  return [p[0]+amp*w(0),p[1]+amp*w(1),p[2]+amp*w(2)];
+}
 const VBY={};
 const MAXD={L:0,R:0};
 for(const v of VESSELS){
-  const s=sample(v.ctrl,1.1);v.p=s.p;v.ld=s.ld;v.len=s.ld[s.ld.length-1];v.n=v.p.length;
+  const s=sample(v.ctrl,1.1);s.p=s.p.map(tortuous);for(let i=1;i<s.p.length;i++)s.ld[i]=s.ld[i-1]+dist3(s.p[i-1],s.p[i]);
+  v.p=s.p;v.ld=s.ld;v.len=s.ld[s.ld.length-1];v.n=v.p.length;
   v.anc=new Set();
   if(v.parent){const P=VBY[v.parent];let bi=0,bd=1e9;P.p.forEach((q,i)=>{const d=dist3(q,v.p[0]);if(d<bd){bd=d;bi=i}});v.base=P.base+P.ld[bi];v.joinIdx=bi;P.anc.forEach(a=>v.anc.add(a));v.anc.add(P.id)}else v.base=0;
   v.r=v.ld.map(d=>v.r0+(v.r1-v.r0)*d/v.len);
@@ -117,9 +128,44 @@ function getBg(a,b){
   g.fillStyle='rgb(178,178,176)';g.fillRect(0,0,W,W);
   for(const x of [-62,66]){const q=proj([x,45,-5],B);const rg=g.createRadialGradient(q[0],q[1],10,q[0],q[1],170);rg.addColorStop(0,'rgba(255,255,255,0.26)');rg.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=rg;g.fillRect(0,0,W,W)}
   {const q=proj(HC,B);const rg=g.createRadialGradient(q[0],q[1],20,q[0],q[1],78*SCALE);rg.addColorStop(0,'rgba(0,0,0,0.17)');rg.addColorStop(0.75,'rgba(0,0,0,0.11)');rg.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=rg;g.fillRect(0,0,W,W)}
-  // ribs
-  g.lineCap='round';
-  for(let y0=170;y0>-110;y0-=25){for(const side of [-1,1]){g.beginPath();for(let k=0;k<=24;k++){const ph=k/24*2.6;const p=[side*(12+110*Math.sin(ph)),y0-40*(ph/Math.PI),-88*Math.cos(ph)];const q=proj(p,B);k?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1])}g.lineWidth=9;g.strokeStyle='rgba(0,0,0,0.075)';g.stroke();g.lineWidth=3;g.strokeStyle='rgba(0,0,0,0.05)';g.stroke()}}
+  // ribs: twelve pairs, each articulating with its thoracic vertebra (T1 at the top of the spine below). A rib runs
+  // back and out from the spine to its angle, sweeps round the side of the chest, then slopes down and forwards
+  // to the costochondral junction, three or four levels below where it started. The posterior part is dense with
+  // a thick lower cortex (the costal groove); the anterior part is flatter and fainter, and the cartilage that
+  // joins it to the sternum barely shows. Ribs 11 and 12 are short and float free.
+  {const RX=[50,76,94,106,114,120,123,124,122,116,104,90],RZ=[44,60,73,80,85,87,87,85,81,75,66,56];
+   const XE=[30,36,42,49,56,64,73,83,93,104,0,0],DROP=[24,42,56,66,73,77,79,77,71,60,22,14];
+   g.lineCap='round';g.lineJoin='round';
+   for(let i=0;i<12;i++){
+    const y0=154-27*i+9,Rx=RX[i],Rz=RZ[i],zc=-100+Rz;
+    const pmax=i>=10?(i===10?1.35:1.05):Math.PI-Math.asin(clamp((XE[i]-14)/Rx,0,1));
+    for(const sd of [-1,1]){
+     const N=44,C=[],U=[],L=[],F=[];
+     for(let k=0;k<=N;k++){
+      const ph=pmax*k/N,f=k/N;
+      const y=y0+5*Math.sin(Math.min(1,ph/0.8)*Math.PI/2)-DROP[i]*Math.pow(Math.max(0,ph-0.5)/Math.max(0.3,pmax-0.5),1.5);
+      const c=[sd*(14+Rx*Math.sin(ph)),y,zc-Rz*Math.cos(ph)],w=(i===0?10:8)+3*f*(i<10?1:0.2);
+      C.push(c);U.push(proj([c[0],y+w/2,c[2]],B));L.push(proj([c[0],y-w/2,c[2]],B));F.push(f);
+     }
+     // bone body
+     g.beginPath();U.forEach((q,k)=>k?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]));for(let k=N;k>=0;k--)g.lineTo(L[k][0],L[k][1]);g.closePath();
+     g.fillStyle='rgba(0,0,0,0.045)';g.fill();
+     // cortical edges, fading towards the front
+     for(let k=0;k<N;k++){const fade=1-0.55*F[k];
+      g.beginPath();g.moveTo(U[k][0],U[k][1]);g.lineTo(U[k+1][0],U[k+1][1]);g.lineWidth=1.6;g.strokeStyle=`rgba(0,0,0,${(0.12*fade).toFixed(3)})`;g.stroke();
+      g.beginPath();g.moveTo(L[k][0],L[k][1]);g.lineTo(L[k+1][0],L[k+1][1]);g.lineWidth=2.6;g.strokeStyle=`rgba(0,0,0,${(0.15*fade).toFixed(3)})`;g.stroke()}
+     // rib head and neck against the vertebra
+     {const h=proj([sd*9,y0-1,-92],B);g.beginPath();g.ellipse(h[0],h[1],4.5,5.5,0,0,7);g.fillStyle='rgba(0,0,0,0.06)';g.fill()}
+     // costal cartilage to the sternum (only the upper ten reach it, directly or via the costal margin)
+     if(i<10){const e=C[N],st=[sd*(i<7?11:24+6*(i-7)),e[1]-(i<7?6+3*i:18),i<7?84:70],q0=proj(e,B),q1=proj(st,B);
+      g.beginPath();g.moveTo(q0[0],q0[1]);g.lineTo(q1[0],q1[1]);g.lineWidth=7;g.strokeStyle='rgba(0,0,0,0.018)';g.stroke()}
+    }
+   }
+   // clavicles: S-shaped, from the sternal notch out to the acromion
+   for(const sd of [-1,1]){const P=[[sd*16,150,66],[sd*60,156,52],[sd*104,160,22],[sd*140,170,-12]].map(p=>proj(p,B));
+    g.beginPath();g.moveTo(P[0][0],P[0][1]);g.bezierCurveTo(P[1][0],P[1][1],P[2][0],P[2][1],P[3][0],P[3][1]);
+    g.lineWidth=13*SCALE*0.75;g.strokeStyle='rgba(0,0,0,0.06)';g.stroke();g.lineWidth=2;g.strokeStyle='rgba(0,0,0,0.05)';g.stroke()}
+  }
   // spine: vertebral bodies with cortical rims and endplates, pedicles, transverse and spinous processes
   {const sx=0.75+0.25*Math.abs(Math.cos(a*D2R)),sy=Math.abs(Math.cos(b*D2R));
    const P=(x,y,z)=>proj([x,y,z],B),line=(p,q,w,col)=>{g.beginPath();g.moveTo(p[0],p[1]);g.lineTo(q[0],q[1]);g.lineWidth=w;g.strokeStyle=col;g.stroke()};
@@ -228,29 +274,8 @@ function drawPCI(pci,projV){
   if(w){const q=chain(w.vid);const n=Math.max(2,Math.round(q.length*w.frac));dctx.beginPath();for(let i=0;i<n;i++)i?dctx.lineTo(q[i][0],q[i][1]):dctx.moveTo(q[i][0],q[i][1]);dctx.lineWidth=1.5;dctx.strokeStyle=grey(0.3);dctx.stroke()}
 }
 
-/* ---------- coronary map sketch (easy mode) ---------- */
-const MAP_VIEW=basis(30,10);
+/* ---------- coverage segments: the tree split into short segments, used to score how much was opacified ---------- */
 const MAP_SEGS=[];for(const v of VESSELS){const parts=v.id==='LM'||v.len<30?1:3;for(let j=0;j<parts;j++)MAP_SEGS.push({key:v.id+':'+j,v,j,parts})}
 const mapKey=(v,ld)=>{const parts=v.id==='LM'||v.len<30?1:3;return v.id+':'+Math.min(parts-1,Math.floor(ld/v.len*parts))};
-let mapGeom=null;
-function drawMap(ctx,mapped){
-  const Wd=ctx.canvas.width,Hd=ctx.canvas.height;
-  if(!mapGeom){let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;const P={};for(const v of VESSELS){P[v.id]=v.p.map(p=>{const q=proj(p,MAP_VIEW);x0=Math.min(x0,q[0]);x1=Math.max(x1,q[0]);y0=Math.min(y0,q[1]);y1=Math.max(y1,q[1]);return q})}
-    const sc=Math.min((Wd-20)/(x1-x0),(Hd-40)/(y1-y0));mapGeom={P,f:q=>[10+(q[0]-x0)*sc+((Wd-20)-(x1-x0)*sc)/2,26+(q[1]-y0)*sc],sc}}
-  const {P,f,sc}=mapGeom;
-  ctx.clearRect(0,0,Wd,Hd);ctx.fillStyle='rgba(12,16,18,0.82)';ctx.fillRect(0,0,Wd,Hd);
-  ctx.strokeStyle='rgba(242,165,59,0.35)';ctx.lineWidth=1;ctx.strokeRect(0.5,0.5,Wd-1,Hd-1);
-  const h=f(proj(HC,MAP_VIEW)),rt=f(proj(ROOT,MAP_VIEW));
-  ctx.strokeStyle='rgba(220,227,230,0.16)';ctx.setLineDash([3,3]);ctx.beginPath();ctx.ellipse(h[0],h[1]+4,62*SCALE*sc/SCALE,52*sc,0.5,0,7);ctx.stroke();ctx.setLineDash([]);
-  ctx.strokeStyle='rgba(220,227,230,0.35)';ctx.beginPath();ctx.arc(rt[0],rt[1],13*sc,0,7);ctx.stroke();
-  ctx.lineCap='round';
-  for(const s of MAP_SEGS){const v=s.v,pts=P[v.id],a=Math.floor(s.j/s.parts*(v.n-1)),b=Math.floor((s.j+1)/s.parts*(v.n-1)),on=mapped.has(s.key);
-    ctx.beginPath();for(let i=a;i<=b;i++){const q=f(pts[i]);i===a?ctx.moveTo(q[0],q[1]):ctx.lineTo(q[0],q[1])}
-    ctx.setLineDash(on?[]:[2,3]);ctx.lineWidth=on?Math.max(1.6,v.r[a]*1.6):1.1;ctx.strokeStyle=on?'#f2a53b':'rgba(220,227,230,0.4)';ctx.stroke()}
-  ctx.setLineDash([]);
-  ctx.font='600 13px "IBM Plex Mono", monospace';ctx.fillStyle='rgba(220,227,230,0.8)';
-  for(const [id,t] of [['LAD',0.55],['LCx',0.7],['RCA',0.35],['PDA',0.8],['D1',0.8],['OM1',0.9]]){const v=VBY[id],q=f(P[id][Math.floor(t*(v.n-1))]);ctx.fillText(id,q[0]+4,q[1]+3)}
-  ctx.fillStyle='rgba(220,227,230,0.95)';ctx.font='600 14px "IBM Plex Mono", monospace';ctx.fillText(`MAP ${[...mapped].length}/${MAP_SEGS.length}`,8,17);
-}
 
 const angLabel=(a,b)=>(a===0?'AP':(a>0?'LAO ':'RAO ')+Math.abs(a)+'°')+(b===0?'':(b>0?' CRA ':' CAU ')+Math.abs(b)+'°');

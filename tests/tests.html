@@ -39,6 +39,12 @@ test('Three cases load, and every lesion sits on a real vessel',()=>{
   return CASES.map(c=>c.title).join(' · ');
 });
 test('Every branch joins its parent vessel',()=>{for(const v of VESSELS)if(v.parent){ok(v.base>0,v.id+' has no join point')}});
+test('Vessels are tortuous, but branches still meet their parents and the ostia stay put',()=>{
+  let worst=0;for(const v of VESSELS)if(v.parent){const P=VBY[v.parent];worst=Math.max(worst,Math.min(...P.p.map(q=>dist3(q,v.p[0]))))}
+  ok(worst<0.8,'a branch starts '+worst.toFixed(1)+' mm from its parent');
+  ok(dist3(VBY.LM.p[0],VESSELS[0].ctrl[0])<1e-9&&dist3(VBY.RCA.p[0],VBY.RCA.ctrl[0])<1e-9,'an ostium moved');
+  const v=VBY.LAD,chord=dist3(v.p[0],v.p[v.n-1]);return `LAD ${v.len.toFixed(0)} mm long over a ${chord.toFixed(0)} mm span`;
+});
 test('Catheter in the descending aorta is not engaged and can be exchanged',()=>{const c=cathState({type:'JL',th:0,s:60});ok(!c.eng&&c.u===0);ok(c.region==='Descending aorta',c.region);ok(60<S_EXCH)});
 test('JL4 pointed at the left main engages the left system',()=>{const c=inRoot('JL',OSTANG.L,1);ok(c.eng==='L','got '+c.eng);ok(!c.deep)});
 test('JL4 engages anywhere inside its window, not outside it',()=>{
@@ -108,7 +114,7 @@ test('The right ostium has a wider window than the left on every difficulty',()=
 test('Easy has no contrast limit; Medium and Hard do',()=>{ok(DIFFICULTY.easy.budgetX===null);ok(DIFFICULTY.medium.budgetX===1&&DIFFICULTY.hard.budgetX<1)});
 test('Every shop avatar exists and every shop item has a price',()=>{for(const it of SHOP){ok(it.price>0,it.id);if(it.kind==='avatar')ok(AVATARS[it.avatar]&&AVATARS[it.avatar].shop===it.id,it.id)}return SHOP.length+' items'});
 test('Every vessel has an ECG territory lead',()=>{for(const v of VESSELS)ok(LEADS.includes(TERRITORY[v.id]),v.id+' has no lead');return 'LAD→V3, circumflex→V5, RCA→II'});
-test('The coronary map covers every vessel',()=>{const ids=new Set(MAP_SEGS.map(s=>s.v.id));for(const v of VESSELS)ok(ids.has(v.id),v.id);ok(mapKey(VBY.LAD,VBY.LAD.len)==='LAD:2');return MAP_SEGS.length+' segments'});
+test('Coverage segments span every vessel',()=>{const ids=new Set(MAP_SEGS.map(s=>s.v.id));for(const v of VESSELS)ok(ids.has(v.id),v.id);ok(mapKey(VBY.LAD,VBY.LAD.len)==='LAD:2');return MAP_SEGS.length+' segments'});
 test('Contrast darkens the image where the coronaries are',()=>{
   ictx=document.getElementById('img').getContext('2d');
   const base={t:5,phase:0.3,a:-30,b:-25,mode:'cine',frame:0,lesions:[],cath:false,root:0};

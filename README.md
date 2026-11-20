@@ -20,10 +20,10 @@ Then open http://localhost:8767/ (the game) or http://localhost:8767/tests/tests
 |---|---|
 | `cases/*.js` | **Editable case files**: patient, history, task, contrast budget, baseline ECG, and each lesion's vessel, position, length, severity and eccentricity. |
 | `config/config.js` | Anatomy (coronary tree, aorta), coronary flow speed, Judkins catheters, C-arm presets, grading buckets, stent and balloon sizes, difficulty settings, ECG territories and avatars. |
-| `js/sim.js` | Geometry, catheter position and engagement, lesion appearance per projection, stent and balloon outcome rules, the easy-mode coronary map, and the X-ray image renderer (including wire, balloon and stent struts). No game state. |
+| `js/sim.js` | Geometry, catheter position and engagement, lesion appearance per projection, stent and balloon outcome rules, coverage segments, coronary tortuosity, ribs and spine, and the X-ray image renderer (including wire, balloon and stent struts). No game state. |
 | `js/game.js` | Menu, operator profile and coffee tokens, game state, controls, cine runs and review, the PCI tools, the three-lead ECG and pressure strip, the main loop and scoring. |
 | `css/style.css` | Layout and look. |
-| `tests/tests.html` | Automated checks: cases load, catheter engagement, a smooth aorta-to-root path and deep-seating, eccentric lesions per view, contrast rendering, stent and balloon rules, difficulty windows, shop items, ECG territories and the coronary map. |
+| `tests/tests.html` | Automated checks: cases load, catheter engagement, a smooth aorta-to-root path and deep-seating, eccentric lesions per view, contrast rendering, stent and balloon rules, difficulty windows, shop items, ECG territories, coronary tortuosity and coverage segments. |
 
 To add a case, copy a file in `cases/`, edit it, and add a `<script>` line for it in `index.html` and `tests/tests.html`.
 
@@ -46,7 +46,7 @@ Items are defined in `SHOP` in `config/config.js`.
 
 | Difficulty | Engagement window (left / right) | Help finding the ostia | Contrast budget | Extras |
 |---|---|---|---|---|
-| Easy | 45° / 55° | Tip drops in from up to 70° further | No limit | Coronary map in the top left fills in as you inject |
+| Easy | 45° / 55° | Tip drops in from up to 70° further | No limit | |
 | Medium | 28° / 32° | Gentle pull | ×1 | Tokens ×1.5 |
 | Hard | 16° / 18° | None, and the catheter damps sooner | ×0.75 | Tokens ×2 |
 
@@ -77,7 +77,7 @@ Items are defined in `SHOP` in `config/config.js`.
 |---|---|
 | Lesion detection and grading (a significant lesion you imaged but didn't mark earns 30% of its share) | 35 |
 | Treatment: every ≥70% lesion stented, covered, sized within 0.4 mm smaller / 0.75 mm larger than the vessel, deployed at ≥12 atm, subtotal lesions predilated. Balloon only earns 40%. −8 per unnecessary stent, −4 per oversized or unnecessary balloon | 15 |
-| Complete study: views (LCA 3+, RCA 2+) up to 8, plus up to 7 for the share of the 30 coronary segments you opacified | 15 |
+| Complete study: views (LCA 3+, RCA 2+) up to 8, plus up to 7 for the share of the 32 coronary segments you opacified | 15 |
 | Contrast against the case budget | 15 |
 | Air kerma (full marks up to 400 mGy) | 10 |
 | Safety (catheter moved only under fluoro) | 10 |

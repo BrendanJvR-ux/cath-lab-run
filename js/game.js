@@ -48,7 +48,7 @@ function shopIcon(it){if(it.kind==='avatar')return avatarSVG(it.avatar,44);retur
 function applyLut(){const it=SHOP.find(x=>x.id===(profile&&profile.lut));img.style.filter=it&&owns(it.id)?it.filter:''}
 function showMenu(view){
   menuView=view||(profile?'home':'profile');S=null;
-  $('resultOv').hidden=true;$('startOv').hidden=false;$('reviewbar').hidden=true;$('mapCan').hidden=true;$('monitor').classList.remove('withmap');
+  $('resultOv').hidden=true;$('startOv').hidden=false;$('reviewbar').hidden=true;
   applyLut();demoFrame();syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   $('caseHead').innerHTML='<h2>Patient</h2><b>No case loaded</b><p>Pick a case on the monitor to begin.</p>';$('status').textContent='Catheter in the femoral sheath.';$('status').className='status';
   renderMenu();
@@ -147,7 +147,6 @@ function startCase(ci){
   $('startOv').hidden=true;$('resultOv').hidden=true;closeReview();
   const c=S.c;$('caseHead').innerHTML=`<h2>Patient · case ${ci+1} · ${S.D.label}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
   ictx.fillStyle='#000';ictx.fillRect(0,0,W,W);applyLut();
-  $('mapCan').hidden=!S.D.map;$('monitor').classList.toggle('withmap',S.D.map);if(S.D.map)drawMap($('mapCan').getContext('2d'),S.mapped);
   syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   toast('Sheath in the right femoral artery. Hold Space for fluoro and advance.');
 }
@@ -442,8 +441,8 @@ function tick(dt){
     S.imgAcc=0;S.frame++;
     renderImage({t:S.clock,phase:S.phase,a:S.a,b:S.b,mode:S.cine?'cine':'fluoro',frame:S.frame,lesions:S.lesions,pci:pciRender(),cath:true,cathState:cs,wire:S.exch>0,conc:(sys,t)=>histAt(S.hist[sys],t),root:histAt(S.hist.root,S.clock)});
     if(S.cine){S.cine.frames.push({t:S.clock,phase:S.phase,frame:S.frame,cath:{...c},pci:pciRender()});if(S.cine.frames.length>=90)stopCine()}
-    // coronary mapping (scored on every difficulty, drawn on Easy): any segment that filled with contrast is mapped
-    if(lastProj){const n0=S.mapped.size;for(const Pv of lastProj.projV){for(let i=0;i<Pv.v.n;i+=2)if(Pv.cs[i]>0.45)S.mapped.add(mapKey(Pv.v,Pv.v.ld[i]))}if(D.map&&S.mapped.size!==n0)drawMap($('mapCan').getContext('2d'),S.mapped)}
+    // coverage: any segment that filled with contrast counts towards a complete study
+    if(lastProj){for(const Pv of lastProj.projV){for(let i=0;i<Pv.v.n;i+=2)if(Pv.cs[i]>0.45)S.mapped.add(mapKey(Pv.v,Pv.v.ld[i]))}}
   }
 }
 function fmtT(s){s=Math.floor(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
