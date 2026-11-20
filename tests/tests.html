@@ -47,7 +47,7 @@ test('JL4 engages anywhere inside its window, not outside it',()=>{
 });
 test('JL4 never engages the RCA',()=>{ok(!inRoot('JL',OSTANG.R,1).eng)});
 test('JR4 pointed at the RCA engages the right system',()=>{ok(inRoot('JR',OSTANG.R,1).eng==='R')});
-test('Pushing past the ostium deep-seats the catheter',()=>{const c=inRoot('JR',OSTANG.R,1.5);ok(c.eng==='R'&&c.deep)});
+test('Pushing past the ostium deep-seats the catheter',()=>{const c=inRoot('JR',OSTANG.R,1.58);ok(c.eng==='R'&&c.deep)});
 test('Catheter tip moves when torqued in the root',()=>{const a=inRoot('JL',-120,0.3).tip,b=inRoot('JL',60,0.3).tip;ok(Math.hypot(a[0]-b[0],a[2]-b[2])>10,'tip barely moved')});
 test('Lesion labels read like a report',()=>{
   const labels=CASES.map(c=>prepLesions(c.lesions).map(L=>L.label).join(', '));
@@ -59,6 +59,23 @@ test('An eccentric lesion looks different in different projections, never worse 
   const lo=Math.min(...vals),hi=Math.max(...vals);
   ok(hi<=L.sev+1e-9,'apparent exceeds true severity');ok(hi-lo>0.15,'too little difference between views');
   return `looks ${Math.round(lo*100)}–${Math.round(hi*100)}% (true ${Math.round(L.sev*100)}%)`;
+});
+test('A well-sized stent covering the lesion leaves a small residual',()=>{
+  const L=prepLesions(CASES[0].lesions)[0],ref=refDiam(L.vid,L.at),d=STENT_DIAMS.reduce((a,b)=>Math.abs(b-ref)<Math.abs(a-ref)?b:a);
+  const o=stentOutcome(L,{vid:L.vid,ld:L.at,len:18,diam:d,atm:14});
+  ok(o&&o.covered&&!o.under&&!o.over&&!o.lowP,'should be a clean result');ok(o.residual<=0.1,'residual '+o.residual);
+  return `${d.toFixed(1)} mm stent in a ~${ref.toFixed(1)} mm vessel → residual ${Math.round(o.residual*100)}%`;
+});
+test('Undersizing, low pressure and a short off-centre stent each leave more narrowing',()=>{
+  const L=prepLesions(CASES[0].lesions)[0],ref=refDiam(L.vid,L.at);
+  const good=stentOutcome(L,{vid:L.vid,ld:L.at,len:18,diam:3.5,atm:14}).residual;
+  const under=stentOutcome(L,{vid:L.vid,ld:L.at,len:18,diam:ref-1,atm:14});ok(under.under&&under.residual>good,'undersize');
+  const low=stentOutcome(L,{vid:L.vid,ld:L.at,len:18,diam:3.5,atm:9});ok(low.lowP&&low.residual>good,'low pressure');
+  const miss=stentOutcome(L,{vid:L.vid,ld:L.at+8,len:12,diam:3.5,atm:14});ok(miss&&!miss.covered&&miss.residual>good,'geographic miss');
+});
+test('A stent away from the lesion, or in another vessel, does not touch it',()=>{
+  const L=prepLesions(CASES[0].lesions)[0];
+  ok(stentOutcome(L,{vid:L.vid,ld:L.at+40,len:12,diam:3,atm:14})===null);ok(stentOutcome(L,{vid:'RCA',ld:L.at,len:18,diam:3,atm:14})===null);
 });
 test('Contrast darkens the image where the coronaries are',()=>{
   ictx=document.getElementById('img').getContext('2d');

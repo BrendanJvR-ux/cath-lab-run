@@ -10,7 +10,7 @@ const MAXD={L:0,R:0};
 for(const v of VESSELS){
   const s=sample(v.ctrl,1.1);v.p=s.p;v.ld=s.ld;v.len=s.ld[s.ld.length-1];v.n=v.p.length;
   v.anc=new Set();
-  if(v.parent){const P=VBY[v.parent];let bi=0,bd=1e9;P.p.forEach((q,i)=>{const d=dist3(q,v.p[0]);if(d<bd){bd=d;bi=i}});v.base=P.base+P.ld[bi];P.anc.forEach(a=>v.anc.add(a));v.anc.add(P.id)}else v.base=0;
+  if(v.parent){const P=VBY[v.parent];let bi=0,bd=1e9;P.p.forEach((q,i)=>{const d=dist3(q,v.p[0]);if(d<bd){bd=d;bi=i}});v.base=P.base+P.ld[bi];v.joinIdx=bi;P.anc.forEach(a=>v.anc.add(a));v.anc.add(P.id)}else v.base=0;
   v.r=v.ld.map(d=>v.r0+(v.r1-v.r0)*d/v.len);
   MAXD[v.sys]=Math.max(MAXD[v.sys],v.base+v.len);
   VBY[v.id]=v;
@@ -50,10 +50,10 @@ function cathState(c){
   }
   const u=(c.s-S_ROOT)/22;out.u=u;
   const th=c.th*D2R,dir=[Math.cos(th),0,Math.sin(th)];
-  const reach=Math.min(1,0.45+u);let tip=add(ROOT,add(mul(dir,14*reach),[0,4*reach,0]));
+  const reach=Math.min(1,0.5+u);let tip=add(ROOT,add(mul(dir,19*reach),[0,5*reach,0]));
   const C=CATH[c.type];
-  if(u>=0.7&&angDiff(c.th,OSTANG[C.sys])<C.tol){out.eng=C.sys;out.deep=u>1.45;tip=add(OST[C.sys],mul(OSTDIR[C.sys],Math.max(0,u-1)*11))}
-  const ctrl=add(ROOT,add(mul(dir,c.type==='JL'?-8:-3),[0,c.type==='JL'?17:9,0]));
+  if(u>=0.55&&angDiff(c.th,OSTANG[C.sys])<C.tol){out.eng=C.sys;out.deep=u>1.5;tip=add(OST[C.sys],mul(OSTDIR[C.sys],Math.max(0,u-1)*11))}
+  const ctrl=add(ROOT,add(mul(dir,c.type==='JL'?-13:-6),[0,c.type==='JL'?22:12,0]));
   for(let i=1;i<=20;i++){const t=i/20,a=(1-t)*(1-t),b=2*(1-t)*t,cc=t*t;pts.push([a*base[0]+b*ctrl[0]+cc*tip[0],a*base[1]+b*ctrl[1]+cc*tip[1],a*base[2]+b*ctrl[2]+cc*tip[2]])}
   out.pts=pts;out.tip=tip;
   out.region=out.eng?(out.deep?'Deep-seated':'Engaged '+(out.eng==='L'?'LMCA':'RCA')):'Aortic root';
@@ -69,10 +69,20 @@ function prepLesions(list){
     return {...L,sys:v.sys,idx:i,t,e,pos:v.p[i],gd:v.base+L.at,label:segLabel(v,L.at)};
   });
 }
-function apparent(L,B){
+function apparent(L,B,sev=L.sev){
   const t2=[dot(L.t,B.r),dot(L.t,B.u)];const len2=Math.hypot(t2[0],t2[1])||1e-6;
   const n2=[-t2[1]/len2,t2[0]/len2];const f=Math.abs(dot(L.e,B.r)*n2[0]+dot(L.e,B.u)*n2[1]);
-  return L.sev*(0.28+0.72*f)*Math.min(1,0.3+len2*1.25);
+  return sev*(0.28+0.72*f)*Math.min(1,0.3+len2*1.25);
+}
+function refDiam(vid,ld){const v=VBY[vid];let i=0;while(i<v.n-1&&v.ld[i]<ld)i++;return 2*v.r[i]}
+/* What a stent s {vid,ld,len,diam,atm} does to lesion L. Returns null if it misses the lesion entirely. */
+function stentOutcome(L,s){
+  if(L.vid!==s.vid)return null;
+  const off=Math.abs(L.at-s.ld);if(off>s.len/2+L.len/2)return null;
+  const refD=refDiam(L.vid,L.at),diff=s.diam-refD,before=L.cur!=null?L.cur:L.sev;
+  const covered=off+L.len/2<=s.len/2+0.5,under=diff<-0.4,over=diff>0.75,lowP=s.atm<12;
+  let res=under?0.3:0.05;if(lowP)res+=0.12;if(!covered)res=Math.max(res,before*0.6);
+  return {residual:Math.min(before,res),refD,diff,covered,under,over,lowP};
 }
 function segLabel(v,ld){if(v.id==='LM')return 'left main';const f=ld/v.len;return (f<0.33?'proximal ':f<0.66?'mid ':'distal ')+v.name}
 
@@ -121,12 +131,13 @@ function renderImage(st){
     dctx.beginPath();pp.forEach((q,i)=>i?dctx.lineTo(q[0],q[1]):dctx.moveTo(q[0],q[1]));dctx.lineWidth=26*SCALE;dctx.strokeStyle=grey(1-0.4*st.root);dctx.stroke();
     for(const o of [[-7,-4,6],[8,-5,-3],[-1,-5,-9]]){const q=proj(add(ROOT,o),B);dctx.beginPath();dctx.arc(q[0],q[1],9*SCALE,0,7);dctx.fillStyle=grey(1-0.42*st.root);dctx.fill()}
   }
-  const app=st.lesions.map(L=>apparent(L,B));
+  const sevNow=L=>L.cur!=null?L.cur:L.sev;
+  const app=st.lesions.map(L=>apparent(L,B,sevNow(L)));
   const projV=[];
   for(const v of VESSELS){
     const xs=new Float32Array(v.n),ys=new Float32Array(v.n),cs=new Float32Array(v.n);
     const les=[];st.lesions.forEach((L,i)=>{if(L.vid===v.id)les.push([L,app[i]])});
-    const slow=st.lesions.filter(L=>L.sev>=0.9&&L.sys===v.sys&&(L.vid===v.id||v.anc.has(L.vid)));
+    const slow=st.lesions.filter(L=>sevNow(L)>=0.9&&L.sys===v.sys&&(L.vid===v.id||v.anc.has(L.vid)));
     for(let i=0;i<v.n;i++){
       const q=proj(motion(v.p[i],k),B);xs[i]=q[0];ys[i]=q[1];
       const d=v.base+v.ld[i];let delay=d/FLOW[v.sys],att=1-0.35*d/MAXD[v.sys];
@@ -143,6 +154,7 @@ function renderImage(st){
       dctx.lineWidth=w*0.5;dctx.strokeStyle=grey(1-0.86*c*dens);dctx.stroke();
     }
   }
+  if(st.pci)drawPCI(st.pci,projV);
   if(st.cath){
     const cs=st.cathState;const pp=cs.pts.map(p=>proj(motion(p,k),B));
     dctx.beginPath();pp.forEach((q,i)=>i?dctx.lineTo(q[0],q[1]):dctx.moveTo(q[0],q[1]));
@@ -160,5 +172,24 @@ function renderImage(st){
   }
 }
 
+
+/* Wire, balloon and stents, drawn along the already-projected vessels. */
+function drawPCI(pci,projV){
+  const PV={};projV.forEach(P=>PV[P.v.id]=P);
+  const chain=(vid,end)=>{const P=PV[vid],v=P.v,e=end==null?v.n-1:end,own=[];for(let i=0;i<=e;i++)own.push([P.xs[i],P.ys[i]]);return v.parent?chain(v.parent,v.joinIdx).concat(own):own};
+  const seg=(vid,ld,len)=>{const P=PV[vid],v=P.v,out=[];for(let i=0;i<v.n;i++)if(Math.abs(v.ld[i]-ld)<=len/2)out.push([P.xs[i],P.ys[i]]);return out};
+  for(const s of pci.stents){
+    const q=seg(s.vid,s.ld,s.len);if(q.length<2)continue;const hw=s.diam/2*SCALE;
+    dctx.beginPath();
+    for(let j=0;j<q.length;j++){const a=q[Math.max(0,j-1)],b=q[Math.min(q.length-1,j+1)];let nx=a[1]-b[1],ny=b[0]-a[0];const l=Math.hypot(nx,ny)||1;const sg=j%2?1:-1;const x=q[j][0]+nx/l*hw*sg,y=q[j][1]+ny/l*hw*sg;j?dctx.lineTo(x,y):dctx.moveTo(x,y)}
+    dctx.lineWidth=1.1;dctx.strokeStyle=grey(0.55);dctx.stroke();
+  }
+  const b=pci.balloon;
+  if(b){const q=seg(b.vid,b.ld,b.len);if(q.length>1){
+    if(b.inflate>0.02){dctx.beginPath();q.forEach((p,i)=>i?dctx.lineTo(p[0],p[1]):dctx.moveTo(p[0],p[1]));dctx.lineWidth=b.diam*SCALE*(0.3+0.7*Math.min(1,b.inflate));dctx.strokeStyle=grey(0.5);dctx.stroke()}
+    for(const p of [q[0],q[q.length-1]]){dctx.beginPath();dctx.arc(p[0],p[1],2.6,0,7);dctx.fillStyle=grey(0.22);dctx.fill()}}}
+  const w=pci.wire;
+  if(w){const q=chain(w.vid);const n=Math.max(2,Math.round(q.length*w.frac));dctx.beginPath();for(let i=0;i<n;i++)i?dctx.lineTo(q[i][0],q[i][1]):dctx.moveTo(q[i][0],q[i][1]);dctx.lineWidth=1.5;dctx.strokeStyle=grey(0.3);dctx.stroke()}
+}
 
 const angLabel=(a,b)=>(a===0?'AP':(a>0?'LAO ':'RAO ')+Math.abs(a)+'°')+(b===0?'':(b>0?' CRA ':' CAU ')+Math.abs(b)+'°');

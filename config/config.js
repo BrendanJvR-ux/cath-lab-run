@@ -37,13 +37,17 @@ const FLOW={L:150,R:125};
 const AO_CTRL=[[14,-240,-62],[14,-120,-62],[13,-20,-60],[12,60,-56],[9,100,-46],[2,118,-28],[-7,116,-8],[-12,100,6],[-11,78,8],[-6,56,5],[0,44,1],[2,36,0]];
 
 /* Judkins catheters: home = starting tip angle (deg), tol = engagement window (deg), sys = which coronary it engages. */
-const CATH={JL:{label:'JL4',home:-45,tol:32,sys:'L'},JR:{label:'JR4',home:55,tol:26,sys:'R'}};
+const CATH={JL:{label:'JL4',home:-45,tol:45,sys:'L'},JR:{label:'JR4',home:90,tol:40,sys:'R'}};
 
 /* Stenosis grading buckets offered in the report. */
 const BUCKETS=[{k:'<50%',lo:0,hi:0.5},{k:'50–69%',lo:0.5,hi:0.7},{k:'70–89%',lo:0.7,hi:0.9},{k:'≥90%',lo:0.9,hi:1.01}];
 
 /* C-arm presets on keys 1–7: [label, LAO(+)/RAO(-), CRA(+)/CAU(-)]. */
 const PRESETS=[['RAO 30 CAU 25',-30,-25],['RAO 30 CRA 30',-30,30],['AP CRA 35',0,35],['LAO 45 CRA 25',45,25],['LAO 45 CAU 30',45,-30],['LAO 40',40,0],['RAO 30',-30,0]];
+
+/* Stent sizes offered for PCI: diameter (mm) and length (mm). */
+const STENT_DIAMS=[2.5,3.0,3.5,4.0];
+const STENT_LENS=[12,18,24,30];
 
 /* Cases add themselves here (see cases/*.js). */
 const CASES=[];
