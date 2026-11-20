@@ -2,15 +2,30 @@
 
 A diagnostic coronary angiography game with fictional patients. Drive a Judkins catheter from the femoral artery to the aortic root, engage each coronary ostium, record cine runs in standard C-arm projections, then mark and grade the stenosis. Keep contrast and radiation low.
 
-It is one `index.html` file: plain HTML, CSS and JavaScript with Canvas 2D, no build step and no image assets. Fonts load from Google Fonts.
+**Play it:** https://brendanjvr-ux.github.io/cath-lab-run/ (tests at [/tests/tests.html](https://brendanjvr-ux.github.io/cath-lab-run/tests/tests.html))
 
-## Run it
+Plain HTML, CSS and JavaScript with Canvas 2D: no build step and no image assets. Fonts load from Google Fonts.
+
+## Run it locally
 
 ```bash
 python3 -m http.server 8767
 ```
 
-Then open http://localhost:8767/. You can also double-click `index.html`.
+Then open http://localhost:8767/ (the game) or http://localhost:8767/tests/tests.html (the automated tests). You can also double-click `index.html`.
+
+## Files
+
+| File | What it is |
+|---|---|
+| `cases/*.js` | **Editable case files**: patient, history, task, contrast budget, and each lesion's vessel, position, length, severity and eccentricity. |
+| `config/config.js` | Anatomy (coronary tree, aorta), coronary flow speed, the Judkins catheters' engagement windows, C-arm presets and grading buckets. |
+| `js/sim.js` | Geometry, catheter position and engagement, lesion appearance per projection, and the X-ray image renderer. No game state. |
+| `js/game.js` | Game state, controls, cine runs and review, the ECG and pressure strip, the main loop and scoring. |
+| `css/style.css` | Layout and look. |
+| `tests/tests.html` | Automated checks: cases load, catheter engagement and deep-seating, eccentric lesions per view, contrast rendering. |
+
+To add a case, copy a file in `cases/`, edit it, and add a `<script>` line for it in `index.html` and `tests/tests.html`.
 
 ## How it plays
 

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cath Lab Run tests</title>
+<style>
+:root{--bg:#0e1214;--fg:#dce3e6;--muted:#869399;--ok:#5fe08c;--bad:#ff6a63;--line:#29343a;color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 "IBM Plex Mono",ui-monospace,Menlo,monospace;padding:20px max(16px,env(safe-area-inset-left,0px))}
+h1{font:600 22px/1.2 system-ui,sans-serif;margin:0 0 4px}
+#sum{margin:0 0 16px;color:var(--muted)}
+#sum.ok{color:var(--ok)}#sum.bad{color:var(--bad)}
+ol{padding-left:1.4em;margin:0;display:flex;flex-direction:column;gap:4px}
+li.ok::marker{color:var(--ok)}li.bad{color:var(--bad)}
+li small{color:var(--muted)}
+canvas{display:none}
+</style>
+</head>
+<body>
+<h1>Cath Lab Run tests</h1>
+<p id="sum">Running…</p>
+<ol id="out"></ol>
+<canvas id="img" width="512" height="512"></canvas>
+<script src="../config/config.js"></script>
+<script src="../cases/lad-exertional-angina.js"></script>
+<script src="../cases/rca-inferior-nstemi.js"></script>
+<script src="../cases/lcx-breathless-diabetic.js"></script>
+<script src="../js/sim.js"></script>
+<script>
+"use strict";
+const results=[];
+function test(name,fn){try{const note=fn();results.push({name,ok:true,note})}catch(e){results.push({name,ok:false,note:e.message})}}
+function ok(cond,msg){if(!cond)throw new Error(msg||'assertion failed')}
+const inRoot=(type,th,u)=>cathState({type,th,s:S_ROOT+22*u});
+
+test('Three cases load, and every lesion sits on a real vessel',()=>{
+  ok(CASES.length===3,'expected 3 cases, got '+CASES.length);
+  for(const c of CASES)for(const L of c.lesions){const v=VBY[L.vid];ok(v,'unknown vessel '+L.vid);ok(L.at>0&&L.at<v.len,`${L.vid} at ${L.at} mm is outside its ${v.len.toFixed(0)} mm length`);ok(L.sev>0&&L.sev<1,'severity must be 0–1')}
+  return CASES.map(c=>c.title).join(' · ');
+});
+test('Every branch joins its parent vessel',()=>{for(const v of VESSELS)if(v.parent){ok(v.base>0,v.id+' has no join point')}});
+test('Catheter in the descending aorta is not engaged and can be exchanged',()=>{const c=cathState({type:'JL',th:0,s:60});ok(!c.eng&&c.u===0);ok(c.region==='Descending aorta',c.region);ok(60<S_EXCH)});
+test('JL4 pointed at the left main engages the left system',()=>{const c=inRoot('JL',OSTANG.L,1);ok(c.eng==='L','got '+c.eng);ok(!c.deep)});
+test('JL4 engages anywhere inside its window, not outside it',()=>{
+  ok(inRoot('JL',OSTANG.L+CATH.JL.tol-1,1).eng==='L','edge of window should engage');
+  ok(!inRoot('JL',OSTANG.L+CATH.JL.tol+5,1).eng,'outside window should not engage');
+});
+test('JL4 never engages the RCA',()=>{ok(!inRoot('JL',OSTANG.R,1).eng)});
+test('JR4 pointed at the RCA engages the right system',()=>{ok(inRoot('JR',OSTANG.R,1).eng==='R')});
+test('Pushing past the ostium deep-seats the catheter',()=>{const c=inRoot('JR',OSTANG.R,1.5);ok(c.eng==='R'&&c.deep)});
+test('Catheter tip moves when torqued in the root',()=>{const a=inRoot('JL',-120,0.3).tip,b=inRoot('JL',60,0.3).tip;ok(Math.hypot(a[0]-b[0],a[2]-b[2])>10,'tip barely moved')});
+test('Lesion labels read like a report',()=>{
+  const labels=CASES.map(c=>prepLesions(c.lesions).map(L=>L.label).join(', '));
+  ok(labels[0]==='proximal LAD',labels[0]);ok(labels[1]==='mid RCA',labels[1]);return labels.join(' · ');
+});
+test('An eccentric lesion looks different in different projections, never worse than it is',()=>{
+  const L=prepLesions(CASES[0].lesions)[0];
+  const vals=PRESETS.map(p=>apparent(L,basis(p[1],p[2])));
+  const lo=Math.min(...vals),hi=Math.max(...vals);
+  ok(hi<=L.sev+1e-9,'apparent exceeds true severity');ok(hi-lo>0.15,'too little difference between views');
+  return `looks ${Math.round(lo*100)}–${Math.round(hi*100)}% (true ${Math.round(L.sev*100)}%)`;
+});
+test('Contrast darkens the image where the coronaries are',()=>{
+  ictx=document.getElementById('img').getContext('2d');
+  const base={t:5,phase:0.3,a:-30,b:-25,mode:'cine',frame:0,lesions:[],cath:false,root:0};
+  const lum=()=>{const d=ictx.getImageData(0,0,512,512).data;let s=0;for(let i=0;i<d.length;i+=16)s+=d[i];return s};
+  renderImage({...base,conc:()=>0});const empty=lum();
+  renderImage({...base,conc:()=>1});const full=lum();
+  ok(full<empty*0.99,'no visible contrast');return `${((1-full/empty)*100).toFixed(1)}% darker`;
+});
+
+const bad=results.filter(r=>!r.ok).length,sum=document.getElementById('sum');
+sum.textContent=bad?`${bad} of ${results.length} failed`:`All ${results.length} passed`;sum.className=bad?'bad':'ok';
+document.getElementById('out').innerHTML=results.map(r=>`<li class="${r.ok?'ok':'bad'}">${r.ok?'Pass':'FAIL'}: ${r.name}${r.note?` <small>· ${r.note}</small>`:''}</li>`).join('');
+</script>
+</body>
+</html>
