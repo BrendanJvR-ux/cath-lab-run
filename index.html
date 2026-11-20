@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cath Lab Run</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+[hidden]{display:none!important}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+/* Layout: cath-lab control room. Fluoroscopy monitor + hemodynamic strip + pedal/handle pad on the left, operator console on the right. One deliberate dark look (monitors in a dimmed lab). */
+:root{
+  --bg:#0e1214; --panel:#151b1e; --panel2:#1b2327; --line:#29343a; --fg:#dce3e6; --muted:#869399;
+  --amber:#f2a53b; --amber-ink:#2a1a05; --amber-dim:#4a3414;
+  --ecg:#5fe08c; --press:#ff6a63; --ok:#5fe08c; --warn:#f2a53b; --danger:#ff6a63;
+  --f-display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--bg);color:var(--fg)}
+body{margin:0}
+img{max-width:100%}
+body{font-family:var(--f-body);font-size:14px;line-height:1.45;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 28px}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;max-width:1180px;margin:0 auto 12px}
+.brand{font-family:var(--f-display);font-weight:700;font-size:26px;letter-spacing:.06em;text-transform:uppercase;line-height:1}
+.brand small{display:block;font-family:var(--f-mono);font-size:11px;font-weight:400;letter-spacing:.04em;color:var(--muted);text-transform:none;margin-top:4px}
+.lamp{margin-left:auto;display:flex;align-items:center;gap:8px;font-family:var(--f-display);font-weight:600;letter-spacing:.14em;font-size:15px;padding:6px 12px;border:1px solid var(--line);border-radius:4px;color:var(--muted)}
+.lamp i{width:12px;height:12px;border-radius:50%;background:var(--amber-dim)}
+.lamp.on{color:var(--amber-ink);background:var(--amber);border-color:var(--amber)}
+.lamp.on i{background:#fff6e4;box-shadow:0 0 8px #fff3d6}
+.lab{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:16px;align-items:start}
+@media (max-width:920px){.lab{grid-template-columns:minmax(0,1fr)}}
+.stage{display:flex;flex-direction:column;gap:10px;min-width:0;align-items:center}
+.monitor{position:relative;width:100%;max-width:min(640px,calc(100vh - 250px));min-width:min(100%,300px);aspect-ratio:1;background:#000;border:1px solid var(--line);border-radius:3px;overflow:hidden;max-width:100%}
+@media (min-width:921px){.monitor{max-width:min(640px,calc(100vh - 250px))}}
+#img{display:block;width:100%;height:100%;image-rendering:auto}
+.hud{position:absolute;font-family:var(--f-mono);font-size:clamp(10px,1.9vw,13px);color:#f4f4f4;text-shadow:0 1px 2px #000,0 0 4px #000;pointer-events:none;line-height:1.35;white-space:pre}
+.hud.tl{top:10px;left:12px}.hud.tr{top:10px;right:12px;text-align:right}.hud.bl{bottom:10px;left:12px}.hud.br{bottom:10px;right:12px;text-align:right}
+.hud .act{color:var(--amber)}
+.toast{position:absolute;left:50%;top:14%;transform:translateX(-50%);max-width:86%;background:rgba(10,12,13,.82);border:1px solid var(--line);padding:6px 12px;border-radius:3px;font-size:13px;text-align:center;pointer-events:none;transition:opacity .3s}
+.toast.danger{border-color:var(--danger);color:#ffd9d6}
+.overlay{position:absolute;inset:0;background:rgba(9,11,12,.80);overflow:auto;padding:clamp(14px,4%,30px);display:flex;flex-direction:column;gap:14px}
+.overlay h1{font-family:var(--f-display);font-weight:700;font-size:clamp(28px,5.4vw,44px);letter-spacing:.03em;text-transform:uppercase;line-height:.95;margin:0;text-wrap:balance}
+.overlay p{margin:0;color:#c3ccd0;max-width:60ch}
+.cases{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.case{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.case:hover{border-color:var(--amber)}
+.case b{font-family:var(--f-display);font-size:20px;font-weight:600;letter-spacing:.02em;line-height:1.05}
+.case span{font-family:var(--f-mono);font-size:11px;color:var(--muted);letter-spacing:.04em}
+.case em{font-style:normal;font-size:12.5px;color:#bcc6ca}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:4px 16px;font-size:12.5px;color:#c3ccd0}
+kbd{font-family:var(--f-mono);font-size:11px;border:1px solid #4a575d;border-bottom-width:2px;border-radius:3px;padding:0 5px;color:var(--fg);background:var(--panel2)}
+.fine{font-size:11.5px;color:var(--muted)}
+.reviewbar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;align-items:center;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,.85) 35%)}
+.reviewbar input{flex:1;min-width:0;accent-color:var(--amber)}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:7px 11px;cursor:pointer;font-size:13px;line-height:1.1}
+.btn:hover:not(:disabled){border-color:#4d5c63}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.primary{background:var(--amber);color:var(--amber-ink);border-color:var(--amber);font-weight:600}
+.hemo{width:100%;max-width:640px;height:118px;display:block;background:#05090a;border:1px solid var(--line);border-radius:3px}
+.pad{width:100%;max-width:640px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){.pad{grid-template-columns:1fr}}
+.group{display:grid;gap:6px;grid-template-columns:repeat(4,1fr)}
+.group.ped{grid-template-columns:repeat(3,1fr)}
+.hold{user-select:none;-webkit-user-select:none;touch-action:none;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:9px 4px 7px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:var(--f-display);font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:14px}
+.hold kbd{font-size:10px}
+.hold.on{background:var(--amber);color:var(--amber-ink);border-color:var(--amber)}
+.hold.on kbd{background:#ffe2b0;color:var(--amber-ink);border-color:#b97a20}
+.hold.cine.on{background:#ffcf7a}
+.hold.inj.on{background:#dfe9ff;color:#0a1630;border-color:#dfe9ff}
+.grouplabel{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.console{background:var(--panel);border:1px solid var(--line);border-radius:4px;display:flex;flex-direction:column;min-width:0}
+.sec{padding:12px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;min-width:0}
+.sec:first-child{border-top:0}
+.sec h2{font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0}
+.casehead b{font-family:var(--f-display);font-size:22px;font-weight:600;line-height:1.05}
+.casehead p{margin:0;font-size:12.5px;color:#bcc6ca}
+.casehead .task{color:var(--fg);font-weight:500}
+.reads{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.read{background:var(--panel2);padding:7px 10px}
+.read span{display:block;font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.read b{font-family:var(--f-mono);font-size:19px;font-weight:500;font-variant-numeric:tabular-nums}
+.read b small{font-size:11px;color:var(--muted);font-weight:400;margin-left:3px}
+.read.hot b{color:var(--amber)}
+.cath{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.chip{font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);border-radius:3px;padding:3px 7px;background:var(--panel2)}
+.status{font-size:12.5px;padding:7px 9px;border-left:3px solid var(--line);background:var(--panel2);border-radius:0 3px 3px 0;min-height:2.6em}
+.status.ok{border-left-color:var(--ok)}.status.warn{border-left-color:var(--warn)}.status.danger{border-left-color:var(--danger);color:#ffd9d6}
+.slider{display:grid;grid-template-columns:62px 1fr 64px;align-items:center;gap:8px;font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.slider output{color:var(--fg);text-align:right;font-variant-numeric:tabular-nums}
+.slider input{width:100%;accent-color:var(--amber);min-width:0}
+.presets{display:flex;flex-wrap:wrap;gap:5px}
+.presets button{font-family:var(--f-mono);font-size:11px;padding:4px 7px;border-radius:3px;border:1px solid var(--line);background:var(--panel2);cursor:pointer}
+.presets button:hover:not(:disabled){border-color:var(--amber)}
+.presets button:disabled{opacity:.4}
+.runs{display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto}
+.run{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:6px 8px;cursor:pointer;font-size:12px}
+.run:hover,.run.sel{border-color:var(--amber)}
+.run b{font-family:var(--f-mono);font-weight:500;font-size:11.5px}
+.run .sys{font-family:var(--f-mono);font-size:10.5px;padding:1px 5px;border-radius:2px;background:#26323a}
+.run .sys.L{background:#2c3d52}.run .sys.R{background:#4a3133}
+.empty{font-size:12px;color:var(--muted)}
+.marks{display:flex;flex-direction:column;gap:4px}
+.mark{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:12.5px;background:var(--panel2);padding:5px 8px;border-radius:3px}
+.mark button{background:none;border:0;color:var(--muted);cursor:pointer;font-size:12px}
+.pending{border:1px solid var(--amber);border-radius:4px;padding:8px;display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+.sev{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.sev button{font-family:var(--f-mono);font-size:12px;padding:6px 0;border:1px solid var(--line);background:var(--panel2);border-radius:3px;cursor:pointer}
+.sev button:hover{border-color:var(--amber)}
+.score{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.score b{font-family:var(--f-display);font-size:64px;line-height:.9;font-weight:700;color:var(--amber)}
+.score span{font-family:var(--f-display);font-size:24px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.rows{display:grid;grid-template-columns:1fr auto;gap:4px 16px;font-size:13px;max-width:520px}
+.rows .v{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.notes{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#c3ccd0;max-width:62ch}
+.notes div{padding-left:10px;border-left:2px solid var(--line)}
+.notes .bad{border-left-color:var(--danger)}.notes .good{border-left-color:var(--ok)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">Cath Lab Run<small>Diagnostic coronary angiography simulator · femoral access · 6F</small></div>
+  <div class="lamp" id="lamp"><i></i>X-RAY</div>
+</header>
+
+<main class="lab">
+  <section class="stage">
+    <div class="monitor" id="monitor">
+      <canvas id="img" width="512" height="512" aria-label="Fluoroscopy image"></canvas>
+      <div class="hud tl" id="hudTL"></div>
+      <div class="hud tr" id="hudTR"></div>
+      <div class="hud bl" id="hudBL"></div>
+      <div class="hud br" id="hudBR"></div>
+      <div class="toast" id="toast" hidden></div>
+      <div class="reviewbar" id="reviewbar" hidden>
+        <button class="btn" id="rvPlay">Pause</button>
+        <input type="range" id="rvSlider" min="0" max="10" value="0" aria-label="Cine frame">
+        <button class="btn" id="rvClose">Back to live</button>
+      </div>
+      <div class="overlay" id="startOv">
+        <h1>Cath Lab Run</h1>
+        <p>You have a 6F sheath in the right femoral artery. Drive the catheter to the aortic root, engage each coronary ostium, record cine runs in useful projections, then mark and grade the stenosis. Keep contrast and radiation low.</p>
+        <div class="cases" id="caseList"></div>
+        <div class="keys">
+          <div><kbd>Space</kbd> hold for fluoro (live X-ray)</div>
+          <div><kbd>C</kbd> start / stop a cine run</div>
+          <div><kbd>J</kbd> hold to inject contrast</div>
+          <div><kbd>↑</kbd><kbd>↓</kbd> advance / withdraw</div>
+          <div><kbd>←</kbd><kbd>→</kbd> torque counter-clockwise / clockwise</div>
+          <div><kbd>1</kbd>–<kbd>7</kbd> C-arm presets</div>
+        </div>
+        <p class="fine">Teaching game with simplified anatomy and physics. Not a clinical training device.</p>
+      </div>
+      <div class="overlay" id="resultOv" hidden></div>
+    </div>
+    <canvas class="hemo" id="hemo" aria-label="ECG and aortic pressure"></canvas>
+    <div class="pad">
+      <div>
+        <div class="grouplabel">Catheter</div>
+        <div class="group">
+          <button class="hold" data-k="ArrowLeft"><span>⟲ CCW</span><kbd>←</kbd></button>
+          <button class="hold" data-k="ArrowUp"><span>Advance</span><kbd>↑</kbd></button>
+          <button class="hold" data-k="ArrowDown"><span>Withdraw</span><kbd>↓</kbd></button>
+          <button class="hold" data-k="ArrowRight"><span>CW ⟳</span><kbd>→</kbd></button>
+        </div>
+      </div>
+      <div>
+        <div class="grouplabel">Pedals and syringe</div>
+        <div class="group ped">
+          <button class="hold" data-k="Space" id="bFluoro"><span>Fluoro</span><kbd>Space</kbd></button>
+          <button class="hold cine" id="bCine"><span>Cine</span><kbd>C</kbd></button>
+          <button class="hold inj" data-k="KeyJ" id="bInj"><span>Inject</span><kbd>J</kbd></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="console">
+    <div class="sec casehead" id="caseHead">
+      <h2>Patient</h2>
+      <b>No case loaded</b>
+      <p>Pick a case on the monitor to begin.</p>
+    </div>
+    <div class="sec">
+      <h2>Exposure</h2>
+      <div class="reads">
+        <div class="read" id="rdFT"><span>Fluoro time</span><b>0:00</b></div>
+        <div class="read" id="rdAK"><span>Air kerma</span><b>0<small>mGy</small></b></div>
+        <div class="read" id="rdCM"><span>Contrast</span><b>0<small>mL</small></b></div>
+        <div class="read" id="rdHD"><span>HR · AO</span><b>72<small>bpm</small></b></div>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>Catheter</h2>
+      <div class="cath"><span class="chip" id="cathType">JL4 · 6F</span><button class="btn" id="bExch">Exchange for JR4</button></div>
+      <div class="status" id="status">Catheter in the femoral sheath.</div>
+    </div>
+    <div class="sec">
+      <h2>C-arm</h2>
+      <div class="slider"><label for="sA">LAO/RAO</label><input type="range" id="sA" min="-60" max="60" step="1" value="0"><output id="oA">AP</output></div>
+      <div class="slider"><label for="sB">CRA/CAU</label><input type="range" id="sB" min="-40" max="40" step="1" value="0"><output id="oB">0°</output></div>
+      <div class="presets" id="presets"></div>
+    </div>
+    <div class="sec">
+      <h2>Cine runs</h2>
+      <div class="runs" id="runs"><div class="empty">No runs yet. Engage an ostium, press Cine, then inject.</div></div>
+    </div>
+    <div class="sec">
+      <h2>Findings</h2>
+      <div id="pending"></div>
+      <div class="marks" id="marks"><div class="empty">Open a cine run and click on a narrowing to mark it.</div></div>
+      <button class="btn primary" id="bFinish" disabled>Finish study and report</button>
+    </div>
+  </aside>
+</main>
+
+<script>
+(()=>{
+"use strict";
+const W=512, SCALE=2.85, CX=256, CY=258, D2R=Math.PI/180;
+const ISO=[10,6,0], ROOT=[2,36,0], HC=[26,-4,2];
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const dist3=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
+const mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const norm=a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return [a[0]/l,a[1]/l,a[2]/l]};
+
+/* ---------- geometry ---------- */
+function crPt(p0,p1,p2,p3,t){const t2=t*t,t3=t2*t;const f=i=>0.5*(2*p1[i]+(-p0[i]+p2[i])*t+(2*p0[i]-5*p1[i]+4*p2[i]-p3[i])*t2+(-p0[i]+3*p1[i]-3*p2[i]+p3[i])*t3);return [f(0),f(1),f(2)]}
+function sample(ctrl,step){const out=[];for(let i=0;i<ctrl.length-1;i++){const p0=ctrl[Math.max(0,i-1)],p1=ctrl[i],p2=ctrl[i+1],p3=ctrl[Math.min(ctrl.length-1,i+2)];const n=Math.max(2,Math.ceil(dist3(p1,p2)/step));for(let k=0;k<n;k++)out.push(crPt(p0,p1,p2,p3,k/n))}out.push(ctrl[ctrl.length-1].slice());const ld=[0];for(let i=1;i<out.length;i++)ld.push(ld[i-1]+dist3(out[i-1],out[i]));return {p:out,ld}}
+function pointAt(S,s){const ld=S.ld;if(s<=0)return S.p[0].slice();if(s>=ld[ld.length-1])return S.p[S.p.length-1].slice();let lo=0,hi=ld.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(ld[m]<=s)lo=m;else hi=m}const f=(s-ld[lo])/(ld[hi]-ld[lo]||1);return add(S.p[lo],mul(sub(S.p[hi],S.p[lo]),f))}
+
+const VESSELS=[
+ {id:'LM',sys:'L',name:'left main',r0:2.3,r1:2.1,ctrl:[[12,40,-4],[17,40,-4],[22,39,-2]]},
+ {id:'LAD',sys:'L',name:'LAD',parent:'LM',r0:1.9,r1:0.7,ctrl:[[22,39,-2],[27,37,9],[31,31,20],[35,19,28],[39,5,31],[43,-11,29],[47,-27,23],[50,-40,15]]},
+ {id:'S1',sys:'L',name:'first septal',parent:'LAD',r0:0.6,r1:0.3,ctrl:[[28,35,13],[27,29,7],[26,21,2]]},
+ {id:'D1',sys:'L',name:'first diagonal',parent:'LAD',r0:1.15,r1:0.5,ctrl:[[31,31,20],[40,28,24],[50,20,22],[58,8,17],[62,-4,12]]},
+ {id:'S2',sys:'L',name:'second septal',parent:'LAD',r0:0.55,r1:0.3,ctrl:[[35,19,28],[32,12,19],[30,4,13]]},
+ {id:'D2',sys:'L',name:'second diagonal',parent:'LAD',r0:0.8,r1:0.4,ctrl:[[43,-11,29],[52,-14,26],[58,-22,20]]},
+ {id:'LCx',sys:'L',name:'circumflex',parent:'LM',r0:1.7,r1:0.8,ctrl:[[22,39,-2],[31,41,-11],[40,38,-21],[46,30,-30],[49,19,-37],[50,7,-41]]},
+ {id:'OM1',sys:'L',name:'first obtuse marginal',parent:'LCx',r0:1.2,r1:0.5,ctrl:[[40,38,-21],[51,30,-18],[58,17,-14],[61,2,-10]]},
+ {id:'OM2',sys:'L',name:'second obtuse marginal',parent:'LCx',r0:1.0,r1:0.45,ctrl:[[49,19,-37],[56,10,-33],[58,-2,-28]]},
+ {id:'RCA',sys:'R',name:'RCA',r0:2.0,r1:1.2,ctrl:[[-8,40,10],[-19,35,17],[-30,26,20],[-39,12,16],[-41,-3,8],[-36,-16,-4],[-24,-23,-17],[-8,-25,-27]]},
+ {id:'CON',sys:'R',name:'conus branch',parent:'RCA',r0:0.55,r1:0.3,ctrl:[[-19,35,17],[-17,40,26],[-11,42,32]]},
+ {id:'AM',sys:'R',name:'acute marginal',parent:'RCA',r0:0.75,r1:0.35,ctrl:[[-39,12,16],[-34,2,26],[-26,-8,30]]},
+ {id:'PDA',sys:'R',name:'posterior descending',parent:'RCA',r0:1.1,r1:0.5,ctrl:[[-8,-25,-27],[4,-31,-22],[17,-37,-15],[28,-42,-7]]},
+ {id:'PLV',sys:'R',name:'posterolateral',parent:'RCA',r0:1.0,r1:0.5,ctrl:[[-8,-25,-27],[6,-21,-35],[18,-15,-40],[26,-8,-41]]},
+];
+const VBY={};
+const MAXD={L:0,R:0};
+for(const v of VESSELS){
+  const s=sample(v.ctrl,1.1);v.p=s.p;v.ld=s.ld;v.len=s.ld[s.ld.length-1];v.n=v.p.length;
+  v.anc=new Set();
+  if(v.parent){const P=VBY[v.parent];let bi=0,bd=1e9;P.p.forEach((q,i)=>{const d=dist3(q,v.p[0]);if(d<bd){bd=d;bi=i}});v.base=P.base+P.ld[bi];P.anc.forEach(a=>v.anc.add(a));v.anc.add(P.id)}else v.base=0;
+  v.r=v.ld.map(d=>v.r0+(v.r1-v.r0)*d/v.len);
+  MAXD[v.sys]=Math.max(MAXD[v.sys],v.base+v.len);
+  VBY[v.id]=v;
+}
+const OST={L:VBY.LM.p[0],R:VBY.RCA.p[0]};
+const OSTDIR={L:norm(sub(VBY.LM.p[3],VBY.LM.p[0])),R:norm(sub(VBY.RCA.p[3],VBY.RCA.p[0]))};
+const OSTANG={L:Math.atan2(OST.L[2]-ROOT[2],OST.L[0]-ROOT[0])/D2R,R:Math.atan2(OST.R[2]-ROOT[2],OST.R[0]-ROOT[0])/D2R};
+const FLOW={L:150,R:125};
+
+const AO=sample([[14,-240,-62],[14,-120,-62],[13,-20,-60],[12,60,-56],[9,100,-46],[2,118,-28],[-7,116,-8],[-12,100,6],[-11,78,8],[-6,56,5],[0,44,1],[2,36,0]],2);
+AO.len=AO.ld[AO.ld.length-1];
+const S_ROOT=AO.len-18;
+let S_EXCH=0;for(let i=0;i<AO.p.length;i++){if(AO.p[i][1]>40){S_EXCH=AO.ld[i];break}}
+let S_ARCH0=0,S_ARCH1=0;{let f=false;for(let i=0;i<AO.p.length;i++){if(AO.p[i][1]>95){if(!f){S_ARCH0=AO.ld[i];f=true}S_ARCH1=AO.ld[i]}}}
+const AO_ASC=AO.p.filter((q,i)=>AO.ld[i]>AO.len-80);
+
+function basis(aDeg,bDeg){const a=aDeg*D2R,b=bDeg*D2R;const d=[Math.sin(a)*Math.cos(b),Math.sin(b),Math.cos(a)*Math.cos(b)];const r=[Math.cos(a),0,-Math.sin(a)];const u=[d[1]*r[2]-d[2]*r[1],d[2]*r[0]-d[0]*r[2],d[0]*r[1]-d[1]*r[0]];return {d,r,u}}
+function motion(p,k){
+  if(k<=0)return p;
+  const dr=dist3(p,ROOT);const w=clamp((dr-5)/40,0,1)*k;const s=-0.08*w;
+  let x=p[0]+(p[0]-HC[0])*s,y=p[1]+(p[1]-HC[1])*s+2.5*w,z=p[2]+(p[2]-HC[2])*s;
+  const ang=0.07*w,cx=x-HC[0],cz=z-HC[2];
+  return [HC[0]+cx*Math.cos(ang)-cz*Math.sin(ang),y,HC[2]+cx*Math.sin(ang)+cz*Math.cos(ang)];
+}
+function proj(p,B){const q=sub(p,ISO);return [CX+dot(q,B.r)*SCALE,CY-dot(q,B.u)*SCALE]}
+function contraction(ph){return ph>0.13&&ph<0.5?Math.pow(Math.sin(Math.PI*(ph-0.13)/0.37),1.2):0}
+
+/* ---------- catheter ---------- */
+const CATH={JL:{label:'JL4',home:-70,tol:20,sys:'L'},JR:{label:'JR4',home:20,tol:14,sys:'R'}};
+function angDiff(a,b){let d=(a-b)%360;if(d>180)d-=360;if(d<-180)d+=360;return Math.abs(d)}
+function cathState(c){
+  const out={u:0,eng:null,deep:false,pts:null,tip:null,region:''};
+  const sBody=Math.min(c.s,S_ROOT);
+  const pts=[];for(let i=0;i<AO.p.length&&AO.ld[i]<sBody;i++)pts.push(AO.p[i]);
+  const base=pointAt(AO,sBody);pts.push(base);
+  if(c.s<=S_ROOT){
+    out.pts=pts;out.tip=base;
+    out.region=c.s<S_ARCH0?'Descending aorta':c.s<=S_ARCH1?'Aortic arch':'Ascending aorta';
+    return out;
+  }
+  const u=(c.s-S_ROOT)/22;out.u=u;
+  const th=c.th*D2R,dir=[Math.cos(th),0,Math.sin(th)];
+  let tip=add(ROOT,add(mul(dir,12.5*Math.min(u,1)),[0,4*Math.min(u,1),0]));
+  const C=CATH[c.type];
+  if(u>=0.85&&angDiff(c.th,OSTANG[C.sys])<C.tol){out.eng=C.sys;out.deep=u>1.3;tip=add(OST[C.sys],mul(OSTDIR[C.sys],Math.max(0,u-1)*11))}
+  const ctrl=add(ROOT,add(mul(dir,c.type==='JL'?-8:-3),[0,c.type==='JL'?17:9,0]));
+  for(let i=1;i<=20;i++){const t=i/20,a=(1-t)*(1-t),b=2*(1-t)*t,cc=t*t;pts.push([a*base[0]+b*ctrl[0]+cc*tip[0],a*base[1]+b*ctrl[1]+cc*tip[1],a*base[2]+b*ctrl[2]+cc*tip[2]])}
+  out.pts=pts;out.tip=tip;
+  out.region=out.eng?(out.deep?'Deep-seated':'Engaged '+(out.eng==='L'?'LMCA':'RCA')):'Aortic root';
+  return out;
+}
+
+/* ---------- lesions ---------- */
+function prepLesions(list){
+  return list.map(L=>{
+    const v=VBY[L.vid];let i=0;while(i<v.n-1&&v.ld[i]<L.at)i++;
+    const t=norm(sub(v.p[Math.min(v.n-1,i+2)],v.p[Math.max(0,i-2)]));
+    let e=norm(L.e);e=norm(sub(e,mul(t,dot(e,t))));
+    return {...L,sys:v.sys,idx:i,t,e,pos:v.p[i],gd:v.base+L.at,label:segLabel(v,L.at)};
+  });
+}
+function apparent(L,B){
+  const t2=[dot(L.t,B.r),dot(L.t,B.u)];const len2=Math.hypot(t2[0],t2[1])||1e-6;
+  const n2=[-t2[1]/len2,t2[0]/len2];const f=Math.abs(dot(L.e,B.r)*n2[0]+dot(L.e,B.u)*n2[1]);
+  return L.sev*(0.28+0.72*f)*Math.min(1,0.3+len2*1.25);
+}
+function segLabel(v,ld){if(v.id==='LM')return 'left main';const f=ld/v.len;return (f<0.33?'proximal ':f<0.66?'mid ':'distal ')+v.name}
+
+/* ---------- static image layers ---------- */
+const noise=[];for(let n=0;n<4;n++){const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');const id=g.createImageData(256,256);for(let i=0;i<id.data.length;i+=4){const v=128+(Math.random()+Math.random()-1)*80;id.data[i]=id.data[i+1]=id.data[i+2]=v;id.data[i+3]=255}g.putImageData(id,0,0);noise.push(c)}
+const vign=document.createElement('canvas');vign.width=vign.height=W;{const g=vign.getContext('2d');const rg=g.createRadialGradient(W/2,W/2,W*0.32,W/2,W/2,W*0.74);rg.addColorStop(0,'rgba(0,0,0,0)');rg.addColorStop(1,'rgba(0,0,0,0.62)');g.fillStyle=rg;g.fillRect(0,0,W,W)}
+const bgCache=new Map();
+function getBg(a,b){
+  const key=Math.round(a)+'|'+Math.round(b);if(bgCache.has(key))return bgCache.get(key);
+  const c=document.createElement('canvas');c.width=c.height=W;const g=c.getContext('2d');const B=basis(a,b);
+  g.fillStyle='rgb(178,178,176)';g.fillRect(0,0,W,W);
+  for(const x of [-62,66]){const q=proj([x,45,-5],B);const rg=g.createRadialGradient(q[0],q[1],10,q[0],q[1],170);rg.addColorStop(0,'rgba(255,255,255,0.26)');rg.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=rg;g.fillRect(0,0,W,W)}
+  {const q=proj(HC,B);const rg=g.createRadialGradient(q[0],q[1],20,q[0],q[1],78*SCALE);rg.addColorStop(0,'rgba(0,0,0,0.17)');rg.addColorStop(0.75,'rgba(0,0,0,0.11)');rg.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=rg;g.fillRect(0,0,W,W)}
+  // ribs
+  g.lineCap='round';
+  for(let y0=170;y0>-110;y0-=25){for(const side of [-1,1]){g.beginPath();for(let k=0;k<=24;k++){const ph=k/24*2.6;const p=[side*(12+110*Math.sin(ph)),y0-40*(ph/Math.PI),-88*Math.cos(ph)];const q=proj(p,B);k?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1])}g.lineWidth=9;g.strokeStyle='rgba(0,0,0,0.075)';g.stroke();g.lineWidth=3;g.strokeStyle='rgba(0,0,0,0.05)';g.stroke()}}
+  // spine
+  for(let y=-170;y<=180;y+=27){
+    const q=proj([2,y,-84],B);const w=36*SCALE*(0.75+0.25*Math.abs(Math.cos(a*D2R))),h=21*SCALE*Math.abs(Math.cos(b*D2R))+4;
+    g.fillStyle='rgba(0,0,0,0.16)';g.beginPath();g.roundRect?g.roundRect(q[0]-w/2,q[1]-h/2,w,h,8):g.rect(q[0]-w/2,q[1]-h/2,w,h);g.fill();
+    g.fillStyle='rgba(0,0,0,0.09)';g.fillRect(q[0]-w/2,q[1]-h/2,w,3);g.fillRect(q[0]-w/2,q[1]+h/2-3,w,3);
+    for(const s of [-1,1]){const pq=proj([2+s*14,y+3,-100],B);g.beginPath();g.ellipse(pq[0],pq[1],7,9,0,0,7);g.strokeStyle='rgba(0,0,0,0.12)';g.lineWidth=3;g.stroke()}
+  }
+  // diaphragm
+  g.beginPath();for(let x=-150;x<=150;x+=6){const y=-58-Math.pow((x-6)/60,2)*12+(x>20?-8:0)*Math.min(1,(x-20)/40);const q=proj([x,y,0],B);x===-150?g.moveTo(q[0],q[1]):g.lineTo(q[0],q[1])}
+  g.lineTo(W+50,W+400);g.lineTo(-50,W+400);g.closePath();const dg=g.createLinearGradient(0,W*0.7,0,W);dg.addColorStop(0,'rgba(0,0,0,0.2)');dg.addColorStop(1,'rgba(0,0,0,0.28)');g.fillStyle=dg;g.fill();
+  // ECG electrodes and leads on the skin
+  for(const e of [[-74,-30,96],[82,-48,90],[-60,110,70]]){const q=proj(e,B);g.beginPath();g.arc(q[0],q[1],9,0,7);g.strokeStyle='rgba(0,0,0,0.42)';g.lineWidth=2.5;g.stroke();g.beginPath();g.arc(q[0],q[1],3,0,7);g.fillStyle='rgba(0,0,0,0.5)';g.fill();g.beginPath();g.moveTo(q[0],q[1]);g.bezierCurveTo(q[0]+30,q[1]+40,q[0]-10,q[1]+120,q[0]+40,q[1]+260);g.lineWidth=1.6;g.strokeStyle='rgba(0,0,0,0.32)';g.stroke()}
+  if(bgCache.size>40)bgCache.delete(bgCache.keys().next().value);
+  bgCache.set(key,c);return c;
+}
+
+/* ---------- rendering ---------- */
+const img=document.getElementById('img'),ictx=img.getContext('2d');
+const dcan=document.createElement('canvas');dcan.width=dcan.height=W;const dctx=dcan.getContext('2d');
+const grey=v=>{const n=Math.round(clamp(v,0,1)*255);return 'rgb('+n+','+n+','+n+')'};
+let lastProj=null;
+function renderImage(st){
+  const B=basis(st.a,st.b),k=contraction(st.phase);
+  const ctx=ictx;ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+  ctx.drawImage(getBg(st.a,st.b),0,0);
+  dctx.globalCompositeOperation='source-over';dctx.fillStyle='#fff';dctx.fillRect(0,0,W,W);
+  dctx.globalCompositeOperation='darken';dctx.lineCap='round';dctx.lineJoin='round';
+  if(st.root>0.02){
+    const pp=AO_ASC.map(p=>proj(motion(p,k*0.5),B));
+    dctx.beginPath();pp.forEach((q,i)=>i?dctx.lineTo(q[0],q[1]):dctx.moveTo(q[0],q[1]));dctx.lineWidth=26*SCALE;dctx.strokeStyle=grey(1-0.4*st.root);dctx.stroke();
+    for(const o of [[-7,-4,6],[8,-5,-3],[-1,-5,-9]]){const q=proj(add(ROOT,o),B);dctx.beginPath();dctx.arc(q[0],q[1],9*SCALE,0,7);dctx.fillStyle=grey(1-0.42*st.root);dctx.fill()}
+  }
+  const app=st.lesions.map(L=>apparent(L,B));
+  const projV=[];
+  for(const v of VESSELS){
+    const xs=new Float32Array(v.n),ys=new Float32Array(v.n),cs=new Float32Array(v.n);
+    const les=[];st.lesions.forEach((L,i)=>{if(L.vid===v.id)les.push([L,app[i]])});
+    const slow=st.lesions.filter(L=>L.sev>=0.9&&L.sys===v.sys&&(L.vid===v.id||v.anc.has(L.vid)));
+    for(let i=0;i<v.n;i++){
+      const q=proj(motion(v.p[i],k),B);xs[i]=q[0];ys[i]=q[1];
+      const d=v.base+v.ld[i];let delay=d/FLOW[v.sys],att=1-0.35*d/MAXD[v.sys];
+      for(const L of slow){if(d>L.gd){delay+=(d-L.gd)/FLOW[v.sys]*2.4;att*=0.72}}
+      cs[i]=st.conc(v.sys,st.t-delay)*att;
+    }
+    projV.push({v,xs,ys,cs});
+    for(let i=0;i<v.n-1;i++){
+      const c=(cs[i]+cs[i+1])/2;if(c<0.02)continue;
+      let rf=1;for(const [L,ap] of les){const dd=Math.abs(v.ld[i]-L.at),h=L.len/2;if(dd<h)rf*=1-ap*0.5*(1+Math.cos(Math.PI*dd/h))}
+      const r=v.r[i]*rf,w=Math.max(1.1,2*r*SCALE),dens=0.5+0.5*Math.min(1,r/1.5);
+      dctx.beginPath();dctx.moveTo(xs[i],ys[i]);dctx.lineTo(xs[i+1],ys[i+1]);
+      dctx.lineWidth=w;dctx.strokeStyle=grey(1-0.6*c*dens);dctx.stroke();
+      dctx.lineWidth=w*0.5;dctx.strokeStyle=grey(1-0.86*c*dens);dctx.stroke();
+    }
+  }
+  if(st.cath){
+    const cs=st.cathState;const pp=cs.pts.map(p=>proj(motion(p,k),B));
+    dctx.beginPath();pp.forEach((q,i)=>i?dctx.lineTo(q[0],q[1]):dctx.moveTo(q[0],q[1]));
+    dctx.lineWidth=5.2;dctx.strokeStyle=grey(0.5);dctx.stroke();
+    const tq=pp[pp.length-1];dctx.beginPath();dctx.arc(tq[0],tq[1],2.8,0,7);dctx.fillStyle=grey(0.36);dctx.fill();
+    if(st.wire){const p2=proj(motion(add(cs.tip,[0,14,0]),k),B);dctx.beginPath();dctx.moveTo(tq[0],tq[1]);dctx.lineTo(p2[0],p2[1]);dctx.lineWidth=1.6;dctx.strokeStyle=grey(0.35);dctx.stroke()}
+  }
+  ctx.globalCompositeOperation='multiply';ctx.drawImage(dcan,0,0);
+  ctx.globalCompositeOperation='overlay';ctx.globalAlpha=st.mode==='cine'?0.11:0.26;ctx.imageSmoothingEnabled=true;ctx.drawImage(noise[st.frame%4],0,0,W,W);
+  ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.drawImage(vign,0,0);
+  lastProj={B,k,projV};
+  if(st.marks&&st.marks.length){
+    ctx.lineWidth=2;ctx.font='600 13px "IBM Plex Mono", monospace';
+    st.marks.forEach((m,i)=>{const q=proj(motion(m.p3,k),B);ctx.strokeStyle='#f2a53b';ctx.beginPath();ctx.arc(q[0],q[1],13,0,7);ctx.stroke();ctx.fillStyle='#f2a53b';ctx.fillText(String(i+1),q[0]+15,q[1]-10)});
+  }
+}
+
+/* ---------- cases ---------- */
+const CASES=[
+ {title:'Exertional chest pain',pt:'M, 64',hx:'Two months of chest tightness walking uphill, relieved by rest. Treadmill: 2 mm anterior ST depression at 6 METs. Creatinine 88 µmol/L.',task:'Image both coronary systems and report any significant stenosis.',budget:80,lesions:[{vid:'LAD',at:13,len:9,sev:0.82,e:[1,0.3,-0.2]}]},
+ {title:'Inferior NSTEMI',pt:'F, 58',hx:'Four hours of rest pain, rising troponin, T-wave inversion in II, III and aVF. Settled on nitrates and heparin.',task:'Find the culprit lesion. Expect sluggish distal flow.',budget:80,lesions:[{vid:'RCA',at:52,len:8,sev:0.94,e:[0.2,0.1,1]}]},
+ {title:'Breathless on exertion',pt:'M, 71',hx:'Diabetic, dyspnoea after one flight of stairs. Echo: lateral hypokinesis, EF 50%. eGFR 48, so the contrast budget is tight.',task:'Map all disease, significant or not. Aim for under 50 mL of contrast.',budget:50,lesions:[{vid:'LCx',at:31,len:10,sev:0.76,e:[0,1,0.2]},{vid:'LAD',at:52,len:8,sev:0.38,e:[1,0,0]}]},
+];
+const BUCKETS=[{k:'<50%',lo:0,hi:0.5},{k:'50–69%',lo:0.5,hi:0.7},{k:'70–89%',lo:0.7,hi:0.9},{k:'≥90%',lo:0.9,hi:1.01}];
+const PRESETS=[['RAO 30 CAU 25',-30,-25],['RAO 30 CRA 30',-30,30],['AP CRA 35',0,35],['LAO 45 CRA 25',45,25],['LAO 45 CAU 30',45,-30],['LAO 40',40,0],['RAO 30',-30,0]];
+const angLabel=(a,b)=>(a===0?'AP':(a>0?'LAO ':'RAO ')+Math.abs(a)+'°')+(b===0?'':(b>0?' CRA ':' CAU ')+Math.abs(b)+'°');
+
+/* ---------- state ---------- */
+let S=null;
+const keys={};
+function newState(ci){
+  return {ci,c:CASES[ci],lesions:prepLesions(CASES[ci].lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,type:'JL'},exch:0,
+    cL:0,cR:0,cRoot:0,hist:{L:[],R:[],root:[]},histN:0,contrast:0,ak:0,ftime:0,ctime:0,blind:0,wasted:0,
+    cine:null,runs:[],marks:[],pending:null,review:null,imgAcc:0,frame:0,deepInj:0,rcaInj:0,complication:null,done:false,
+    sysP:128,diaP:74,beatMax:0,beatMin:999,lastPh:0,hemoAcc:0};
+}
+const histAt=(arr,t)=>{if(t<0||!arr.length)return 0;const i=Math.floor(t*50);return i<arr.length?arr[i]:arr[arr.length-1]};
+
+/* ---------- UI refs ---------- */
+const $=id=>document.getElementById(id);
+const hudTL=$('hudTL'),hudTR=$('hudTR'),hudBL=$('hudBL'),hudBR=$('hudBR'),toastEl=$('toast');
+let toastT=0;
+function toast(msg,danger){toastEl.textContent=msg;toastEl.className='toast'+(danger?' danger':'');toastEl.hidden=false;toastT=2.6}
+
+$('caseList').innerHTML=CASES.map((c,i)=>`<button class="case" data-ci="${i}"><span>CASE ${i+1} · ${c.pt}</span><b>${c.title}</b><em>${c.task}</em></button>`).join('');
+$('caseList').addEventListener('click',e=>{const b=e.target.closest('.case');if(b)startCase(+b.dataset.ci)});
+$('presets').innerHTML=PRESETS.map((p,i)=>`<button data-i="${i}" title="Key ${i+1}">${p[0]}</button>`).join('');
+$('presets').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setPreset(+b.dataset.i)});
+function setPreset(i){if(!S||S.cine)return;S.a=PRESETS[i][1];S.b=PRESETS[i][2];syncArm()}
+function syncArm(){$('sA').value=S?S.a:0;$('sB').value=S?S.b:0;const a=S?S.a:0,b=S?S.b:0;$('oA').textContent=a===0?'AP':(a>0?'LAO ':'RAO ')+Math.abs(a)+'°';$('oB').textContent=b===0?'0°':(b>0?'CRA ':'CAU ')+Math.abs(b)+'°'}
+$('sA').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.a=+e.target.value;syncArm()});
+$('sB').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.b=+e.target.value;syncArm()});
+
+function startCase(ci){
+  S=newState(ci);
+  $('startOv').hidden=true;$('resultOv').hidden=true;closeReview();
+  const c=S.c;$('caseHead').innerHTML=`<h2>Patient · case ${ci+1}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${c.task}</p>`;
+  ictx.fillStyle='#000';ictx.fillRect(0,0,W,W);
+  syncArm();renderRuns();renderMarks();renderPending();
+  toast('Sheath in the right femoral artery. Hold Space for fluoro and advance.');
+}
+
+/* ---------- input ---------- */
+const GAME_KEYS=new Set(['Space','KeyJ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyW','KeyS','KeyA','KeyD','KeyC','KeyF']);
+window.addEventListener('keydown',e=>{
+  if(e.target&&(e.target.tagName==='INPUT'&&e.target.type!=='range'))return;
+  if(e.target&&e.target.type==='range'&&e.code.startsWith('Arrow'))return;
+  if(GAME_KEYS.has(e.code)||/^Digit[1-7]$/.test(e.code)){if(S&&!S.done)e.preventDefault()}else return;
+  if(e.repeat)return;
+  if(e.code==='KeyC'){toggleCine();return}
+  if(e.code.startsWith('Digit')){setPreset(+e.code.slice(5)-1);return}
+  keys[e.code]=true;
+});
+window.addEventListener('keyup',e=>{keys[e.code]=false});
+window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
+document.querySelectorAll('.hold[data-k]').forEach(b=>{
+  const k=b.dataset.k;
+  b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);keys['btn_'+k]=true});
+  const up=()=>{keys['btn_'+k]=false};b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',up);
+});
+$('bCine').addEventListener('click',toggleCine);
+const down=(...ks)=>ks.some(k=>keys[k]||keys['btn_'+k]);
+
+$('bExch').addEventListener('click',()=>{
+  if(!S||S.done||S.exch>0)return;
+  if(S.cath.s>S_EXCH){toast('Pull the catheter back to the descending aorta before exchanging.');return}
+  S.exch=2.2;toast('Exchanging catheter over a 0.035" wire…');
+});
+
+function toggleCine(){
+  if(!S||S.done||S.complication)return;
+  if(S.review)closeReview();
+  if(S.cine){stopCine();return}
+  S.cine={id:S.runs.length+1,a:S.a,b:S.b,frames:[],t0:S.clock};
+}
+function stopCine(){
+  const r=S.cine;S.cine=null;if(!r||r.frames.length<4)return;
+  let mL=0,mR=0;for(const f of r.frames){mL=Math.max(mL,histAt(S.hist.L,f.t));mR=Math.max(mR,histAt(S.hist.R,f.t))}
+  r.sys=mL>0.55?'L':mR>0.55?'R':null;r.mL=mL;r.mR=mR;r.dur=r.frames.length/15;
+  S.runs.push(r);renderRuns();
+  toast(`Run ${r.id} saved · ${r.sys?(r.sys==='L'?'LCA':'RCA'):'non-selective'} · ${angLabel(r.a,r.b)}`);
+}
+
+/* ---------- review ---------- */
+function openReview(id){
+  if(!S)return;const run=S.runs.find(r=>r.id===id);if(!run)return;
+  if(S.cine)stopCine();
+  S.review={run,idx:0,playing:true,acc:0};
+  $('reviewbar').hidden=false;$('rvSlider').max=run.frames.length-1;$('rvPlay').textContent='Pause';renderRuns();
+}
+function closeReview(){if(S)S.review=null;$('reviewbar').hidden=true;renderRuns()}
+$('rvClose').addEventListener('click',closeReview);
+$('rvPlay').addEventListener('click',()=>{if(!S||!S.review)return;S.review.playing=!S.review.playing;$('rvPlay').textContent=S.review.playing?'Pause':'Play'});
+$('rvSlider').addEventListener('input',e=>{if(!S||!S.review)return;S.review.idx=+e.target.value;S.review.playing=false;$('rvPlay').textContent='Play';drawReview()});
+$('runs').addEventListener('click',e=>{const b=e.target.closest('.run');if(b)openReview(+b.dataset.id)});
+function frameState(run,f){
+  return {t:f.t,phase:f.phase,a:run.a,b:run.b,mode:'cine',frame:f.frame,lesions:S.lesions,cath:true,cathState:cathState(f.cath),
+    conc:(sys,t)=>histAt(S.hist[sys],t),root:histAt(S.hist.root,f.t),marks:S.marks.filter(m=>true)};
+}
+function drawReview(){const R=S.review;const f=R.run.frames[R.idx];renderImage(frameState(R.run,f));$('rvSlider').value=R.idx}
+img.addEventListener('click',e=>{
+  if(!S||!S.review||S.done||!lastProj)return;
+  const rect=img.getBoundingClientRect();const x=(e.clientX-rect.left)/rect.width*W,y=(e.clientY-rect.top)/rect.height*W;
+  let best=null,bd=14;
+  for(const P of lastProj.projV){for(let i=0;i<P.v.n;i++){if(P.cs[i]<0.3)continue;const d=Math.hypot(P.xs[i]-x,P.ys[i]-y);if(d<bd){bd=d;best={v:P.v,i}}}}
+  S.review.playing=false;$('rvPlay').textContent='Play';
+  if(!best){toast('No opacified vessel there. Pause on a well-filled frame and click on the vessel.');return}
+  S.pending={vid:best.v.id,ld:best.v.ld[best.i],p3:best.v.p[best.i],label:segLabel(best.v,best.v.ld[best.i]),run:S.review.run.id};
+  renderPending();drawReview();
+});
+function renderPending(){
+  const el=$('pending');if(!S||!S.pending){el.innerHTML='';return}
+  el.innerHTML=`<div class="pending"><div>Marked <b>${S.pending.label}</b> on run ${S.pending.run}. Estimate the diameter stenosis:</div><div class="sev">${BUCKETS.map((b,i)=>`<button data-b="${i}">${b.k}</button>`).join('')}</div><button class="btn" data-x="1">Discard mark</button></div>`;
+}
+$('pending').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b||!S||!S.pending)return;
+  if(b.dataset.x){S.pending=null}else{S.marks.push({...S.pending,bucket:+b.dataset.b});S.pending=null}
+  renderPending();renderMarks();if(S.review)drawReview();
+});
+function renderMarks(){
+  const el=$('marks');
+  $('bFinish').disabled=!S||S.done||(!S.runs.length&&!S.complication);
+  if(!S||!S.marks.length){el.innerHTML='<div class="empty">Open a cine run and click on a narrowing to mark it.</div>';return}
+  el.innerHTML=S.marks.map((m,i)=>`<div class="mark"><span>${i+1}. ${m.label} · ${BUCKETS[m.bucket].k}</span><button data-i="${i}" aria-label="Remove mark ${i+1}">Remove</button></div>`).join('');
+}
+$('marks').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!S)return;S.marks.splice(+b.dataset.i,1);renderMarks();if(S.review)drawReview()});
+function renderRuns(){
+  const el=$('runs');
+  if(!S||!S.runs.length){el.innerHTML='<div class="empty">No runs yet. Engage an ostium, press Cine, then inject.</div>';$('bFinish').disabled=!S||S.done||!S.complication;return}
+  el.innerHTML=S.runs.map(r=>`<button class="run${S.review&&S.review.run===r?' sel':''}" data-id="${r.id}"><b>Run ${r.id}</b><span>${angLabel(r.a,r.b)} · ${r.dur.toFixed(1)} s</span><span class="sys ${r.sys||''}">${r.sys?(r.sys==='L'?'LCA':'RCA'):'NS'}</span></button>`).join('');
+  $('bFinish').disabled=S.done;
+}
+
+/* ---------- hemodynamics ---------- */
+const hemo=$('hemo'),hctx=hemo.getContext('2d');let HB=null,hx=0,dpr=1;
+function sizeHemo(){dpr=Math.min(2,window.devicePixelRatio||1);const w=Math.max(200,Math.round(hemo.clientWidth*dpr)),h=Math.round(118*dpr);hemo.width=w;hemo.height=h;HB={e:new Float32Array(w).fill(NaN),p:new Float32Array(w).fill(NaN)};hx=0}
+window.addEventListener('resize',sizeHemo);
+const gs=(x,m,s)=>Math.exp(-((x-m)*(x-m))/(2*s*s));
+function ecgAt(ph){return 0.1*gs(ph,0.03,0.016)-0.1*gs(ph,0.085,0.006)+1*gs(ph,0.1,0.007)-0.26*gs(ph,0.115,0.008)+0.28*gs(ph,0.33,0.04)}
+function pressAt(ph,damped){
+  const x=((ph-0.14)%1+1)%1;let s;
+  if(x<0.12)s=Math.sin(x/0.12*Math.PI/2);else if(x<0.32)s=1-(x-0.12)/0.2*0.36;else if(x<0.36)s=0.62+0.07*Math.sin((x-0.32)/0.04*Math.PI);else s=0.62*Math.exp(-(x-0.36)*3.2)-0.08*(x-0.36)/0.64;
+  return damped?62+30*Math.pow(Math.max(0,s),1.6):74+54*s;
+}
+function hemoStep(dt,ph0,ph1,damped){
+  if(!HB)return;const speed=105*dpr;const n=Math.max(0,Math.round(dt*speed));
+  for(let j=1;j<=n;j++){let ph=ph0+(((ph1-ph0+1)%1))*j/n;ph%=1;HB.e[hx]=ecgAt(ph);HB.p[hx]=pressAt(ph,damped);hx=(hx+1)%HB.e.length;for(let g=0;g<14*dpr;g++){HB.e[(hx+g)%HB.e.length]=NaN;HB.p[(hx+g)%HB.e.length]=NaN}}
+}
+function drawHemo(){
+  if(!HB)return;const w=hemo.width,h=hemo.height;hctx.clearRect(0,0,w,h);
+  hctx.strokeStyle='rgba(120,140,150,0.13)';hctx.lineWidth=1;
+  const pTop=h*0.5,pBot=h-6*dpr,pm=v=>pBot-(v/160)*(pBot-pTop);
+  for(const v of [40,80,120]){hctx.beginPath();hctx.moveTo(0,pm(v));hctx.lineTo(w,pm(v));hctx.stroke()}
+  const trace=(arr,map,col)=>{hctx.strokeStyle=col;hctx.lineWidth=1.6*dpr;hctx.beginPath();let pen=false;for(let x=0;x<w;x++){const v=arr[x];if(isNaN(v)){pen=false;continue}const y=map(v);pen?hctx.lineTo(x,y):hctx.moveTo(x,y);pen=true}hctx.stroke()};
+  trace(HB.e,v=>h*0.36-v*h*0.27,'#5fe08c');trace(HB.p,pm,'#ff6a63');
+  hctx.font=`${11*dpr}px "IBM Plex Mono", monospace`;hctx.fillStyle='#5fe08c';hctx.fillText('II',6*dpr,14*dpr);
+  hctx.fillStyle='#ff6a63';hctx.fillText('AO 0–160',6*dpr,h*0.5+10*dpr);
+  const hr=S?Math.round(S.hr):72,sp=S?Math.round(S.sysP):128,dp=S?Math.round(S.diaP):74;
+  hctx.textAlign='right';hctx.font=`600 ${15*dpr}px "IBM Plex Mono", monospace`;hctx.fillStyle='#5fe08c';hctx.fillText('HR '+hr,w-8*dpr,18*dpr);
+  hctx.fillStyle='#ff6a63';hctx.fillText(`${sp}/${dp} (${Math.round(dp+(sp-dp)/3)})`,w-8*dpr,h*0.5+12*dpr);hctx.textAlign='left';
+}
+
+/* ---------- main loop ---------- */
+let demoPhase=0.25,last=performance.now();
+function demoFrame(){
+  const cs=cathState({s:S_ROOT+22*1.02,th:OSTANG.L,type:'JL'});
+  renderImage({t:10,phase:demoPhase,a:-30,b:-25,mode:'cine',frame:0,lesions:[],cath:true,cathState:cs,conc:()=>1,root:0.05});
+}
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  if(S&&!S.done)tick(dt);else{const p0=demoPhase;demoPhase=(demoPhase+dt*72/60)%1;hemoStep(dt,p0,demoPhase,false)}
+  if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true}
+  drawHemo();updateUI();
+  requestAnimationFrame(loop);
+}
+function tick(dt){
+  const c=S.cath;
+  // heart
+  const ph0=S.phase;S.hr+=(S.hrT-S.hr)*Math.min(1,dt/1.2);S.phase=(S.phase+dt*S.hr/60)%1;
+  // catheter handling
+  let cs=cathState(c);
+  if(S.exch>0){S.exch-=dt;if(S.exch<=0){c.type=c.type==='JL'?'JR':'JL';c.th=CATH[c.type].home;toast(`${CATH[c.type].label} in the descending aorta.`)}}
+  else if(!S.complication){
+    let moved=false;const fine=c.s>S_ROOT-30;
+    if(down('ArrowUp','KeyW')){c.s=Math.min(S_ROOT+22*1.6,c.s+(fine?16:95)*dt);moved=true}
+    if(down('ArrowDown','KeyS')){c.s=Math.max(0,c.s-(fine?16:95)*dt);moved=true}
+    if(down('ArrowRight','KeyD')){c.th+=75*dt;moved=true}
+    if(down('ArrowLeft','KeyA')){c.th-=75*dt;moved=true}
+    if(c.th>180)c.th-=360;if(c.th<-180)c.th+=360;
+    const imaging=down('Space','KeyF')||!!S.cine;
+    if(moved&&!imaging&&c.s>120){S.blind+=dt;if(S.blind>0.6&&Math.floor((S.blind-dt)/2)!==Math.floor(S.blind/2))toast('Moving the catheter without fluoro. Step on the pedal.',true)}
+    cs=cathState(c);
+  }
+  S.cs=cs;
+  // contrast dynamics at 50 Hz
+  const inj=down('KeyJ')&&!S.complication&&S.exch<=0;
+  while(S.histN/50<=S.clock){
+    const h=0.02;let tL=0,tR=0,tRoot=0;
+    if(inj){
+      S.contrast+=3.2*h;
+      if(cs.eng){if(cs.eng==='L')tL=1;else tR=1;tRoot=cs.deep?0:0.12;if(cs.deep)S.deepInj+=h}
+      else if(cs.u>0){tRoot=0.9;tL=0.32*Math.max(0,1-angDiff(c.th,OSTANG.L)/55)*Math.min(1,cs.u);tR=0.32*Math.max(0,1-angDiff(c.th,OSTANG.R)/55)*Math.min(1,cs.u)}
+      else S.wasted+=3.2*h;
+    }
+    const step=(v,t,up,dn)=>v+(t-v)*(1-Math.exp(-h/(t>v?up:dn)));
+    S.cL=step(S.cL,tL,0.12,0.55);S.cR=step(S.cR,tR,0.12,0.55);S.cRoot=step(S.cRoot,tRoot,0.08,0.25);
+    S.hist.L.push(S.cL);S.hist.R.push(S.cR);S.hist.root.push(S.cRoot);S.histN++;
+  }
+  S.clock+=dt;
+  if(inj&&cs.u<=0&&S.wasted>1&&toastT<=0)toast('Injecting outside the aortic root wastes contrast.');
+  if(inj&&cs.u>0&&!cs.eng&&toastT<=0)toast('Non-selective injection: contrast is refluxing into the aortic root.');
+  if(S.deepInj>0.45&&!S.complication){S.complication='Injection through a damped catheter caused an ostial dissection.';if(S.cine)stopCine();toast('Ostial dissection. Stop and report.',true);renderMarks()}
+  // bradycardia with RCA injection
+  if(S.cR>0.7)S.rcaInj+=dt;else S.rcaInj=Math.max(0,S.rcaInj-dt*1.5);
+  S.hrT=S.rcaInj>1.6?46:72;
+  // hemodynamics
+  const damped=cs.deep;
+  hemoStep(dt,ph0,S.phase,damped);
+  const p=pressAt(S.phase,damped);S.beatMax=Math.max(S.beatMax,p);S.beatMin=Math.min(S.beatMin,p);
+  if(S.phase<ph0){S.sysP=S.beatMax;S.diaP=S.beatMin;S.beatMax=0;S.beatMin=999}
+  // imaging
+  const fl=down('Space','KeyF')&&!S.complication;const imaging=(fl||!!S.cine);
+  if(imaging&&S.review)closeReview();
+  const f=1/Math.pow(Math.cos(S.a*D2R)*Math.cos(S.b*D2R),1.5);
+  if(S.cine){S.ak+=165/60*dt*f;S.ctime+=dt}else if(fl){S.ak+=17/60*dt*f;S.ftime+=dt}
+  S.imgAcc+=dt;
+  if(S.review){if(S.review.playing){S.review.acc+=dt;if(S.review.acc>=1/15){S.review.acc=0;S.review.idx=(S.review.idx+1)%S.review.run.frames.length;drawReview()}}}
+  else if(imaging&&S.imgAcc>=1/15){
+    S.imgAcc=0;S.frame++;
+    renderImage({t:S.clock,phase:S.phase,a:S.a,b:S.b,mode:S.cine?'cine':'fluoro',frame:S.frame,lesions:S.lesions,cath:true,cathState:cs,wire:S.exch>0,conc:(sys,t)=>histAt(S.hist[sys],t),root:histAt(S.hist.root,S.clock)});
+    if(S.cine){S.cine.frames.push({t:S.clock,phase:S.phase,frame:S.frame,cath:{...c}});if(S.cine.frames.length>=90)stopCine()}
+  }
+}
+function fmtT(s){s=Math.floor(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+let uiAcc=0;
+function updateUI(){
+  const fl=S&&!S.done&&down('Space','KeyF')&&!S.complication,cine=S&&!!S.cine;
+  $('lamp').classList.toggle('on',!!(fl||cine));
+  document.querySelector('[data-k="Space"]').classList.toggle('on',!!fl);
+  $('bCine').classList.toggle('on',!!cine);
+  $('bInj').classList.toggle('on',!!(S&&down('KeyJ')));
+  ['ArrowLeft','ArrowUp','ArrowDown','ArrowRight'].forEach(k=>document.querySelector(`[data-k="${k}"]`).classList.toggle('on',!!down(k)));
+  if(!S){hudTL.textContent='CATH LAB RUN\nRAO 30° CAU 25°';hudTR.innerHTML='<span>SAMPLE IMAGE</span>';hudBL.textContent='';hudBR.textContent='';return}
+  const R=S.review;
+  hudTL.textContent=`CASE ${S.ci+1} · ${S.c.pt}\n${R?angLabel(R.run.a,R.run.b):angLabel(S.a,S.b)}`;
+  hudTR.innerHTML=R?`<span class="act">REVIEW · RUN ${R.run.id}</span>\nfr ${R.idx+1}/${R.run.frames.length}`:cine?`<span class="act">● CINE 15 f/s</span>\n${(S.cine.frames.length/15).toFixed(1)} s`:fl?'<span class="act">FLUORO 15 p/s</span>':(S.frame?'LIH':'NO IMAGE');
+  hudBL.textContent=R?'Click a narrowing to mark it':(S.frame?'':'Hold Space for fluoro');
+  hudBR.textContent=`AK ${Math.round(S.ak)} mGy\n${Math.round(S.contrast)} mL`;
+  uiAcc++;if(uiAcc%6)return;
+  $('rdFT').querySelector('b').textContent=fmtT(S.ftime);
+  $('rdAK').querySelector('b').innerHTML=`${Math.round(S.ak)}<small>mGy</small>`;$('rdAK').classList.toggle('hot',S.ak>800);
+  $('rdCM').querySelector('b').innerHTML=`${Math.round(S.contrast)}<small>mL</small>`;$('rdCM').classList.toggle('hot',S.contrast>S.c.budget);
+  $('rdHD').querySelector('b').innerHTML=`${Math.round(S.hr)}<small>${Math.round(S.sysP)}/${Math.round(S.diaP)}</small>`;$('rdHD').classList.toggle('hot',S.hr<55||(S.cs&&S.cs.deep));
+  $('cathType').textContent=(S.exch>0?'Exchanging…':CATH[S.cath.type].label+' · 6F');
+  const other=S.cath.type==='JL'?'JR4':'JL4';const be=$('bExch');be.textContent='Exchange for '+other;be.disabled=S.exch>0||!!S.complication;
+  const st=$('status');const cs=S.cs||{};let cls='',msg='';
+  if(S.complication){cls='danger';msg=S.complication+' Finish the study to see your report.'}
+  else if(S.exch>0){msg='Exchanging catheter over a 0.035" wire…'}
+  else if(cs.deep){cls='danger';msg='Pressure damped: catheter deep-seated. Withdraw slightly before you inject.'}
+  else if(cs.eng){cls='ok';msg=`Engaged ${cs.eng==='L'?'left main':'right coronary'} ostium. Pressure normal. Start cine, then inject.`}
+  else if(cs.u>0){cls='warn';const need=CATH[S.cath.type].sys;msg=`In the aortic root, ${CATH[S.cath.type].label} tip at ${Math.round(S.cath.th)}°. Torque to find the ${need==='L'?'left main':'right coronary'} ostium; a short test puff shows where you are.`}
+  else{msg=`${cs.region||'Femoral sheath'} · ${Math.round(S.cath.s)} mm inserted.`+(S.cath.s<S_EXCH?' Catheter exchange is possible here.':'')}
+  st.className='status '+cls;st.textContent=msg;
+  document.querySelectorAll('#presets button').forEach(b=>b.disabled=!!S.cine);
+  $('sA').disabled=$('sB').disabled=!!S.cine;
+}
+
+/* ---------- scoring ---------- */
+$('bFinish').addEventListener('click',finish);
+function finish(){
+  if(!S||S.done)return;if(S.cine)stopCine();closeReview();S.done=true;
+  const notes=[],rows=[];let total=0;
+  // lesions
+  const sig=S.lesions.filter(L=>L.sev>=0.5),minor=S.lesions.filter(L=>L.sev<0.5);
+  let lesPts=0;const used=new Set();
+  const per=40/Math.max(1,sig.length);
+  const match=L=>S.marks.findIndex((m,i)=>!used.has(i)&&m.vid===L.vid&&Math.abs(m.ld-L.at)<=L.len/2+7);
+  for(const L of [...sig,...minor]){
+    const bi=BUCKETS.findIndex(b=>L.sev>=b.lo&&L.sev<b.hi);
+    const mi=match(L);
+    const views=S.runs.filter(r=>r.sys===L.sys).map(r=>({r,ap:apparent(L,basis(r.a,r.b))})).sort((x,y)=>y.ap-x.ap);
+    let viewNote='';
+    if(views.length){const b=views[0],w=views[views.length-1];viewNote=` Best shown in ${angLabel(b.r.a,b.r.b)} (looked about ${Math.round(b.ap*100)}%)`+(views.length>1&&b.ap-w.ap>0.15?`; in ${angLabel(w.r.a,w.r.b)} it looked about ${Math.round(w.ap*100)}%.`:'.')}
+    else viewNote=` You never recorded a selective run of the ${L.sys==='L'?'left':'right'} system.`;
+    if(L.sev>=0.5){
+      if(mi>=0){used.add(mi);const m=S.marks[mi];const ok=m.bucket===bi,near=Math.abs(m.bucket-bi)===1;const p=per*(ok?1:near?0.7:0.55);lesPts+=p;
+        notes.push({c:ok?'good':'',t:`${Math.round(L.sev*100)}% ${L.label}: found, graded ${BUCKETS[m.bucket].k}${ok?'.':' (true range '+BUCKETS[bi].k+').'}${viewNote}`})}
+      else notes.push({c:'bad',t:`Missed: ${Math.round(L.sev*100)}% ${L.label}.${viewNote}`});
+    }else{
+      if(mi>=0){used.add(mi);const m=S.marks[mi];if(m.bucket===0)notes.push({c:'good',t:`${Math.round(L.sev*100)}% ${L.label}: correctly called non-significant.`});else{lesPts-=8;notes.push({c:'bad',t:`Overcalled: ${L.label} is about ${Math.round(L.sev*100)}%, you graded it ${BUCKETS[m.bucket].k}.${viewNote}`})}}
+    }
+  }
+  const fp=S.marks.filter((m,i)=>!used.has(i)).length;
+  if(fp){lesPts-=6*fp;notes.push({c:'bad',t:`${fp} mark${fp>1?'s':''} on normal vessel.`})}
+  lesPts=clamp(lesPts,0,40);rows.push(['Lesion detection and grading',lesPts,40]);
+  // completeness
+  const distinct=sys=>{const v=[];for(const r of S.runs){if(r.sys!==sys)continue;if(!v.some(o=>Math.abs(o.a-r.a)<15&&Math.abs(o.b-r.b)<15))v.push(r)}return v.length};
+  const nL=distinct('L'),nR=distinct('R');
+  const comp=(nL>=3?12:nL===2?8:nL===1?4:0)+(nR>=2?8:nR===1?4:0);rows.push([`Complete study (LCA ${nL} views, RCA ${nR})`,comp,20]);
+  if(nL<3)notes.push({c:'',t:'A standard left system study uses at least three or four projections: RAO caudal, RAO cranial, LAO cranial and LAO caudal.'});
+  if(nR<2)notes.push({c:'',t:'Image the RCA in at least two orthogonal views, for example LAO 40° and RAO 30°.'});
+  const B=S.c.budget;const cm=Math.round(15*clamp(1-(S.contrast-B)/(B*2),0,1));rows.push([`Contrast ${Math.round(S.contrast)} mL (budget ${B})`,cm,15]);
+  const rad=Math.round(15*clamp(1-(S.ak-300)/900,0,1));rows.push([`Air kerma ${Math.round(S.ak)} mGy · fluoro ${fmtT(S.ftime)}`,rad,15]);
+  if(S.ak>300)notes.push({c:'',t:'Steep angles and long cine runs drive dose up. Keep runs to 3–4 seconds and collimate your pedal time.'});
+  let saf=10-Math.min(10,Math.round(S.blind*2));rows.push(['Safety (catheter moved under fluoro)',saf,10]);
+  total=lesPts+comp+cm+rad+saf;
+  if(S.complication){total=Math.min(total,35);notes.unshift({c:'bad',t:S.complication+' A damped or ventricularised pressure trace means the tip is against the vessel wall. Withdraw before injecting.'})}
+  total=Math.round(total);
+  const grade=S.complication?'Complication':total>=85?'Attending standard':total>=70?'Senior fellow':total>=50?'Junior fellow':'Keep practising';
+  const ov=$('resultOv');
+  ov.innerHTML=`<h1>Study report · case ${S.ci+1}</h1><div class="score"><b>${total}</b><span>${grade}</span></div>
+  <div class="rows">${rows.map(r=>`<span>${r[0]}</span><span class="v">${Math.round(r[1])} / ${r[2]}</span>`).join('')}</div>
+  <div class="notes">${notes.map(n=>`<div class="${n.c}">${n.t}</div>`).join('')}</div>
+  <div class="row"><button class="btn primary" id="rAgain">Repeat case</button><button class="btn" id="rCases">Choose another case</button></div>`;
+  ov.hidden=false;
+  $('rAgain').onclick=()=>startCase(S.ci);
+  $('rCases').onclick=()=>{ov.hidden=true;$('startOv').hidden=false;S=null;demoFrame();syncArm();renderRuns();renderMarks();renderPending();$('caseHead').innerHTML='<h2>Patient</h2><b>No case loaded</b><p>Pick a case on the monitor to begin.</p>';$('status').textContent='Catheter in the femoral sheath.';$('status').className='status'};
+  renderMarks();
+}
+
+sizeHemo();demoFrame();syncArm();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
