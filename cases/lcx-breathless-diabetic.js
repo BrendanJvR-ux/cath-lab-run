@@ -10,4 +10,5 @@ CASES.push({
   hx:'Diabetic, dyspnoea after one flight of stairs. Echo: lateral hypokinesis, EF 50%. eGFR 48, so the contrast budget is tight.',
   task:'Map all disease, significant or not. Aim for under 50 mL of contrast.',
   budget:50,
+  ecg:{twi:['V5']},
   lesions:[{vid:'LCx',at:31,len:10,sev:0.76,e:[0,1,0.2]},{vid:'LAD',at:52,len:8,sev:0.38,e:[1,0,0]}]});

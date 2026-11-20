@@ -14,7 +14,7 @@
 
 <header class="top">
   <div class="brand">Cath Lab Run<small>Diagnostic coronary angiography simulator · femoral access · 6F</small></div>
-  <div class="lamp" id="lamp"><i></i>X-RAY</div>
+  <div class="topright"><button class="who" id="who" hidden title="Main menu"></button><div class="lamp" id="lamp"><i></i>X-RAY</div></div>
 </header>
 
 <main class="lab">
@@ -31,20 +31,14 @@
         <input type="range" id="rvSlider" min="0" max="10" value="0" aria-label="Cine frame">
         <button class="btn" id="rvClose">Back to live</button>
       </div>
-      <div class="overlay" id="startOv">
-        <h1>Cath Lab Run</h1>
-        <p>You have a 6F sheath in the right femoral artery. Drive the catheter to the aortic root, engage each coronary ostium, record cine runs in useful projections, then mark and grade the stenosis. Keep contrast and radiation low.</p>
-        <div class="cases" id="caseList"></div>
-        <div class="keys">
-          <div><kbd>Space</kbd> hold for fluoro (live X-ray)</div>
-          <div><kbd>C</kbd> start / stop a cine run</div>
-          <div><kbd>J</kbd> hold to inject contrast</div>
-          <div><kbd>↑</kbd><kbd>↓</kbd> advance / withdraw</div>
-          <div><kbd>←</kbd><kbd>→</kbd> torque counter-clockwise / clockwise</div>
-          <div><kbd>1</kbd>–<kbd>7</kbd> C-arm presets</div>
-        </div>
-        <p class="fine">Teaching game with simplified anatomy and physics. Not a clinical training device.</p>
+      <canvas id="mapCan" width="230" height="190" hidden aria-label="Coronary map"></canvas>
+      <div class="ivus" id="ivusOv" hidden>
+        <div class="ivushead"><b>IVUS · 40 MHz</b><button class="btn" id="ivusDone">Done</button></div>
+        <div class="ivusbody"><canvas id="ivusCan" width="256" height="256" aria-label="IVUS cross-section"></canvas><pre id="ivusRead"></pre></div>
+        <label class="ivuspos" for="ivusPos"><span>Distal</span><input type="range" id="ivusPos" min="0" max="100" value="0"><span>Proximal</span></label>
+        <p id="ivusSum" class="fine"></p>
       </div>
+      <div class="overlay" id="startOv"></div>
       <div class="overlay" id="resultOv" hidden></div>
     </div>
     <canvas class="hemo" id="hemo" aria-label="ECG and aortic pressure"></canvas>

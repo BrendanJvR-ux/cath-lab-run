@@ -77,6 +77,36 @@ test('A stent away from the lesion, or in another vessel, does not touch it',()=
   const L=prepLesions(CASES[0].lesions)[0];
   ok(stentOutcome(L,{vid:L.vid,ld:L.at+40,len:12,diam:3,atm:14})===null);ok(stentOutcome(L,{vid:'RCA',ld:L.at,len:18,diam:3,atm:14})===null);
 });
+test('Harder difficulties need more accurate torque',()=>{
+  const off=20;const at=d=>!!cathState({type:'JL',th:OSTANG.L+off,s:S_ROOT+22},DIFFICULTY[d]).eng;
+  ok(at('easy')&&at('medium')&&!at('hard'),`20° off: easy ${at('easy')}, medium ${at('medium')}, hard ${at('hard')}`);
+  ok(DIFFICULTY.hard.deep<DIFFICULTY.easy.deep,'hard should damp sooner');
+});
+test('Balloon angioplasty alone leaves recoil; a stent afterwards does better',()=>{
+  const L=prepLesions(CASES[1].lesions)[0],ref=refDiam(L.vid,L.at);
+  const b=balloonOutcome(L,{vid:L.vid,ld:L.at,len:15,diam:Math.round(ref*2)/2-0.5,atm:10});
+  ok(b&&b.residual>=0.3&&b.residual<L.sev,'balloon residual '+b.residual);
+  return `${Math.round(L.sev*100)}% → ${Math.round(b.residual*100)}% after the balloon`;
+});
+test('A subtotal lesion stented without predilation is underexpanded',()=>{
+  const L=prepLesions(CASES[1].lesions)[0];ok(L.sev>=0.9);
+  const s={vid:L.vid,ld:L.at,len:18,diam:3.5,atm:14};
+  const raw=stentOutcome({...L},s),pre=stentOutcome({...L,predil:true,cur:0.4},s);
+  ok(raw.noPre&&!pre.noPre&&raw.residual>pre.residual,`without ${raw.residual}, with ${pre.residual}`);
+});
+test('Oversized balloon flags a dissection; post-dilating a stent improves it',()=>{
+  const L=prepLesions(CASES[0].lesions)[0],ref=refDiam(L.vid,L.at);
+  ok(balloonOutcome(L,{vid:L.vid,ld:L.at,len:15,diam:ref+1,atm:12}).over,'should be oversized');
+  const st={...L,stented:true,cur:0.12};const o=balloonOutcome(st,{vid:L.vid,ld:L.at,len:15,diam:3.5,atm:16});ok(o.post&&o.residual<0.12,'post-dilation');
+});
+test('IVUS shows a smaller lumen and more plaque at the lesion than in normal vessel',()=>{
+  const L=prepLesions(CASES[0].lesions)[0];
+  const at=lumenProfile(L.vid,L.at,[L],[]),away=lumenProfile(L.vid,L.at+30,[L],[]);
+  ok(at.lumenR<away.lumenR*0.5&&at.plaque>0.7&&away.plaque===0);
+  return `lumen ${(2*at.lumenR).toFixed(1)} mm at the lesion vs ${(2*away.lumenR).toFixed(1)} mm downstream`;
+});
+test('Every vessel has an ECG territory lead',()=>{for(const v of VESSELS)ok(LEADS.includes(TERRITORY[v.id]),v.id+' has no lead');return 'LAD→V3, circumflex→V5, RCA→II'});
+test('The coronary map covers every vessel',()=>{const ids=new Set(MAP_SEGS.map(s=>s.v.id));for(const v of VESSELS)ok(ids.has(v.id),v.id);ok(mapKey(VBY.LAD,VBY.LAD.len)==='LAD:2');return MAP_SEGS.length+' segments'});
 test('Contrast darkens the image where the coronaries are',()=>{
   ictx=document.getElementById('img').getContext('2d');
   const base={t:5,phase:0.3,a:-30,b:-25,mode:'cine',frame:0,lesions:[],cath:false,root:0};

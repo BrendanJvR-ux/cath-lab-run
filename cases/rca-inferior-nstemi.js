@@ -10,4 +10,5 @@ CASES.push({
   hx:'Four hours of rest pain, rising troponin, T-wave inversion in II, III and aVF. Settled on nitrates and heparin.',
   task:'Find the culprit lesion. Expect sluggish distal flow.',
   budget:80,
+  ecg:{twi:['II']},
   lesions:[{vid:'RCA',at:52,len:8,sev:0.94,e:[0.2,0.1,1]}]});

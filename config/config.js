@@ -49,5 +49,32 @@ const PRESETS=[['RAO 30 CAU 25',-30,-25],['RAO 30 CRA 30',-30,30],['AP CRA 35',0
 const STENT_DIAMS=[2.5,3.0,3.5,4.0];
 const STENT_LENS=[12,18,24,30];
 
+/* Balloon sizes for angioplasty: diameter (mm) and length (mm). */
+const BALLOON_DIAMS=[2.0,2.5,3.0,3.5,4.0];
+const BALLOON_LENS=[12,15,20];
+
+/* Difficulty. tol = engagement window (deg) per system, seek = how far (deg) beyond the window the tip
+   is pulled into the ostium (0 = no help), deep = how far past the ostium (u) before damping,
+   budgetX scales each case's contrast budget, map = show the coronary sketch, tokenX scales coffee tokens. */
+const DIFFICULTY={
+  easy:{label:'Easy',blurb:'Wide engagement windows and the tip drops into the ostia. A coronary map fills in as you inject. 50% more contrast.',tol:{L:45,R:40},seek:70,seekSpeed:90,deep:1.5,budgetX:1.5,map:true,tokenX:1},
+  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Tokens ×1.5.',tol:{L:28,R:22},seek:25,seekSpeed:45,deep:1.42,budgetX:1,map:false,tokenX:1.5},
+  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, the catheter damps sooner, 25% less contrast. Tokens ×2.',tol:{L:16,R:12},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,map:false,tokenX:2},
+};
+
+/* ECG lead that shows ischaemia in each vessel's territory: V3 anterior (LAD), V5 lateral (circumflex), II inferior (RCA). */
+const TERRITORY={LM:'V3',LAD:'V3',D1:'V3',D2:'V3',S1:'V3',S2:'V3',LCx:'V5',OM1:'V5',OM2:'V5',RCA:'II',CON:'II',AM:'II',PDA:'II',PLV:'II'};
+const LEADS=['II','V3','V5'];
+
+/* Operator avatars (drawn as SVG in js/game.js). */
+const AVATARS=[
+  {skin:'#f1c7a5',hair:'#3b2a20',style:'short',scrub:'#4f7fa8',cap:null},
+  {skin:'#8d5a3b',hair:'#1d1512',style:'bun',scrub:'#5c8f7a',cap:null},
+  {skin:'#c99067',hair:'#6b3f22',style:'long',scrub:'#7a6aa8',cap:null},
+  {skin:'#e7b896',hair:'#b9883e',style:'short',scrub:'#a86a5c',cap:'#d9a441'},
+  {skin:'#5e3a26',hair:'#0f0b09',style:'crop',scrub:'#3f7f8f',cap:'#4f7fa8'},
+  {skin:'#d7a57d',hair:'#8a8a8a',style:'bald',scrub:'#6f8a4f',cap:null},
+];
+
 /* Cases add themselves here (see cases/*.js). */
 const CASES=[];

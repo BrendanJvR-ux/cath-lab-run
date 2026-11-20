@@ -38,7 +38,7 @@ function contraction(ph){return ph>0.13&&ph<0.5?Math.pow(Math.sin(Math.PI*(ph-0.
 
 /* ---------- catheter ---------- */
 function angDiff(a,b){let d=(a-b)%360;if(d>180)d-=360;if(d<-180)d+=360;return Math.abs(d)}
-function cathState(c){
+function cathState(c,D){
   const out={u:0,eng:null,deep:false,pts:null,tip:null,region:''};
   const sBody=Math.min(c.s,S_ROOT);
   const pts=[];for(let i=0;i<AO.p.length&&AO.ld[i]<sBody;i++)pts.push(AO.p[i]);
@@ -51,8 +51,8 @@ function cathState(c){
   const u=(c.s-S_ROOT)/22;out.u=u;
   const th=c.th*D2R,dir=[Math.cos(th),0,Math.sin(th)];
   const reach=Math.min(1,0.5+u);let tip=add(ROOT,add(mul(dir,19*reach),[0,5*reach,0]));
-  const C=CATH[c.type];
-  if(u>=0.55&&angDiff(c.th,OSTANG[C.sys])<C.tol){out.eng=C.sys;out.deep=u>1.5;tip=add(OST[C.sys],mul(OSTDIR[C.sys],Math.max(0,u-1)*11))}
+  const C=CATH[c.type],tol=D?D.tol[C.sys]:C.tol,deepU=D?D.deep:1.5;
+  if(u>=0.55&&angDiff(c.th,OSTANG[C.sys])<tol){out.eng=C.sys;out.deep=u>deepU;tip=add(OST[C.sys],mul(OSTDIR[C.sys],Math.max(0,u-1)*11))}
   const ctrl=add(ROOT,add(mul(dir,c.type==='JL'?-13:-6),[0,c.type==='JL'?22:12,0]));
   for(let i=1;i<=20;i++){const t=i/20,a=(1-t)*(1-t),b=2*(1-t)*t,cc=t*t;pts.push([a*base[0]+b*ctrl[0]+cc*tip[0],a*base[1]+b*ctrl[1]+cc*tip[1],a*base[2]+b*ctrl[2]+cc*tip[2]])}
   out.pts=pts;out.tip=tip;
@@ -81,8 +81,30 @@ function stentOutcome(L,s){
   const off=Math.abs(L.at-s.ld);if(off>s.len/2+L.len/2)return null;
   const refD=refDiam(L.vid,L.at),diff=s.diam-refD,before=L.cur!=null?L.cur:L.sev;
   const covered=off+L.len/2<=s.len/2+0.5,under=diff<-0.4,over=diff>0.75,lowP=s.atm<12;
-  let res=under?0.3:0.05;if(lowP)res+=0.12;if(!covered)res=Math.max(res,before*0.6);
-  return {residual:Math.min(before,res),refD,diff,covered,under,over,lowP};
+  const noPre=L.sev>=0.9&&!L.predil;
+  let res=under?0.3:0.05;if(lowP)res+=0.12;if(noPre)res+=0.15;if(!covered)res=Math.max(res,before*0.6);
+  return {residual:Math.min(before,res),refD,diff,covered,under,over,lowP,noPre};
+}
+/* Plain balloon angioplasty b {vid,ld,len,diam,atm} on lesion L. Leaves recoil (about 30–45% residual) unless
+   it is post-dilating a stent. Oversizing by more than 0.5 mm risks dissection. */
+function balloonOutcome(L,b){
+  if(L.vid!==b.vid)return null;
+  const off=Math.abs(L.at-b.ld);if(off>b.len/2+L.len/2)return null;
+  const refD=refDiam(L.vid,L.at),diff=b.diam-refD,before=L.cur!=null?L.cur:L.sev;
+  const covered=off+L.len/2<=b.len/2+0.5,over=diff>0.5,under=diff<-0.75,lowP=b.atm<8;
+  let res;
+  if(L.stented)res=(!under&&!lowP)?Math.min(before,0.02):before;
+  else res=(under||lowP)?before*0.85:Math.max(0.3,before*0.45);
+  if(!covered)res=Math.max(res,before*0.8);
+  return {residual:Math.min(before,res),refD,diff,covered,over,under,lowP,post:!!L.stented};
+}
+/* True cross-section at a point, for IVUS: lumen and external elastic membrane radius (mm), plaque direction. */
+function lumenProfile(vid,ld,lesions,stents){
+  const r=refDiam(vid,ld)/2;let red=0,pk=0,ecc=null;
+  for(const L of lesions){if(L.vid!==vid)continue;const dd=Math.abs(ld-L.at),h=L.len/2+2;if(dd<h){const k=0.5*(1+Math.cos(Math.PI*dd/h));const now=(L.cur!=null?L.cur:L.sev)*k;if(L.sev*k>pk){pk=L.sev*k;ecc=L.e}red=Math.max(red,now)}}
+  const stent=(stents||[]).find(s=>s.vid===vid&&Math.abs(ld-s.ld)<=s.len/2);
+  let lumenR=r*(1-red);if(stent)lumenR=Math.max(lumenR,Math.min(stent.diam/2*0.95,r*(1-red)));
+  return {lumenR,eemR:r*(1.1+0.3*pk),plaque:pk,ecc,stent:!!stent,refR:r};
 }
 function segLabel(v,ld){if(v.id==='LM')return 'left main';const f=ld/v.len;return (f<0.33?'proximal ':f<0.66?'mid ':'distal ')+v.name}
 
@@ -188,8 +210,62 @@ function drawPCI(pci,projV){
   if(b){const q=seg(b.vid,b.ld,b.len);if(q.length>1){
     if(b.inflate>0.02){dctx.beginPath();q.forEach((p,i)=>i?dctx.lineTo(p[0],p[1]):dctx.moveTo(p[0],p[1]));dctx.lineWidth=b.diam*SCALE*(0.3+0.7*Math.min(1,b.inflate));dctx.strokeStyle=grey(0.5);dctx.stroke()}
     for(const p of [q[0],q[q.length-1]]){dctx.beginPath();dctx.arc(p[0],p[1],2.6,0,7);dctx.fillStyle=grey(0.22);dctx.fill()}}}
+  if(pci.ivus){const P=PV[pci.ivus.vid],v=P.v;let i=0;while(i<v.n-1&&v.ld[i]<pci.ivus.ld)i++;dctx.beginPath();dctx.arc(P.xs[i],P.ys[i],2.4,0,7);dctx.fillStyle=grey(0.2);dctx.fill()}
   const w=pci.wire;
   if(w){const q=chain(w.vid);const n=Math.max(2,Math.round(q.length*w.frac));dctx.beginPath();for(let i=0;i<n;i++)i?dctx.lineTo(q[i][0],q[i][1]):dctx.moveTo(q[i][0],q[i][1]);dctx.lineWidth=1.5;dctx.strokeStyle=grey(0.3);dctx.stroke()}
+}
+
+/* ---------- IVUS cross-section ---------- */
+const ivusSpeckle=[];for(let n=0;n<3;n++){const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');const id=g.createImageData(256,256);for(let i=0;i<id.data.length;i+=4){const v=Math.random()<0.5?90+Math.random()*165:255;id.data[i]=id.data[i+1]=id.data[i+2]=v;id.data[i+3]=255}g.putImageData(id,0,0);ivusSpeckle.push(c)}
+function drawIVUS(ctx,prof,k,frame){
+  const Wd=ctx.canvas.width,C=Wd/2,PX=Wd/10; // 10 mm field of view
+  const pulse=1+0.03*k,lr=prof.lumenR*PX*pulse,er=prof.eemR*PX;
+  let ang=0.8;if(prof.ecc)ang=Math.atan2(prof.ecc[1],prof.ecc[0]+prof.ecc[2]*0.5);
+  const off=(prof.eemR-prof.lumenR)*PX*0.55*Math.min(1,prof.plaque*1.4);
+  const ex=C+Math.cos(ang)*off,ey=C+Math.sin(ang)*off;
+  ctx.globalCompositeOperation='source-over';ctx.fillStyle='#000';ctx.fillRect(0,0,Wd,Wd);
+  const ad=ctx.createRadialGradient(ex,ey,er,ex,ey,er+3*PX);ad.addColorStop(0,'rgb(170,170,170)');ad.addColorStop(0.35,'rgb(110,110,110)');ad.addColorStop(1,'rgb(0,0,0)');
+  ctx.fillStyle=ad;ctx.beginPath();ctx.arc(ex,ey,er+3*PX,0,7);ctx.fill();
+  ctx.fillStyle='rgb(25,25,25)';ctx.beginPath();ctx.arc(ex,ey,er+0.12*PX,0,7);ctx.fill();
+  ctx.fillStyle=`rgb(${Math.round(95+60*prof.plaque)},${Math.round(95+60*prof.plaque)},${Math.round(95+60*prof.plaque)})`;ctx.beginPath();ctx.arc(ex,ey,er,0,7);ctx.fill();
+  ctx.fillStyle='rgb(150,150,150)';ctx.beginPath();ctx.arc(C,C,lr+1.6,0,7);ctx.fill();
+  ctx.fillStyle='rgb(30,30,30)';ctx.beginPath();ctx.arc(C,C,lr,0,7);ctx.fill();
+  ctx.globalCompositeOperation='multiply';ctx.drawImage(ivusSpeckle[frame%3],0,0,Wd,Wd);ctx.globalCompositeOperation='source-over';
+  if(prof.stent){for(let i=0;i<9;i++){const a=i/9*Math.PI*2+0.3,x=C+Math.cos(a)*lr,y=C+Math.sin(a)*lr;
+    ctx.fillStyle='rgba(0,0,0,0.75)';ctx.beginPath();ctx.moveTo(x,y);ctx.arc(C,C,lr+4*PX,a-0.06,a+0.06);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(C,C,lr,a-0.07,a+0.07);ctx.stroke()}}
+  // imaging catheter on the wire, wire artefact, ring-down
+  const cx=C-0.25*PX,cy=C+0.15*PX;
+  ctx.fillStyle='rgba(0,0,0,0.8)';ctx.beginPath();ctx.moveTo(cx+0.6*PX,cy-0.3*PX);ctx.arc(cx,cy,6*PX,-0.62,-0.38);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#000';ctx.beginPath();ctx.arc(cx,cy,0.5*PX,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,0.58*PX,0,7);ctx.stroke();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(cx+0.62*PX,cy-0.3*PX,2.2,0,7);ctx.fill();
+  ctx.fillStyle='rgba(240,240,240,0.9)';for(let i=1;i<10;i++){ctx.fillRect(10+i*PX-1,Wd-14,2,6);ctx.fillRect(8,10+i*PX-1,6,2)}
+}
+
+/* ---------- coronary map sketch (easy mode) ---------- */
+const MAP_VIEW=basis(30,10);
+const MAP_SEGS=[];for(const v of VESSELS){const parts=v.id==='LM'||v.len<30?1:3;for(let j=0;j<parts;j++)MAP_SEGS.push({key:v.id+':'+j,v,j,parts})}
+const mapKey=(v,ld)=>{const parts=v.id==='LM'||v.len<30?1:3;return v.id+':'+Math.min(parts-1,Math.floor(ld/v.len*parts))};
+let mapGeom=null;
+function drawMap(ctx,mapped){
+  const Wd=ctx.canvas.width,Hd=ctx.canvas.height;
+  if(!mapGeom){let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;const P={};for(const v of VESSELS){P[v.id]=v.p.map(p=>{const q=proj(p,MAP_VIEW);x0=Math.min(x0,q[0]);x1=Math.max(x1,q[0]);y0=Math.min(y0,q[1]);y1=Math.max(y1,q[1]);return q})}
+    const sc=Math.min((Wd-20)/(x1-x0),(Hd-40)/(y1-y0));mapGeom={P,f:q=>[10+(q[0]-x0)*sc+((Wd-20)-(x1-x0)*sc)/2,26+(q[1]-y0)*sc],sc}}
+  const {P,f,sc}=mapGeom;
+  ctx.clearRect(0,0,Wd,Hd);ctx.fillStyle='rgba(12,16,18,0.82)';ctx.fillRect(0,0,Wd,Hd);
+  ctx.strokeStyle='rgba(242,165,59,0.35)';ctx.lineWidth=1;ctx.strokeRect(0.5,0.5,Wd-1,Hd-1);
+  const h=f(proj(HC,MAP_VIEW)),rt=f(proj(ROOT,MAP_VIEW));
+  ctx.strokeStyle='rgba(220,227,230,0.16)';ctx.setLineDash([3,3]);ctx.beginPath();ctx.ellipse(h[0],h[1]+4,62*SCALE*sc/SCALE,52*sc,0.5,0,7);ctx.stroke();ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(220,227,230,0.35)';ctx.beginPath();ctx.arc(rt[0],rt[1],13*sc,0,7);ctx.stroke();
+  ctx.lineCap='round';
+  for(const s of MAP_SEGS){const v=s.v,pts=P[v.id],a=Math.floor(s.j/s.parts*(v.n-1)),b=Math.floor((s.j+1)/s.parts*(v.n-1)),on=mapped.has(s.key);
+    ctx.beginPath();for(let i=a;i<=b;i++){const q=f(pts[i]);i===a?ctx.moveTo(q[0],q[1]):ctx.lineTo(q[0],q[1])}
+    ctx.setLineDash(on?[]:[2,3]);ctx.lineWidth=on?Math.max(1.6,v.r[a]*1.6):1.1;ctx.strokeStyle=on?'#f2a53b':'rgba(220,227,230,0.4)';ctx.stroke()}
+  ctx.setLineDash([]);
+  ctx.font='600 9px "IBM Plex Mono", monospace';ctx.fillStyle='rgba(220,227,230,0.75)';
+  for(const [id,t] of [['LAD',0.55],['LCx',0.7],['RCA',0.35],['PDA',0.8],['D1',0.8],['OM1',0.9]]){const v=VBY[id],q=f(P[id][Math.floor(t*(v.n-1))]);ctx.fillText(id,q[0]+4,q[1]+3)}
+  ctx.fillStyle='rgba(220,227,230,0.9)';ctx.font='600 10px "IBM Plex Mono", monospace';ctx.fillText(`CORONARY MAP ${[...mapped].length}/${MAP_SEGS.length}`,8,14);
 }
 
 const angLabel=(a,b)=>(a===0?'AP':(a>0?'LAO ':'RAO ')+Math.abs(a)+'°')+(b===0?'':(b>0?' CRA ':' CAU ')+Math.abs(b)+'°');
