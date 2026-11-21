@@ -448,3 +448,9 @@ body.inmenu .txpop,body.inmenu .txdot,body.inreport .txpop,body.inreport .txdot{
 .txgrip{color:var(--muted);font-size:16px;line-height:1;flex:none}
 .txpop .lnk{background:none;border:0;padding:0;font:inherit;font-size:14px;color:var(--blue);text-decoration:underline;cursor:pointer}
 .mark select{font:inherit;font-size:14px;border:1.5px solid var(--line);border-radius:var(--wob-s);background:var(--panel);padding:1px 4px;color:var(--fg)}
+.gradepop{border-color:var(--amber);width:min(270px,46%)}
+.gradepop .txhead{border-bottom-color:var(--amber-dim)}
+.txpop.popin{animation:popin .22s ease-out}
+@keyframes popin{from{opacity:0;scale:.92}}
+@media (prefers-reduced-motion:reduce){.txpop.popin{animation:none}}
+.gradepop .sev{grid-template-columns:1fr 1fr}.gradepop .sev button{padding:6px 0;font-size:16px}

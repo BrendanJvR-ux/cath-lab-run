@@ -406,6 +406,7 @@ img.addEventListener('click',e=>{
   for(const P of lastProj.projV){for(let i=0;i<P.v.n;i++){if(P.cs[i]<0.3)continue;const d=Math.hypot(P.xs[i]-x,P.ys[i]-y);if(d<bd){bd=d;best={v:P.v,i}}}}
   S.review.playing=false;$('rvPlay').textContent='Play';
   if(!best){toast('No opacified vessel there. Pause on a well-filled frame and click on the vessel.');return}
+  {const vid=best.v.id,ld=best.v.ld[best.i];if(S.marks.some(m=>m.vid===vid&&Math.abs(m.ld-ld)<=8)){toast('You have already graded this spot. A grade is final.');return}}
   S.pending={vid:best.v.id,ld:best.v.ld[best.i],p3:best.v.p[best.i],label:segLabel(best.v,best.v.ld[best.i]),run:S.review.run.id};
   renderPending();drawReview();
 });
@@ -413,17 +414,14 @@ img.addEventListener('click',e=>{
 function renderPending(){
   const el=$('pending');
   el.innerHTML=S&&S.pending?`<div class="empty">Marked the ${S.pending.label}: grade it in the pop-up beside the mark.</div>`:'';
-  if(S){S.txClosed=false;renderPCI(true);txPlaced=''}
+  if(S){S.txClosed=false;renderGrade();txGen++}
 }
 function renderMarks(){
   const el=$('marks');
   $('bFinish').disabled=!S||S.done||(!S.runs.length&&!S.complication);
   if(!S||!S.marks.length){el.innerHTML='<div class="empty">Open a cine run and click on a narrowing to mark it.</div>';return}
-  el.innerHTML=S.marks.map((m,i)=>`<div class="mark"><span>${i+1}. ${m.label}</span><span class="row"><select data-g="${i}" aria-label="Grade of mark ${i+1} (scoring only)" title="Change the grade: it only affects your score">${BUCKETS.map((b,j)=>`<option value="${j}"${j===m.bucket?' selected':''}>${b.k}</option>`).join('')}</select><button data-i="${i}" aria-label="Remove mark ${i+1}">Remove</button></span></div>`).join('')
-    +'<div class="fine">Change a grade at any time: it only affects your score, not the treatment.</div>';
+  el.innerHTML=S.marks.map((m,i)=>`<div class="mark"><span>${i+1}. ${m.label} · ${BUCKETS[m.bucket].k}</span></div>`).join('');
 }
-$('marks').addEventListener('change',e=>{const g=e.target.closest('select[data-g]');if(!g||!S||S.done)return;const m=S.marks[+g.dataset.g];if(m){m.bucket=+g.value;toast(`Grade changed to ${BUCKETS[m.bucket].k}. Scoring only.`);renderPCI(true)}});
-$('marks').addEventListener('click',e=>{const b=e.target.closest('button[data-i]');if(!b||!S)return;S.marks.splice(+b.dataset.i,1);S.regrade=null;renderMarks();renderPCI(true);if(S.review)drawReview()});
 function renderRuns(){
   const el=$('runs');
   if(!S||!S.runs.length){el.innerHTML='<div class="empty">No runs yet. Engage an ostium, press Cine, then inject.</div>';$('bFinish').disabled=!S||S.done||!S.complication;return}
@@ -584,7 +582,7 @@ function sizingAdvice(P){
 }
 function renderPCI(force){
   const el=$('pci');
-  const sig=!S?'none':JSON.stringify([S.done,S.cs&&S.cs.eng,S.cs&&S.cs.deep,S.events.map(e=>[e.seen,e.closed,e.treated,e.doses.length,e.sealed,e.temporised,Math.round(e.sev*10)]),Math.round(S.effusion*5),S.pcT>0,S.tamponade,S.protamine,S.pci&&[S.pci.stage,S.pci.kind,S.pci.diam,S.pci.len,Math.round(S.pci.ld)],S.marks.map(m=>m.vid+m.ld+canTreat(m)),S.stents.length,S.balloons.length,S.ffr.length,!!S.txClosed,S.marks.map(m=>m.bucket).join(),S.pending&&S.pending.vid+S.pending.ld,S.regrade]);
+  const sig=!S?'none':JSON.stringify([S.done,S.cs&&S.cs.eng,S.cs&&S.cs.deep,S.events.map(e=>[e.seen,e.closed,e.treated,e.doses.length,e.sealed,e.temporised,Math.round(e.sev*10)]),Math.round(S.effusion*5),S.pcT>0,S.tamponade,S.protamine,S.pci&&[S.pci.stage,S.pci.kind,S.pci.diam,S.pci.len,Math.round(S.pci.ld)],S.marks.map(m=>m.vid+m.ld+canTreat(m)),S.stents.length,S.balloons.length,S.ffr.length,!!S.txClosed,S.marks.map(m=>m.bucket).join()]);
   if(!force&&sig===pciSig)return;pciSig=sig;
   if(!S){el.innerHTML='';$('txSide').innerHTML='<div class="empty">Load a case to begin.</div>';return}
   const P=S.pci;let h='';
@@ -605,7 +603,7 @@ function renderPCI(force){
   const log=[...S.balloons.map(b=>`Balloon ${b.diam.toFixed(1)} × ${b.len} mm · ${b.label} · ${b.atm} atm`),...S.stents.map(s=>`Stent ${s.diam.toFixed(1)} × ${s.len} mm · ${s.label} · ${s.atm} atm`)].map(t=>`<div class="mark"><span>${t}</span></div>`).join('');
   if(!P){
     const tg=txTargets();
-    if(tg.length){h=tg.map(m=>[m,S.marks.indexOf(m)]).map(([m,i])=>`<div class="mark"><span>${i+1}. ${m.label} · ${BUCKETS[m.bucket].k} <button class="lnk" data-regrade="${i}" title="Change the grade (scoring only)">change</button></span><span class="row"><button class="btn" data-ffr="${i}" ${canTreat(m)?'':'disabled'} title="Measure the pressure drop across it (FFR)">FFR</button><button class="btn" data-treat="${i}" ${canTreat(m)?'':'disabled'}>Wire it</button></span></div>`).join('');
+    if(tg.length){h=tg.map(m=>[m,S.marks.indexOf(m)]).map(([m,i])=>`<div class="mark"><span>${i+1}. ${m.label} · ${BUCKETS[m.bucket].k}</span><span class="row"><button class="btn" data-ffr="${i}" ${canTreat(m)?'':'disabled'} title="Measure the pressure drop across it (FFR)">FFR</button><button class="btn" data-treat="${i}" ${canTreat(m)?'':'disabled'}>Wire it</button></span></div>`).join('');
       if(!tg.some(canTreat))h+='<div class="empty">Engage the matching coronary to treat it.</div>'}
   }else if(P.stage==='wire'){
     h=`<div class="pending"><div>Crossing the ${P.label} with a 0.014" ${P.ffr?'pressure ':''}wire. Hold fluoro. <b id="pciWire" class="pci-read">0%</b></div><div class="row"><button class="btn" data-cancel="1">Cancel</button></div></div>`;
@@ -631,14 +629,9 @@ function renderPCI(force){
       <div class="row"><button class="btn" data-nudge="-2">◀ Proximal</button><button class="btn" data-nudge="2">Distal ▶</button></div>
       <div class="row"><button class="hold" data-hold="1"><span>Inflate</span><kbd>${typeof shortKey==='function'?shortKey('KeyB'):'B'}</kbd></button><b id="pciAtm" class="pci-read">0.0 atm</b><button class="btn" data-back="1">Back</button></div></div>`;
   }
-  let grading=false;
-  if(S.pending){grading=true;
-    h=`<div class="pending"><div>How narrow is the <b>${S.pending.label}</b>? Estimate the diameter stenosis:</div><div class="sev">${BUCKETS.map((b,i)=>`<button data-b="${i}">${b.k}</button>`).join('')}</div><div class="row"><button class="btn" data-x="1">Discard mark</button></div></div>`}
-  else if(S.regrade!=null&&S.marks[S.regrade]){grading=true;const m=S.marks[S.regrade];
-    h=`<div class="pending"><div>Change the grade of the <b>${m.label}</b>. This only affects your score: the treatment stays the same.</div><div class="sev">${BUCKETS.map((b,i)=>`<button data-rg="${i}" class="${i===m.bucket?'sel':''}">${b.k}</button>`).join('')}</div><div class="row"><button class="btn" data-rgx="1">Keep ${BUCKETS[m.bucket].k}</button></div></div>`}
-  el.innerHTML=grading?h+alerts:alerts+h+(S.events.length||S.drugs.length||eng?drugs:'');
+  el.innerHTML=alerts+h+(S.events.length||S.drugs.length||eng?drugs:'');
   $('txSide').innerHTML=txSideHTML()+resolved+log;
-  txPlaced='';
+  txGen++;
 }
 /* ---------- the treatment pop-up: beside the lesion on the X-ray, once a lesion has been marked correctly ---------- */
 function activeEvents(){return S.events.filter(e=>!e.treated&&!(e.kind==='spasm'&&!(e.sev>0.8||(e.seen&&S.D.level===1))))}
@@ -646,7 +639,7 @@ function lesionOfMark(m){return S.lesions.find(L=>m.vid===L.vid&&Math.abs(m.ld-L
 function markDone(m){const L=lesionOfMark(m);return !!L&&(!!L.stented||S.ffr.some(f=>f.vid===m.vid&&f.value>0.8&&Math.abs(f.ld-L.at)<=L.len/2+15))}
 function txTargets(){return S.marks.filter(m=>lesionOfMark(m)&&!markDone(m)).filter((m,i,a)=>a.findIndex(x=>lesionOfMark(x)===lesionOfMark(m))===i)}
 function txAlertCount(){return activeEvents().length+(S.effusion>0.3?1:0)}
-function txWanted(){return !!(S&&!S.done&&!S.complication&&(S.pending||S.pci||txAlertCount()||txTargets().length))}
+function txWanted(){return !!(S&&!S.done&&!S.complication&&(S.pci||txAlertCount()||txTargets().length))}
 function txSideHTML(){
   if(!S)return '';
   if(txWanted())return S.txClosed?'<button class="btn" id="txOpen">Show treatment options</button>':'<div class="empty">Treatment options are open on the X-ray, beside the lesion.</div>';
@@ -655,33 +648,57 @@ function txSideHTML(){
   if(S.marks.some(m=>lesionOfMark(m)&&markDone(m))&&!S.marks.some(m=>lesionOfMark(m)&&!markDone(m)))return '<div class="empty">Treatment done for the lesions you marked.</div>';
   return '<div class="empty">No treatment options yet: the options open beside a lesion once it is marked correctly.</div>';
 }
-let txPlaced='',txLastN=0,txLastT=0;
+let txGen=0,txLastN=0,txLastT=0;
+/* first pop-up: grade the narrowing just clicked (once graded, it closes and can't be reopened) */
+function renderGrade(){
+  const g=S&&S.pending;if(!g){$('gradeBody').innerHTML='';return}
+  $('gradeTitle').textContent=`Grade the ${g.label}`;
+  $('gradeBody').innerHTML=`<div class="pending"><div>How narrow is the <b>${g.label}</b>? Estimate the diameter stenosis. You can't change it afterwards.</div><div class="sev">${BUCKETS.map((b,i)=>`<button data-b="${i}">${b.k}</button>`).join('')}</div><div class="row"><button class="btn" data-x="1">Discard mark</button></div></div>`;
+}
+$('gradeBody').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b||!S||!S.pending||S.done)return;
+  if(b.dataset.b!=null){const m={...S.pending,bucket:+b.dataset.b};S.marks.push(m);
+    // the grading pop-up goes away; a real lesion gets the treatment pop-up a moment later
+    if(lesionOfMark(m)&&!markDone(m))S.txShowAt=performance.now()+650}
+  S.pending=null;renderPending();renderMarks();renderPCI(true);if(S.review)drawReview();txUpdate();
+});
+function gradeUpdate(){
+  const gp=$('gradePop'),show=!!(S&&S.pending&&!S.done);
+  if(gp.hidden===show){gp.hidden=!show;if(show)popIn(gp)}
+  if(show)placePop(gp,{vid:S.pending.vid,ld:S.pending.ld});
+  return show;
+}
+function popIn(el){el.classList.remove('popin');void el.offsetWidth;el.classList.add('popin')}
+/* second pop-up: the treatment options for a correctly identified lesion, complications and drugs */
 function txUpdate(){
   const pop=$('txPop'),dot=$('txDot');
-  if(!S){pop.hidden=dot.hidden=true;return}
+  if(!S){pop.hidden=$('gradePop').hidden=dot.hidden=true;return}
+  const grading=gradeUpdate();
   // reopen if something new needs the player: a new complication or a newly identified lesion
   const n=txAlertCount(),t=txTargets().length;if(n>txLastN||t>txLastT)S.txClosed=false;txLastN=n;txLastT=t;
-  const want=txWanted(),show=want&&!S.txClosed;
-  if(pop.hidden===show){pop.hidden=!show;renderPCI(true)}
+  const show=txWanted()&&!S.txClosed&&!grading&&performance.now()>=(S.txShowAt||0);
+  if(pop.hidden===show){pop.hidden=!show;if(show)popIn(pop);renderPCI(true)}
+  if(grading)return;
   if(!show){dot.hidden=true;return}
   const P=S.pci,e=activeEvents().find(x=>x.seen),m=txTargets()[0];
-  const g=S.pending,rg=!g&&S.regrade!=null?S.marks[S.regrade]:null;
-  const an=g?{vid:g.vid,ld:g.ld}:rg?{vid:rg.vid,ld:rg.ld}:P?{vid:P.vid,ld:P.ld}:e?{vid:e.vid,ld:e.ld}:m?{vid:m.vid,ld:m.ld}:null;
-  $('txTitle').textContent=g?`Grade the ${g.label}`:rg?`Regrade the ${rg.label}`:P?`Treating the ${P.label}`:e?`${EV_NAME[e.kind]} · ${e.label}`:m?`Treat the ${m.label}`:'Treatment';
-  const dr=S.txDrag||(S.txDrag={x:0,y:0});
-  const mon=$('monitor'),mw=mon.clientWidth,mh=mon.clientHeight;
+  const an=P?{vid:P.vid,ld:P.ld}:e?{vid:e.vid,ld:e.ld}:m?{vid:m.vid,ld:m.ld}:null;
+  $('txTitle').textContent=P?`Treating the ${P.label}`:e?`${EV_NAME[e.kind]} · ${e.label}`:m?`Treat the ${m.label}`:'Treatment';
+  placePop(pop,an);
+}
+/* put a pop-up well clear of the lesion: towards the image edge across from it, and shifted up or down away from it */
+function placePop(pop,an){
+  const dot=$('txDot'),mon=$('monitor'),mw=mon.clientWidth,mh=mon.clientHeight,dr=S.txDrag||(S.txDrag={x:0,y:0});
   const a=S.review?S.review.run.a:S.a,b=S.review?S.review.run.b:S.b;
-  const key=[an&&an.vid,an&&Math.round(an.ld),a,b,mw,mh,pop.offsetHeight,dr.x,dr.y].join();if(key===txPlaced)return;txPlaced=key;
+  const key=[txGen,an&&an.vid,an&&Math.round(an.ld),a,b,mw,mh,pop.offsetHeight,dr.x,dr.y,!!S.review].join();if(key===pop._placed)return;pop._placed=key;
   const dock=mw<470;pop.classList.toggle('dock',dock);
   if(!an){dot.hidden=true;pop.style.left=pop.style.top='';txNudge(pop,mw,mh,dr);return}
   const v=VBY[an.vid];let i=0;while(i<v.n-1&&v.ld[i]<an.ld)i++;
   const q=proj(motion(v.p[i],contraction(0.3)),basis(a,b)),lx=q[0]/W*mw,ly=q[1]/W*mh;
   dot.hidden=false;dot.style.left=lx+'px';dot.style.top=ly+'px';
   if(dock){pop.style.left=pop.style.top='';txNudge(pop,mw,mh,dr);return}
-  // well clear of the lesion, towards the edge of the image, so the narrowing and the vessel around it stay in view
-  const pw=pop.offsetWidth,ph=pop.offsetHeight,right=lx<mw/2;
-  pop.style.left=clamp(right?Math.max(lx+90,mw-pw-14):Math.min(lx-90-pw,14),8,mw-pw-8)+'px';
-  pop.style.top=clamp(ly-ph/2,8,Math.max(8,mh-ph-58))+'px';
+  const pw=pop.offsetWidth,ph=pop.offsetHeight,right=lx<mw/2,below=ly<mh/2;
+  pop.style.left=clamp(right?Math.max(lx+130,mw-pw-10):Math.min(lx-130-pw,10),8,mw-pw-8)+'px';
+  pop.style.top=clamp(below?ly+50:ly-50-ph,8,Math.max(8,mh-ph-58))+'px';
   pop.classList.toggle('left',!right);
   txNudge(pop,mw,mh,dr);
 }
@@ -692,20 +709,15 @@ function txNudge(pop,mw,mh,dr){
   const dx=clamp(clamp(dr.x,-TX_DRAG,TX_DRAG),4-L,Math.max(4-L,mw-pw-4-L)),bot=S&&S.review?54:4,dy=clamp(clamp(dr.y,-TX_DRAG,TX_DRAG),4-T,Math.max(4-T,mh-ph-bot-T)); // stays clear of the review controls
   pop.style.transform=dx||dy?`translate(${dx}px,${dy}px)`:'';
 }
-{let drag=null;const head=document.querySelector('#txPop .txhead');
+document.querySelectorAll('.txpop .txhead').forEach(head=>{let drag=null;
  head.addEventListener('pointerdown',e=>{if(!S||e.target.closest('button'))return;e.preventDefault();const dr=S.txDrag||(S.txDrag={x:0,y:0});drag={x:e.clientX,y:e.clientY,ox:dr.x,oy:dr.y};head.setPointerCapture(e.pointerId);head.classList.add('drag')});
- head.addEventListener('pointermove',e=>{if(!drag||!S)return;S.txDrag={x:clamp(drag.ox+e.clientX-drag.x,-TX_DRAG,TX_DRAG),y:clamp(drag.oy+e.clientY-drag.y,-TX_DRAG,TX_DRAG)};txPlaced='';txUpdate()});
+ head.addEventListener('pointermove',e=>{if(!drag||!S)return;S.txDrag={x:clamp(drag.ox+e.clientX-drag.x,-TX_DRAG,TX_DRAG),y:clamp(drag.oy+e.clientY-drag.y,-TX_DRAG,TX_DRAG)};txGen++;txUpdate()});
  const end=()=>{drag=null;head.classList.remove('drag')};head.addEventListener('pointerup',end);head.addEventListener('pointercancel',end);
- head.addEventListener('dblclick',e=>{if(!S||e.target.closest('button'))return;S.txDrag={x:0,y:0};txPlaced='';txUpdate()})}
+ head.addEventListener('dblclick',e=>{if(!S||e.target.closest('button'))return;S.txDrag={x:0,y:0};txGen++;txUpdate()})});
 $('txClose').addEventListener('click',()=>{if(!S)return;S.txClosed=true;txLastN=txAlertCount();txLastT=txTargets().length;txUpdate();renderPCI(true)});
 $('txSide').addEventListener('click',e=>{if(e.target.closest('#txOpen')&&S){S.txClosed=false;txUpdate();renderPCI(true)}});
 $('pci').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b||!S||S.done)return;const P=S.pci,d=b.dataset;
-  if(d.b!=null&&S.pending){S.marks.push({...S.pending,bucket:+d.b});S.pending=null;renderPending();renderMarks();if(S.review)drawReview();return}
-  if(d.x&&S.pending){S.pending=null;renderPending();if(S.review)drawReview();return}
-  if(d.regrade!=null){S.regrade=+d.regrade;renderPCI(true);return}
-  if(d.rg!=null){const m=S.marks[S.regrade];if(m){m.bucket=+d.rg;toast(`Grade changed to ${BUCKETS[m.bucket].k}. Scoring only: the treatment is unchanged.`)}S.regrade=null;renderMarks();renderPCI(true);return}
-  if(d.rgx){S.regrade=null;renderPCI(true);return}
   if(d.treat!=null)startPCI(+d.treat);
   else if(d.ffr!=null)startPCI(+d.ffr,{ffr:true});
   else if(d.hyper){if(!P.hyperT&&P.reading==null){P.hyperT=3.2;S.hrDip=1.2;toast('IV adenosine: maximal flow (hyperaemia) building… watch the blue distal pressure fall.')}}
