@@ -137,7 +137,7 @@ function newState(ci){
   return {ci,c,D,diff:profile.diff,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,type:'JL'},exch:0,
     cL:0,cR:0,cRoot:0,hist:{L:[],R:[],root:[]},histN:0,contrast:0,ak:0,ftime:0,ctime:0,blind:0,wasted:0,
     cine:null,runs:[],marks:[],pending:null,review:null,imgAcc:0,frame:0,deepInj:0,rcaInj:0,complication:null,done:false,
-    sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),
+    sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),events:[],drugs:[],hrDip:0,bpDip:0,isch:0,
     st:{II:0,V3:0,V5:0},twi:new Set((c.ecg&&c.ecg.twi)||[])};
 }
 const histAt=(arr,t)=>{if(t<0||!arr.length)return 0;const i=Math.floor(t*50);return i<arr.length?arr[i]:arr[arr.length-1]};
@@ -220,7 +220,7 @@ $('rvPlay').addEventListener('click',()=>{if(!S||!S.review)return;S.review.playi
 $('rvSlider').addEventListener('input',e=>{if(!S||!S.review)return;S.review.idx=+e.target.value;S.review.playing=false;$('rvPlay').textContent='Play';drawReview()});
 $('runs').addEventListener('click',e=>{const b=e.target.closest('.run');if(b)openReview(+b.dataset.id)});
 function frameState(run,f){
-  return {t:f.t,phase:f.phase,a:run.a,b:run.b,mode:'cine',frame:f.frame,lesions:run.lesState||S.lesions,pci:f.pci,cath:true,cathState:cst(f.cath),
+  return {t:f.t,phase:f.phase,a:run.a,b:run.b,mode:'cine',frame:f.frame,lesions:run.lesState||S.lesions,pci:f.pci,events:f.ev,cath:true,cathState:cst(f.cath),
     conc:(sys,t)=>histAt(S.hist[sys],t),root:histAt(S.hist.root,f.t),marks:S.marks};
 }
 function drawReview(){const R=S.review;const f=R.run.frames[R.idx];renderImage(frameState(R.run,f));$('rvSlider').value=R.idx}
@@ -270,16 +270,16 @@ function ecgAt(ph,st=0,twi=false,amp=1){
     +st*0.34*(gs(ph,0.2,0.05)+0.6*gs(ph,0.27,0.05))+(t+0.25*Math.max(0,st))*gs(ph,0.33,0.04);
 }
 const LEAD_AMP={II:1,V3:0.85,V5:1.1};
-function pressAt(ph,damped){
+function pressAt(ph,damped,drop=0){
   const x=((ph-0.14)%1+1)%1;let s;
   if(x<0.12)s=Math.sin(x/0.12*Math.PI/2);else if(x<0.32)s=1-(x-0.12)/0.2*0.36;else if(x<0.36)s=0.62+0.07*Math.sin((x-0.32)/0.04*Math.PI);else s=0.62*Math.exp(-(x-0.36)*3.2)-0.08*(x-0.36)/0.64;
-  return damped?62+30*Math.pow(Math.max(0,s),1.6):74+54*s;
+  return damped?62+30*Math.pow(Math.max(0,s),1.6):74-drop*0.45+(54-drop)*s;
 }
 function hemoStep(dt,ph0,ph1,damped){
   if(!HB)return;const speed=105*dpr;const n=Math.max(0,Math.round(dt*speed));const len=HB.p.length;
   for(let j=1;j<=n;j++){let ph=ph0+(((ph1-ph0+1)%1))*j/n;ph%=1;
     for(const l of LEADS)HB[l][hx]=ecgAt(ph,S?S.st[l]:0,S?S.twi.has(l):false,LEAD_AMP[l]);
-    HB.p[hx]=pressAt(ph,damped);hx=(hx+1)%len;
+    HB.p[hx]=pressAt(ph,damped,S?S.bpDrop||0:0);hx=(hx+1)%len;
     for(let g=0;g<14*dpr;g++){const k=(hx+g)%len;HB.p[k]=NaN;for(const l of LEADS)HB[l][k]=NaN}}
 }
 function drawHemo(){
@@ -306,31 +306,72 @@ function pciRender(){
     balloon:P&&P.stage==='positioned'?{vid:P.vid,ld:P.ld,len:P.len,diam:P.diam,inflate:P.atm/14}:null};
 }
 function canTreat(m){const sys=VBY[m.vid].sys;return !!(S&&S.cs&&S.cs.eng===sys&&!S.cs.deep&&!S.complication&&!S.done)}
-function startPCI(mi){
-  const m=S.marks[mi];if(!canTreat(m)){toast(`Engage the ${VBY[m.vid].sys==='L'?'left':'right'} coronary first.`);return}
-  S.pci={vid:m.vid,ld:m.ld,mark:m.ld,label:m.label,stage:'wire',wire:0,kind:null,diam:3.0,len:18,atm:0,maxAtm:0};
-  toast('Hold fluoro while the wire crosses the lesion.');renderPCI(true);
+function startPCI(mi){startPCIAt(S.marks[mi])}
+function startPCIAt(m){
+  if(!canTreat(m)){toast(`Engage the ${VBY[m.vid].sys==='L'?'left':'right'} coronary first.`);return}
+  const closed=S.events.some(e=>e.kind==='dissection'&&e.closed&&!e.treated&&e.vid===m.vid);
+  S.pci={vid:m.vid,ld:m.ld,mark:m.ld,label:m.label,stage:'wire',wire:0,kind:null,diam:3.0,len:18,atm:0,maxAtm:0,slow:closed};
+  toast(closed?'Recrossing an occluded, dissected vessel: the wire will be slow. Hold fluoro.':'Hold fluoro while the wire crosses the lesion.');renderPCI(true);
+}
+/* ---------- complications: dissection and no-reflow ---------- */
+const evRender=()=>S.events.map(e=>({kind:e.kind,vid:e.vid,ld:e.ld,len:e.len,flow:e.flow,progress:e.progress,closed:e.closed,treated:e.treated,stain:e.stain}));
+const isACS=()=>/STEMI/.test(S.c.title||'');
+function addEvent(kind,vid,ld,cause){
+  if(S.events.some(e=>e.kind===kind&&e.vid===vid&&!e.treated&&Math.abs(e.ld-ld)<15))return null;
+  const v=VBY[vid];ld=clamp(ld,4,v.len-4);
+  const ev={kind,vid,ld,len:kind==='dissection'?10:0,label:segLabel(v,ld),cause,t0:S.clock,seen:false,treated:false,closed:false,progress:0,stain:0,flow:1,target:kind==='noreflow'?0.12+Math.random()*0.18:1,doses:[]};
+  S.events.push(ev);
+  const l=TERRITORY[vid];
+  setTimeout(()=>{if(S&&!S.done&&S.events.includes(ev))toast(`The patient has chest pain. ST rising in ${l}, BP falling.`,true)},kind==='noreflow'?1500:400);
+  renderPCI(true);return ev;
 }
 function applyDevice(){
   const P=S.pci,dev={vid:P.vid,ld:P.ld,len:P.len,diam:P.diam,atm:Math.round(P.maxAtm),label:segLabel(VBY[P.vid],P.ld),hits:[],t:S.clock};
   if(P.kind==='stent'){
     for(const L of S.lesions){const o=stentOutcome(L,dev);if(o){L.cur=o.residual;L.stented=true;dev.hits.push({L,o})}}
     S.stents.push(dev);toast(`Stent deployed: ${P.diam.toFixed(1)} × ${P.len} mm at ${dev.atm} atm.`);
+    for(const ev of S.events)if(ev.kind==='dissection'&&!ev.treated&&stentCovers(dev,ev)){ev.treated=true;ev.tx=S.clock;setTimeout(()=>{if(S&&!S.done)toast(`Dissection in the ${ev.label} covered: the flap is tacked back and flow restored.`)},2900)}
+    const sigHit=dev.hits.find(h=>h.L.sev>=0.7),over=dev.hits.some(h=>h.o.over);
+    // edge dissection beyond the stent
+    if(Math.random()<dissectRisk({kind:'stent',over,atm:dev.atm})*(over?1:S.D.compX))addEvent('dissection',dev.vid,dev.ld+dev.len/2+3,over?'an oversized stent':dev.atm>16?'deploying above the rated burst pressure':'stent deployment (an edge tear)');
+    // no-reflow: debris and spasm in the microcirculation beyond a freshly stented, often thrombotic, lesion
+    else if(sigHit&&Math.random()<noReflowRisk({acs:isACS(),sev:sigHit.L.sev,len:dev.len})*S.D.compX)addEvent('noreflow',dev.vid,dev.ld,'');
   }else{
     for(const L of S.lesions){const o=balloonOutcome(L,dev);if(o){L.cur=o.residual;if(!o.under&&!o.lowP)L.predil=true;dev.hits.push({L,o})}}
     S.balloons.push(dev);const over=dev.hits.some(h=>h.o.over);
+    const hit=dev.hits[0];
+    if(Math.random()<dissectRisk({kind:'balloon',over,atm:dev.atm,sev:hit?hit.L.sev:0,stented:hit&&hit.L.stented})*(over?1:S.D.compX))addEvent('dissection',dev.vid,hit?hit.L.at:dev.ld,over?'an oversized balloon':dev.atm>16?'inflating above the rated burst pressure':'balloon angioplasty of a hard lesion');
     toast(over?'Balloon oversized: dissection flap at the lesion edge.':`Balloon ${P.diam.toFixed(1)} × ${P.len} mm inflated to ${dev.atm} atm.`,over);
   }
   P.stage='tools';P.kind=null;P.atm=0;P.maxAtm=0;P.warned=P.pain=false;P.ld=P.mark;renderPCI(true);
+}
+function giveDrug(id){
+  const D=IC_DRUGS.find(x=>x.id===id),cs=S.cs;if(!D)return;
+  if(!cs||!cs.eng||cs.deep){toast('Engage the guide (not deep-seated) to give drugs into the coronary.');return}
+  const nr=S.events.filter(e=>e.kind==='noreflow'&&!e.treated&&VBY[e.vid].sys===cs.eng);
+  for(const e of nr){e.target=Math.min(1,e.target+D.gain);e.doses.push(D.short)}
+  S.drugs.push({id,t:S.clock,useful:nr.length>0&&D.gain>0.1});
+  if(D.side==='brady')S.hrDip=3.5;else S.bpDip=8;
+  toast(`${D.name} into the ${cs.eng==='L'?'left':'right'} coronary.`+(D.side==='brady'?' Brief bradycardia.':' BP dips.')+(nr.length?(D.gain>0.1?' Distal flow improving.':' Little effect on the slow flow.'):''));
+  renderPCI(true);
 }
 let pciSig='';
 function sizeChips(list,cur,attr,fmt){return `<div class="sev">${list.map(v=>`<button data-${attr}="${v}" class="${v===cur?'sel':''}">${fmt(v)}</button>`).join('')}</div>`}
 function renderPCI(force){
   const el=$('pci');
-  const sig=!S?'none':JSON.stringify([S.done,S.pci&&[S.pci.stage,S.pci.kind,S.pci.diam,S.pci.len,Math.round(S.pci.ld)],S.marks.map(m=>m.vid+m.ld+canTreat(m)),S.stents.length,S.balloons.length]);
+  const sig=!S?'none':JSON.stringify([S.done,S.cs&&S.cs.eng,S.cs&&S.cs.deep,S.events.map(e=>[e.seen,e.closed,e.treated,e.doses.length]),S.pci&&[S.pci.stage,S.pci.kind,S.pci.diam,S.pci.len,Math.round(S.pci.ld)],S.marks.map(m=>m.vid+m.ld+canTreat(m)),S.stents.length,S.balloons.length]);
   if(!force&&sig===pciSig)return;pciSig=sig;
   if(!S){el.innerHTML='<div class="empty">Load a case to begin.</div>';return}
   const P=S.pci;let h='';
+  // complications come first: what the patient shows, and once imaged, what it is and what to do
+  const active=S.events.filter(e=>!e.treated);
+  const alerts=active.map(e=>{const i=S.events.indexOf(e),l=TERRITORY[e.vid];
+    if(!e.seen)return `<div class="alert"><b>Chest pain · ST ↑ ${l} · BP falling</b><span>Inject and look at the vessel you just treated.</span></div>`;
+    if(e.kind==='dissection')return `<div class="alert"><b>${e.closed?'Abrupt closure':'Dissection'} · ${e.label}</b><span>${e.closed?'No flow beyond the flap. Recross it with a wire and stent it.':'Flap with contrast staining. Cover it with a stent before it closes.'}</span>${!P?`<button class="btn" data-rewire="${i}" ${canTreat(e)?'':'disabled'}>Wire it</button>`:P.vid===e.vid&&P.stage!=='wire'?`<button class="btn" data-aim="${i}">Aim devices here</button>`:''}</div>`;
+    return `<div class="alert"><b>No-reflow · ${e.label}</b><span>Stent open, slow distal flow (${e.flow<0.35?'TIMI 1':'TIMI 2'}). Give intracoronary vasodilators below.${e.doses.length?' Given: '+e.doses.join(', ')+'.':''}</span></div>`;}).join('');
+  const eng=S.cs&&S.cs.eng&&!S.cs.deep&&!S.complication;
+  const drugs=`<div class="grouplabel">Intracoronary drugs</div><div class="drugs">${IC_DRUGS.map(d=>`<button class="btn" data-drug="${d.id}" title="${d.desc}" ${eng?'':'disabled'}>${d.short}</button>`).join('')}</div>`;
+  const resolved=S.events.filter(e=>e.treated).map(e=>`<div class="mark"><span>${e.kind==='dissection'?'Dissection':'No-reflow'} · ${e.label} · resolved</span></div>`).join('');
   const log=[...S.balloons.map(b=>`Balloon ${b.diam.toFixed(1)} × ${b.len} mm · ${b.label} · ${b.atm} atm`),...S.stents.map(s=>`Stent ${s.diam.toFixed(1)} × ${s.len} mm · ${s.label} · ${s.atm} atm`)].map(t=>`<div class="mark"><span>${t}</span></div>`).join('');
   if(!P){
     if(!S.marks.length)h='<div class="empty">Mark a lesion on a cine run, then treat it here with the guide engaged.</div>';
@@ -353,11 +394,14 @@ function renderPCI(force){
       <div class="row"><button class="btn" data-nudge="-2">◀ Proximal</button><button class="btn" data-nudge="2">Distal ▶</button></div>
       <div class="row"><button class="hold" data-hold="1"><span>Inflate</span><kbd>B</kbd></button><b id="pciAtm" class="pci-read">0.0 atm</b><button class="btn" data-back="1">Back</button></div></div>`;
   }
-  el.innerHTML=h+log;
+  el.innerHTML=alerts+h+(S.events.length||S.drugs.length||eng?drugs:'')+resolved+log;
 }
 $('pci').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b||!S||S.done)return;const P=S.pci,d=b.dataset;
   if(d.treat!=null)startPCI(+d.treat);
+  else if(d.rewire!=null){const e=S.events[+d.rewire];startPCIAt({vid:e.vid,ld:e.ld,label:e.label})}
+  else if(d.drug){giveDrug(d.drug);return}
+  else if(d.aim!=null){const e=S.events[+d.aim];P.mark=P.ld=e.ld;P.label=e.label;toast(`Devices will be positioned at the ${e.label}.`)}
   else if(d.cancel){S.pci=null;toast('Wire withdrawn.')}
   else if(d.tool){P.kind=d.tool;P.stage='size';P.diam=d.tool==='stent'?3.0:2.5;P.len=d.tool==='stent'?18:15}
   else if(d.d)P.diam=+d.d;else if(d.l)P.len=+d.l;
@@ -425,9 +469,25 @@ function tick(dt){
   // bradycardia with RCA injection
   if(S.cR>0.7)S.rcaInj+=dt;else S.rcaInj=Math.max(0,S.rcaInj-dt*1.5);
   S.hrT=S.rcaInj>1.6?46:72;
+  // complications: progression, staining, recognition, and the drugs' side effects
+  for(const ev of S.events){
+    const v=VBY[ev.vid],gd=v.base+ev.ld,c=histAt(S.hist[v.sys],S.clock-gd/FLOW[v.sys]),xr=down('Space','KeyF')||!!S.cine;
+    if(ev.kind==='dissection'&&!ev.treated){
+      if(!ev.closed){ev.progress=Math.min(1,ev.progress+dt/S.D.dissectT);if(ev.progress>=1){ev.closed=true;toast(`Abrupt closure of the ${ev.label}: no flow beyond the dissection. Rewire and stent it.`,true);renderPCI(true)}}
+      ev.stain=c>0.3?Math.min(1,ev.stain+dt*0.7*c):ev.stain*Math.exp(-dt/12);
+    }
+    if(ev.kind==='noreflow'){ev.flow+=(ev.target-ev.flow)*Math.min(1,dt/(ev.flow>ev.target?2.5:4));if(!ev.treated&&ev.target>=0.95&&ev.flow>0.92){ev.treated=true;ev.tx=S.clock;toast(`Flow in the ${ev.label} restored. ST settling.`);renderPCI(true)}}
+    if(!ev.seen&&xr&&c>0.35&&S.clock-ev.t0>1){ev.seen=true;renderPCI(true);
+      toast(ev.kind==='dissection'?`Dissection: a flap with contrast staining in the ${ev.label}. Cover it with a stent before it closes.`
+        :`No-reflow: the stent in the ${ev.label} is open but contrast crawls beyond it. Give intracoronary vasodilators through the guide.`,true)}
+  }
+  let isch=0,ischLead=null;for(const ev of S.events){const x=1-evFlow(ev);if(x>isch){isch=x;ischLead=TERRITORY[ev.vid]}}
+  S.isch=isch;S.hrDip=Math.max(0,S.hrDip-dt);S.bpDip=Math.max(0,S.bpDip-dt);
+  S.bpDrop=Math.min(55,isch*38+(S.bpDip>0?14:0));
+  if(S.hrDip>0)S.hrT=38;else if(isch>0.5)S.hrT=ischLead==='II'?50:98;
   // PCI: wire crossing (under X-ray) and balloon inflation
   const P=S.pci,xray=down('Space','KeyF')||!!S.cine;
-  if(P&&P.stage==='wire'&&xray){P.wire+=dt*(owns('wire')?1:0.5);if(P.wire>=1){P.wire=1;P.stage='tools';toast('Wire is across. Choose a device.');renderPCI(true)}}
+  if(P&&P.stage==='wire'&&xray){P.wire+=dt*(owns('wire')?1:0.5)*(P.slow?0.4:1);if(P.wire>=1){P.wire=1;P.stage='tools';toast('Wire is across. Choose a device.');renderPCI(true)}}
   if(P&&P.stage==='positioned'){
     if(down('KeyB')){P.atm=Math.min(18,P.atm+7*dt);P.maxAtm=Math.max(P.maxAtm,P.atm);if(P.atm>=16.5&&!P.warned){P.warned=true;toast('Above the 16 atm rated burst pressure.',true)}if(P.atm>4&&!P.pain){P.pain=true;toast(`Balloon up. Chest pain, ST rising in ${P.vid==='LM'?'V3 and V5':TERRITORY[P.vid]}.`)}}
     else if(P.atm>0){if(P.maxAtm>=4)applyDevice();else{P.atm=Math.max(0,P.atm-20*dt);if(P.atm===0)P.maxAtm=0}}
@@ -435,11 +495,12 @@ function tick(dt){
   // ECG territories: an inflated balloon raises ST in the lead facing that vessel, with reciprocal change elsewhere
   const tgt={II:0,V3:0,V5:0};
   if(P&&P.atm>4){const l=TERRITORY[P.vid];if(P.vid==='LM'){tgt.V3=0.8;tgt.V5=0.8;tgt.II=-0.4}else{tgt[l]=1;if(l==='V3')tgt.II=-0.35;if(l==='V5')tgt.V3=-0.5;if(l==='II')tgt.V5=-0.3}}
+  for(const ev of S.events){const x=1-evFlow(ev);if(x<0.05)continue;const l=TERRITORY[ev.vid];tgt[l]=Math.max(tgt[l],1.1*x);if(l==='V3')tgt.II=Math.min(tgt.II,-0.35*x);if(l==='V5')tgt.V3=Math.min(tgt.V3,-0.5*x);if(l==='II')tgt.V5=Math.min(tgt.V5,-0.3*x)}
   for(const l of LEADS)S.st[l]+=(tgt[l]-S.st[l])*Math.min(1,dt*1.4);
   // hemodynamics
   const damped=cs.deep;
   hemoStep(dt,ph0,S.phase,damped);
-  const p=pressAt(S.phase,damped);S.beatMax=Math.max(S.beatMax,p);S.beatMin=Math.min(S.beatMin,p);
+  const p=pressAt(S.phase,damped,S.bpDrop||0);S.beatMax=Math.max(S.beatMax,p);S.beatMin=Math.min(S.beatMin,p);
   if(S.phase<ph0){S.sysP=S.beatMax;S.diaP=S.beatMin;S.beatMax=0;S.beatMin=999}
   // imaging
   const fl=down('Space','KeyF')&&!S.complication;const imaging=fl||!!S.cine;
@@ -451,8 +512,8 @@ function tick(dt){
   if(S.review){if(S.review.playing){S.review.acc+=dt;if(S.review.acc>=1/15){S.review.acc=0;S.review.idx=(S.review.idx+1)%S.review.run.frames.length;drawReview()}}}
   else if(imaging&&S.imgAcc>=1/15){
     S.imgAcc=0;S.frame++;
-    renderImage({t:S.clock,phase:S.phase,a:S.a,b:S.b,mode:S.cine?'cine':'fluoro',frame:S.frame,lesions:S.lesions,pci:pciRender(),cath:true,cathState:cs,wire:S.exch>0,conc:(sys,t)=>histAt(S.hist[sys],t),root:histAt(S.hist.root,S.clock)});
-    if(S.cine){S.cine.frames.push({t:S.clock,phase:S.phase,frame:S.frame,cath:{...c},pci:pciRender()});if(S.cine.frames.length>=90)stopCine()}
+    renderImage({t:S.clock,phase:S.phase,a:S.a,b:S.b,mode:S.cine?'cine':'fluoro',frame:S.frame,lesions:S.lesions,pci:pciRender(),events:evRender(),cath:true,cathState:cs,wire:S.exch>0,conc:(sys,t)=>histAt(S.hist[sys],t),root:histAt(S.hist.root,S.clock)});
+    if(S.cine){S.cine.frames.push({t:S.clock,phase:S.phase,frame:S.frame,cath:{...c},pci:pciRender(),ev:evRender()});if(S.cine.frames.length>=90)stopCine()}
     // coverage: any segment that filled with contrast counts towards a complete study
     if(lastProj){for(const Pv of lastProj.projV){for(let i=0;i<Pv.v.n;i+=2)if(Pv.cs[i]>0.45)S.mapped.add(mapKey(Pv.v,Pv.v.ld[i]))}}
   }
@@ -535,6 +596,22 @@ function finish(){
   for(const s of S.stents){if(!s.hits.some(h=>h.L.sev>=0.5)){tx-=8;notes.push({c:'bad',t:`Unnecessary stent in the ${s.label}: ${s.hits.length?'that lesion was not flow-limiting.':'there was no lesion there.'}`})}else if(s.hits.some(h=>h.o.over))tx-=4}
   for(const b of S.balloons){if(b.hits.some(h=>h.o.over)){tx-=4;notes.push({c:'bad',t:`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm) caused an edge dissection.`})}if(!b.hits.some(h=>h.L.sev>=0.5)){tx-=4;notes.push({c:'bad',t:`Unnecessary balloon inflation in the ${b.label}.`})}}
   for(const sy of new Set(S.stents.map(s=>VBY[s.vid].sys))){const t=Math.max(...S.stents.filter(s=>VBY[s.vid].sys===sy).map(s=>s.t));if(!S.runs.some(r=>r.sys===sy&&r.t0>t))notes.push({c:'',t:`Record a final cine run of the ${sy==='L'?'left':'right'} system after stenting to confirm the result.`})}
+  // complications during the case
+  let capEv=100;
+  for(const e of S.events){
+    const when=fmtT(e.t0);
+    if(e.kind==='dissection'){
+      const cause=e.cause?` after ${e.cause}`:'';
+      if(e.treated)notes.push({c:'good',t:`Dissection in the ${e.label} at ${when}${cause}: ${e.seen?'recognised and ':''}covered with a stent${e.closed?' after it had closed the vessel':''}. Bailout stenting is the right response.`});
+      else if(e.closed){tx-=10;capEv=45;notes.push({c:'bad',t:`Abrupt closure of the ${e.label}: the dissection${cause} progressed and occluded the vessel. Recross it with a wire and stent it; a closed vessel means an infarct.`})}
+      else{tx-=6;notes.push({c:'bad',t:`Untreated dissection in the ${e.label}${cause}. It can close the vessel after you leave the lab: cover it with a stent.`})}
+    }else{
+      const dz=e.doses.length?` with ${e.doses.join(', ')}`:'';
+      if(e.treated)notes.push({c:'good',t:`No-reflow in the ${e.label} at ${when}: ${e.seen?'recognised and ':''}treated${dz} through the guide; flow restored.`});
+      else{tx-=5;notes.push({c:'bad',t:`Persistent no-reflow in the ${e.label}${dz?` despite ${e.doses.join(', ')}`:''}. Give intracoronary adenosine or verapamil (repeat doses) until distal flow is brisk. GTN alone does little for the microcirculation.`})}
+    }
+  }
+  const idle=S.drugs.filter(x=>!x.useful&&x.id!=='gtn').length;if(idle)notes.push({c:'',t:`${idle} dose${idle>1?'s':''} of vasodilator given without no-reflow to treat.`});
   tx=clamp(tx,0,15);rows.push(['Treatment (balloon and stent)',tx,15]);
   // study quality
   const distinct=sys=>{const v=[];for(const r of S.runs){if(r.sys!==sys)continue;if(!v.some(o=>Math.abs(o.a-r.a)<15&&Math.abs(o.b-r.b)<15))v.push(r)}return v.length};
@@ -551,6 +628,7 @@ function finish(){
   let total=lesPts+tx+comp+cm+rad+saf;
   if(S.complication){total=Math.min(total,35);notes.unshift({c:'bad',t:S.complication+' A damped or ventricularised pressure trace means the tip is against the vessel wall. Withdraw before injecting.'})}
   if(S.c.random){notes.push({c:'',t:`Anatomy: ${S.c.anatomyNote.join('; ')}.`});notes.push({c:'',t:`Case code <b>${S.c.code}</b>: enter it under Random patient to replay this exact patient, or share it.`})}
+  if(capEv<100&&total>capEv){total=capEv}
   total=Math.round(total);
   const grade=S.complication?'Complication':total>=85?'Attending standard':total>=70?'Senior fellow':total>=50?'Junior fellow':'Keep practising';
   // coffee tokens: one per 10 points, scaled by difficulty; none after a complication

@@ -64,6 +64,7 @@ Items are defined in `SHOP` in `config/config.js`.
 | Wire | With the guide engaged, press Wire it next to a marked lesion and hold fluoro while a 0.014" wire crosses. |
 | Balloon | Plain balloon angioplasty: 8–12 atm. Alone it recoils to about 30–45%. Use it to predilate a subtotal (≥90%) lesion before stenting, or to post-dilate a stent. Oversizing by more than 0.5 mm causes a dissection. |
 | Stent | Pick a diameter and length (the 6F guide is 2 mm wide for scale), nudge the markers around the narrowing, then hold Inflate to deploy at 12–14 atm. Take a final shot, remove the wire, finish. |
+| Complications | **Dissection**: an oversized balloon or stent, inflating above 16 atm, or (occasionally) balloon angioplasty of a hard lesion or a stent edge can tear the vessel wall. It shows as a flap, a second channel of contrast beside the lumen and staining that lingers after the injection. Left alone it narrows and then closes the vessel (Easy 80 s, Medium 55 s, Hard 35 s): cover it with a stent (**Aim devices here**, or **Wire it** again if the wire is out). **No-reflow**: after a stent, more often in an NSTEMI, a subtotal lesion or a long stent, the stent stays open but contrast crawls beyond it. Give intracoronary **verapamil** or **adenosine** through the engaged guide until flow is brisk; GTN does little. Both start with chest pain, ST elevation in the territory lead and falling blood pressure, and are only named once you inject and see them. |
 | ECG | Three leads follow the coronary territories: V3 anterior (LAD), V5 lateral (circumflex), II inferior (RCA). An inflated balloon raises ST in that territory's lead with reciprocal depression elsewhere. Case 2 starts with inferior T-wave inversion in II, case 3 with lateral inversion in V5. |
 
 ## Random patients
@@ -94,7 +95,7 @@ The report names the anatomy at the end. Random patients keep their own best sco
 | Part | Points |
 |---|---|
 | Lesion detection and grading (a significant lesion you imaged but didn't mark earns 30% of its share) | 35 |
-| Treatment: every ≥70% lesion stented, covered, sized within 0.4 mm smaller / 0.75 mm larger than the vessel, deployed at ≥12 atm, subtotal lesions predilated. Balloon only earns 40%. −8 per unnecessary stent, −4 per oversized or unnecessary balloon | 15 |
+| Treatment: every ≥70% lesion stented, complications recognised and managed (−6 untreated dissection, −5 persistent no-reflow, −10 and a score cap of 45 for a vessel left closed), covered, sized within 0.4 mm smaller / 0.75 mm larger than the vessel, deployed at ≥12 atm, subtotal lesions predilated. Balloon only earns 40%. −8 per unnecessary stent, −4 per oversized or unnecessary balloon | 15 |
 | Complete study: views (LCA 3+, RCA 2+) up to 8, plus up to 7 for the share of the 32 coronary segments you opacified | 15 |
 | Contrast against the case budget | 15 |
 | Air kerma (full marks up to 400 mGy) | 10 |

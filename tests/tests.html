@@ -124,6 +124,30 @@ test('Contrast darkens the image where the coronaries are',()=>{
   renderImage({...base,conc:()=>1});const full=lum();
   ok(full<empty*0.99,'no visible contrast');return `${((1-full/empty)*100).toFixed(1)}% darker`;
 });
+test('A closed dissection stops contrast beyond it, not before it or in branches that leave above it',()=>{
+  const v=VBY.LAD,at=45,ev={kind:'dissection',vid:'LAD',ld:at,len:10,progress:1,closed:true,treated:false};
+  const idx=mm=>v.ld.findIndex(x=>x>=mm);
+  ok(flowMod(v,idx(70),[ev]).att===0,'distal LAD still fills');ok(flowMod(v,idx(20),[ev]).att===1,'proximal LAD affected');
+  let up=0,down=0;for(const b of VESSELS){if(!b.anc.has('LAD'))continue;let cur=b;while(cur.parent!=='LAD')cur=VBY[cur.parent];const j=v.ld[cur.joinIdx],a=flowMod(b,b.n-1,[ev]).att;
+    if(j<at){ok(a===1,b.id+' leaves above the dissection but lost flow');up++}else{ok(a===0,b.id+' leaves below the dissection but still fills');down++}}
+  ok(flowMod(VBY.RCA,10,[ev]).att===1,'the other system is untouched');
+  return `${up} branch${up===1?'':'es'} above, ${down} below`;
+});
+test('No-reflow slows and fades contrast beyond the stent; treatment restores it',()=>{
+  const v=VBY.LAD,i=v.ld.findIndex(x=>x>=70),ev={kind:'noreflow',vid:'LAD',ld:30,flow:0.15};
+  const m=flowMod(v,i,[ev]);ok(m.delay>1&&m.att<0.5,`delay ${m.delay.toFixed(1)} s, att ${m.att.toFixed(2)}`);
+  ev.flow=1;const n=flowMod(v,i,[ev]);ok(n.delay===0&&n.att===1);return `TIMI 1: +${m.delay.toFixed(1)} s transit, ${Math.round(m.att*100)}% density`;
+});
+test('A stent covers a dissection only if it spans it',()=>{
+  const ev={vid:'LAD',ld:40};ok(stentCovers({vid:'LAD',ld:44,len:18},ev));ok(!stentCovers({vid:'LAD',ld:60,len:18},ev));ok(!stentCovers({vid:'LCx',ld:40,len:18},ev));
+});
+test('Complication risks follow the clinical picture',()=>{
+  ok(noReflowRisk({acs:true,sev:0.95,len:28})>2*noReflowRisk({acs:false,sev:0.75,len:12}),'no-reflow should be likelier in ACS with a subtotal lesion');
+  ok(dissectRisk({kind:'balloon',over:true})===1,'oversized balloon always dissects');ok(dissectRisk({kind:'balloon',stented:true,sev:0.9,atm:12})===0,'post-dilating inside a stent cannot dissect');
+  ok(DIFFICULTY.hard.dissectT<DIFFICULTY.easy.dissectT&&DIFFICULTY.hard.compX>DIFFICULTY.easy.compX,'harder = faster closure, more complications');
+  ok(IC_DRUGS.find(d=>d.id==='vera').gain>IC_DRUGS.find(d=>d.id==='gtn').gain*4,'verapamil should beat GTN for no-reflow');
+});
+
 /* random patients (run last; they rebuild the anatomy, and the final test restores the default) */
 test('Case codes round-trip, and a code always gives the same patient',()=>{
   for(const n of [0,1,12345,CODE_SPACE-1])ok(codeToSeed(seedToCode(n))===n,'round trip '+n);

@@ -161,6 +161,31 @@ function balloonOutcome(L,b){
   if(!covered)res=Math.max(res,before*0.8);
   return {residual:Math.min(before,res),refD,diff,covered,over,under,lowP,post:!!L.stented};
 }
+/* ---------- PCI complications ----------
+   Events are {kind:'dissection'|'noreflow', vid, ld (mm along the vessel), len, ...}. Dissections narrow the vessel
+   as they progress (0–1) and close it at 1 unless a stent covers them; no-reflow leaves the stent open but slows
+   flow beyond it (flow 0–1) until vasodilators restore it. */
+function evDownstream(v,i,ev){
+  const E=VBY[ev.vid];if(!E||v.sys!==E.sys)return false;
+  if(v.id===ev.vid)return v.ld[i]>ev.ld;
+  if(!v.anc.has(ev.vid))return false;
+  let cur=v;while(cur.parent!==ev.vid)cur=VBY[cur.parent];
+  return E.ld[cur.joinIdx]>ev.ld;
+}
+function evFlow(ev){return ev.kind==='noreflow'?ev.flow:ev.treated?1:ev.closed?0:1-0.85*ev.progress}
+/* Extra transit delay (s) and attenuation of contrast at point i of vessel v from all events. */
+function flowMod(v,i,events){
+  let delay=0,att=1;if(!events)return {delay,att};
+  const d=v.base+v.ld[i];
+  for(const ev of events){if(!evDownstream(v,i,ev))continue;const f=evFlow(ev);if(f>0.995)continue;
+    const g=VBY[ev.vid].base+ev.ld;delay+=Math.max(0,d-g)/FLOW[v.sys]*(1/Math.max(0.08,f)-1)*1.5;att*=f<0.03?0:0.2+0.8*f}
+  return {delay,att};
+}
+function stentCovers(st,ev){return st.vid===ev.vid&&Math.abs(st.ld-ev.ld)<=st.len/2+1}
+/* Chance of no-reflow after a stent, and of a dissection after a balloon or stent, before the difficulty factor. */
+function noReflowRisk(x){return Math.min(0.45,0.06+(x.acs?0.16:0)+(x.sev>=0.9?0.1:0)+(x.len>=24?0.05:0))}
+function dissectRisk(x){if(x.over)return 1;if(x.atm>16)return 0.5;return x.kind==='balloon'?(x.stented?0:x.sev>=0.85?0.1:0.03):0.04}
+
 function segLabel(v,ld){if(v.id==='LM')return 'left main';const f=ld/v.len;return (f<0.33?'proximal ':f<0.66?'mid ':'distal ')+v.name}
 
 /* ---------- static image layers ---------- */
@@ -269,18 +294,21 @@ function renderImage(st){
       const q=proj(motion(v.p[i],k),B);xs[i]=q[0];ys[i]=q[1];
       const d=v.base+v.ld[i];let delay=d/FLOW[v.sys],att=1-0.35*d/MAXD[v.sys];
       for(const L of slow){if(d>L.gd){delay+=(d-L.gd)/FLOW[v.sys]*2.4;att*=0.72}}
+      if(st.events){const m=flowMod(v,i,st.events);delay+=m.delay;att*=m.att}
       cs[i]=st.conc(v.sys,st.t-delay)*att;
     }
     projV.push({v,xs,ys,cs});
     for(let i=0;i<v.n-1;i++){
       const c=(cs[i]+cs[i+1])/2;if(c<0.02)continue;
       let rf=1;for(const [L,ap] of les){const dd=Math.abs(v.ld[i]-L.at),h=L.len/2;if(dd<h)rf*=1-ap*0.5*(1+Math.cos(Math.PI*dd/h))}
+      if(st.events)for(const ev of st.events){if(ev.kind!=='dissection'||ev.treated||ev.vid!==v.id)continue;const dd=Math.abs(v.ld[i]-ev.ld),h=ev.len/2;if(dd<h)rf*=1-(ev.closed?0.85:0.25+0.55*ev.progress)*0.5*(1+Math.cos(Math.PI*dd/h))}
       const r=v.r[i]*rf,w=Math.max(1.1,2*r*SCALE),dens=0.5+0.5*Math.min(1,r/1.5);
       dctx.beginPath();dctx.moveTo(xs[i],ys[i]);dctx.lineTo(xs[i+1],ys[i+1]);
       dctx.lineWidth=w;dctx.strokeStyle=grey(1-0.6*c*dens);dctx.stroke();
       dctx.lineWidth=w*0.5;dctx.strokeStyle=grey(1-0.86*c*dens);dctx.stroke();
     }
   }
+  if(st.events)drawDissections(st.events,projV);
   if(st.pci)drawPCI(st.pci,projV);
   if(st.cath){
     const cs=st.cathState;const pp=cs.pts.map(p=>proj(motion(p,k),B));
@@ -301,6 +329,22 @@ function renderImage(st){
 
 
 /* Wire, balloon and stents, drawn along the already-projected vessels. */
+/* A dissection shows as a thin second channel of contrast running beside the lumen (the false lumen behind the
+   flap) and a haze of contrast staining the wall that lingers after the injection washes out. */
+function drawDissections(events,projV){
+  for(const ev of events){
+    if(ev.kind!=='dissection'||ev.treated)continue;const P=projV.find(x=>x.v.id===ev.vid);if(!P)continue;const v=P.v;
+    const ext=ev.len/2+4*ev.progress,idx=[];for(let i=0;i<v.n;i++)if(Math.abs(v.ld[i]-ev.ld)<=ext)idx.push(i);if(idx.length<3)continue;
+    // staining
+    if(ev.stain>0.03){dctx.beginPath();idx.forEach((i,j)=>j?dctx.lineTo(P.xs[i],P.ys[i]):dctx.moveTo(P.xs[i],P.ys[i]));dctx.lineWidth=(v.r[idx[0]]*3.2)*SCALE;dctx.strokeStyle=grey(1-0.32*Math.min(1,ev.stain));dctx.stroke()}
+    // false lumen beside the true lumen, filling with the contrast passing the site
+    const c=Math.max(...idx.map(i=>P.cs[i]));if(c<0.05)continue;
+    const off=(v.r[idx[0]]+0.7)*SCALE;dctx.beginPath();
+    idx.forEach((i,j)=>{const a=idx[Math.max(0,j-1)],b=idx[Math.min(idx.length-1,j+1)];let nx=P.ys[a]-P.ys[b],ny=P.xs[b]-P.xs[a];const l=Math.hypot(nx,ny)||1;
+      const taper=Math.sin(Math.PI*(j+0.5)/idx.length),x=P.xs[i]+nx/l*off*taper,y=P.ys[i]+ny/l*off*taper;j?dctx.lineTo(x,y):dctx.moveTo(x,y)});
+    dctx.lineWidth=Math.max(1.2,v.r[idx[0]]*0.8*SCALE);dctx.strokeStyle=grey(1-0.7*c);dctx.stroke();
+  }
+}
 function drawPCI(pci,projV){
   const PV={};projV.forEach(P=>PV[P.v.id]=P);
   const chain=(vid,end)=>{const P=PV[vid],v=P.v,e=end==null?v.n-1:end,own=[];for(let i=0;i<=e;i++)own.push([P.xs[i],P.ys[i]]);return v.parent?chain(v.parent,v.joinIdx).concat(own):own};

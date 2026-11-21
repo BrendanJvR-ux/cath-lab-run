@@ -74,12 +74,21 @@ const BALLOON_LENS=[12,15,20];
 
 /* Difficulty. tol = engagement window (deg) per system, seek = how far (deg) beyond the window the tip
    is pulled into the ostium (0 = no help), deep = how far past the ostium (u) before damping,
-   budgetX scales each case's contrast budget (null = no limit), tokenX scales coffee tokens. */
+   budgetX scales each case's contrast budget (null = no limit), dissectT = seconds for an untreated dissection to
+   close the vessel, compX scales the chance of PCI complications, tokenX scales coffee tokens. */
 const DIFFICULTY={
-  easy:{label:'Easy',blurb:'Wide engagement windows and the tip drops into the ostia. No contrast limit.',tol:{L:45,R:55},seek:70,seekSpeed:90,deep:1.5,budgetX:null,tokenX:1,level:1},
-  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Tokens ×1.5.',tol:{L:28,R:32},seek:30,seekSpeed:45,deep:1.42,budgetX:1,tokenX:1.5,level:2},
-  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, the catheter damps sooner, 25% less contrast. Tokens ×2.',tol:{L:16,R:18},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,tokenX:2,level:3},
+  easy:{label:'Easy',blurb:'Wide engagement windows and the tip drops into the ostia. No contrast limit.',tol:{L:45,R:55},seek:70,seekSpeed:90,deep:1.5,budgetX:null,dissectT:80,compX:0.8,tokenX:1,level:1},
+  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Tokens ×1.5.',tol:{L:28,R:32},seek:30,seekSpeed:45,deep:1.42,budgetX:1,dissectT:55,compX:1,tokenX:1.5,level:2},
+  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, the catheter damps sooner, 25% less contrast. Tokens ×2.',tol:{L:16,R:18},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,dissectT:35,compX:1.3,tokenX:2,level:3},
 };
+
+/* Intracoronary drugs, given through the guide. gain = how much they restore flow in no-reflow (1 = fully),
+   side = what else they do. */
+const IC_DRUGS=[
+  {id:'gtn',name:'GTN 200 mcg',short:'GTN',gain:0.05,side:'bp',desc:'Nitrate. Relieves spasm; does little for no-reflow. Lowers BP.'},
+  {id:'adeno',name:'Adenosine 100 mcg',short:'Adenosine',gain:0.3,side:'brady',desc:'Microvascular vasodilator. Short-lived; brief bradycardia.'},
+  {id:'vera',name:'Verapamil 200 mcg',short:'Verapamil',gain:0.42,side:'bp',desc:'Microvascular vasodilator. Lowers BP.'},
+];
 
 /* ECG lead that shows ischaemia in each vessel's territory: V3 anterior (LAD), V5 lateral (circumflex), II inferior (RCA). */
 const TERRITORY={LM:'V3',LAD:'V3',D1:'V3',D2:'V3',S1:'V3',S2:'V3',LCx:'V5',OM1:'V5',OM2:'V5',RCA:'II',CON:'II',AM:'II',PDA:'II',PLV:'II',RI:'V5',LPDA:'II',LPL:'II'};
