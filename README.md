@@ -4,7 +4,7 @@ A coronary angiography and stenting game with fictional patients. Drive a Judkin
 
 **Play it:** https://brendanjvr-ux.github.io/cath-lab-run/ (tests at [/tests/tests.html](https://brendanjvr-ux.github.io/cath-lab-run/tests/tests.html))
 
-Plain HTML, CSS and JavaScript with Canvas 2D: no build step. Drawn in a hand-drawn sketchbook style: ink and coloured pencil on paper, the X-ray as pencil anatomy with inked, cross-hatched shading and contrast that fills the vessels like an ink wash (the pen lines "boil" gently like hand-drawn animation), and the ECG on pink ECG paper. A very faint pencil sketch of the heart sits where the heart really is in every projection, following standard radiographic cardiac anatomy: the SVC and right atrium form the right border; the aortic knob, main pulmonary artery, left atrial appendage and left ventricle form the left border; the right ventricle lies in front and the left atrium behind. The ventricles are fitted to the patient's own coronary tree. Easy shows the chambers (RA, RV, LA, LV), grooves, great vessels and labels; Medium shows only the cardiac outline; Hard shows none. The only image file is the menu picture of two cardiologists (`assets/cardiologists.png`), rendered in Blender (cel shading with Freestyle ink outlines) by `tools/render_cardiologists.py`: run `/Applications/Blender.app/Contents/MacOS/Blender -b -P tools/render_cardiologists.py -- assets` from the repo root to re-render it. Fonts (Kalam, Patrick Hand) load from Google Fonts.
+Plain HTML, CSS and JavaScript with Canvas 2D: no build step. Drawn in a hand-drawn sketchbook style: ink and coloured pencil on paper, the X-ray as pencil anatomy with inked, cross-hatched shading and contrast that fills the vessels like an ink wash (the pen lines "boil" gently like hand-drawn animation), and the ECG on pink ECG paper. A very faint pencil sketch of the heart sits where the heart really is in every projection, following standard radiographic cardiac anatomy: the SVC and right atrium form the right border; the aortic knob, main pulmonary artery, left atrial appendage and left ventricle form the left border; the right ventricle lies in front and the left atrium behind. The ventricles are fitted to the patient's own coronary tree. Easy shows the chambers (RA, RV, LA, LV), the grooves, the great cardiac vein and coronary sinus, the great vessels including the three arch branches, and labels; Medium shows only the cardiac outline; Hard shows none. The only image file is the menu picture of two cardiologists (`assets/cardiologists.png`), rendered in Blender (cel shading with Freestyle ink outlines) by `tools/render_cardiologists.py`: run `/Applications/Blender.app/Contents/MacOS/Blender -b -P tools/render_cardiologists.py -- assets` from the repo root to re-render it. Fonts (Kalam, Patrick Hand) load from Google Fonts.
 
 ## Run it locally
 
@@ -18,16 +18,13 @@ Then open http://localhost:8767/ (the game) or http://localhost:8767/tests/tests
 
 | File | What it is |
 |---|---|
-| `cases/*.js` | **Editable case files**: patient, history, task, contrast budget, baseline ECG, and each lesion's vessel, position, length, severity and eccentricity. |
 | `config/config.js` | Anatomy (coronary tree, aorta), coronary flow speed, Judkins catheters, C-arm presets, grading buckets, stent and balloon sizes, difficulty settings, ECG territories and avatars. |
-| `js/gen.js` | Random patients: case codes, anatomy variants, lesions and a matching history. |
+| `js/gen.js` | Random patients: case codes, anatomy variants, lesions, a matching history, and each case's complications for the chosen difficulty (`caseChallenge`). |
 | `js/sim.js` | Geometry, anatomy builder (variants), catheter position and engagement, lesion appearance per projection, stent and balloon outcome rules, coverage segments, coronary tortuosity, ribs and spine, and the X-ray image renderer (including wire, balloon and stent struts). No game state. |
 | `js/game.js` | Menu, operator profile and coffee tokens, game state, controls, cine runs and review, the PCI tools, the three-lead ECG and pressure strip, the main loop and scoring. |
 | `css/style.css` | Layout and look. |
 | `tools/render_cardiologists.py` | Blender script that renders the menu picture `assets/cardiologists.png`. |
 | `tests/tests.html` | Automated checks: cases load, catheter engagement, a smooth aorta-to-root path and deep-seating, eccentric lesions per view, contrast rendering, stent and balloon rules, difficulty windows, shop items, ECG territories, coronary tortuosity, coverage segments, and 400 random patients (valid anatomy, stentable culprit, engageable ostia, same code gives the same patient). |
-
-To add a case, copy a file in `cases/`, edit it, and add a `<script>` line for it in `index.html` and `tests/tests.html`.
 
 ## Menu, operators and coffee tokens
 
@@ -35,15 +32,15 @@ Create an operator (name and one of six avatars), then pick a difficulty and a c
 
 ### Coffee cart (shop)
 
-| Item | Tokens | Effect |
-|---|---|---|
-| Torque device | 25 | Every engagement window 6° wider |
-| Hydrophilic wire | 15 | Crosses lesions twice as fast |
-| Low-dose fluoro | 30 | 30% less air kerma |
-| Power injector | 35 | Contrast budgets 25% bigger on Medium and Hard |
-| Three extra avatars | 15 each | Pick them in Change operator |
+| Item (tokens) | Effect |
+|---|---|
+| Power injector (tiers I–III: 20 / 40 / 70) | Contrast budget +15% / +30% / +50%: about +10 / +21 / +35 mL on a typical 70 mL case |
+| Fluoro budget (tiers I–III: 20 / 40 / 70) | Full radiation marks up to 500 / 650 / 850 mGy air kerma instead of 400 |
+| Torque device (tiers I–III: 20 / 40 / 70) | Every engagement window 4° / 8° / 12° wider |
+| Hydrophilic wire (15) | Crosses lesions twice as fast, but exits small vessels a little more often |
+| Three extra avatars (15 each) | Pick them in Change operator |
 
-Items are defined in `SHOP` in `config/config.js`. The old monitor colour filters were retired; anyone who bought one gets the tokens back when their profile loads.
+Upgrades are `UPGRADES` and other items `SHOP` in `config/config.js`. Old single-tier perks carry over as tier I. The old monitor colour filters were retired; anyone who bought one gets the tokens back when their profile loads.
 
 | Difficulty | Engagement window (left / right) | Help finding the ostia | Contrast budget | Extras |
 |---|---|---|---|---|
@@ -67,11 +64,11 @@ Items are defined in `SHOP` in `config/config.js`. The old monitor colour filter
 | Complications | **Dissection**: an oversized balloon or stent, inflating above 16 atm, or (occasionally) balloon angioplasty of a hard lesion or a stent edge can tear the vessel wall. It shows as a flap, a second channel of contrast beside the lumen and staining that lingers after the injection. Left alone it narrows and then closes the vessel (Easy 80 s, Medium 55 s, Hard 35 s): cover it with a stent (**Aim devices here**, or **Wire it** again if the wire is out). **No-reflow**: after a stent, more often in an NSTEMI, a subtotal lesion or a long stent, the stent stays open but contrast crawls beyond it. Give intracoronary **verapamil** or **adenosine** through the engaged guide until flow is brisk; GTN does little. Both start with chest pain, ST elevation in the territory lead and falling blood pressure, and are only named once you inject and see them. |
 | Perforation and tamponade | **Perforation**: a balloon or stent more than 1 mm too big, or inflated above 16 atm, can tear right through the vessel: a jet of contrast squirts out and pools beside the heart. A wire can also exit the tip of a small distal vessel (hydrophilic wires do this more often). Blood fills the pericardium: an untreated big hole tamponades in about 36 s (BP collapses with a narrow pulse pressure, HR races) and a cardiac arrest ends the case. Seal a big hole with a **covered stent**; a distal wire exit with a **coil** or a 15 s low-pressure balloon inflation (**Aim devices here** caps the balloon at 6 atm and stops the leak while held). **IV protamine** slows the leak; **Pericardiocentesis** drains the effusion and restores BP, but it reaccumulates until the hole is sealed. |
 | Spasm | Engaging an ostium (the RCA more than the left), deep-seating the catheter, or passing the wire can cause **spasm**: a smooth, concentric narrowing that looks the same in every view. Tight spasm causes chest pain and ST elevation. **Intracoronary GTN** relieves it (verapamil partly, adenosine not); it also settles by itself once the catheter or wire is gone. Don't grade or stent it: a mark or stent on spasm is penalised. On Easy the panel names it once imaged; on Medium and Hard only tight, symptomatic spasm gets an alert. |
-| ECG | Three leads follow the coronary territories: V3 anterior (LAD), V5 lateral (circumflex), II inferior (RCA). An inflated balloon raises ST in that territory's lead with reciprocal depression elsewhere. Case 2 starts with inferior T-wave inversion in II, case 3 with lateral inversion in V5. |
+| ECG | Three leads follow the coronary territories: V3 anterior (LAD), V5 lateral (circumflex), II inferior (RCA). An inflated balloon raises ST in that territory's lead with reciprocal depression elsewhere. Patients with an NSTEMI start with T-wave inversion in the lead facing the culprit vessel. |
 
 ## Random patients
 
-**New random patient** on the case menu builds a fresh patient from a seed, shown as a case code such as `CLR-BNF2J`. The same code always gives the same patient, so you can replay it or send it to a friend (type it into the box next to the button).
+Every case is a random patient. **New random patient** builds a fresh one from a seed, shown as a case code such as `CLR-BNF2J`. The same code always gives the same patient, so you can replay it or send it to a friend (type it into the box next to the button).
 
 Each patient gets:
 
@@ -84,13 +81,17 @@ Each patient gets:
 | Disease | One or two significant lesions (70–96%) in a vessel big enough to stent, plus up to two mild or intermediate decoys you should report but not stent |
 | Story | Age, sex, risk factors, stable angina or NSTEMI with a stress test or ECG that matches the culprit's territory, and sometimes impaired kidneys with a tighter contrast budget |
 
-The report names the anatomy at the end. Random patients keep their own best score per difficulty. The generator is `js/gen.js`; the variants are `VARIANT_PARTS` in `config/config.js`.
+The report names the anatomy at the end. Your best score is kept per difficulty.
 
-## Teaching cases
+### What goes wrong, by difficulty
 
-1. **Exertional chest pain** (M, 64): proximal LAD stenosis.
-2. **Inferior NSTEMI** (F, 58): tight mid RCA lesion with sluggish distal flow.
-3. **Breathless on exertion** (M, 71): circumflex disease plus a mild LAD lesion, with a 50 mL contrast budget.
+| Difficulty | Complications |
+|---|---|
+| Easy | None: oversizing or a damped injection only earns a warning |
+| Medium | About a third of cases are complication-prone (more chance complications, some with a set complication waiting); the rest only go wrong if you cause it |
+| Hard | About 9 in 10 cases bring a set complication (dissection, no-reflow, perforation or spasm), a severe contrast restriction (half the budget, severe kidney disease), or both |
+
+The same case code on the same difficulty always brings the same challenge. The generator is `js/gen.js`; the variants are `VARIANT_PARTS` in `config/config.js`.
 
 ## Scoring (out of 100)
 
@@ -100,7 +101,7 @@ The report names the anatomy at the end. Random patients keep their own best sco
 | Treatment: every ≥70% lesion stented, complications recognised and managed (−6 untreated dissection, −5 persistent no-reflow, −8 and a score cap of 45 for an unsealed perforation, −10 and the same cap for a vessel left closed, −3 for protamine with nothing bleeding), covered, sized within 0.4 mm smaller / 0.75 mm larger than the vessel, deployed at ≥12 atm, subtotal lesions predilated. Balloon only earns 40%. −8 per unnecessary stent, −4 per oversized or unnecessary balloon | 15 |
 | Complete study: views (LCA 3+, RCA 2+) up to 8, plus up to 7 for the share of the 36 coronary segments you opacified | 15 |
 | Contrast against the case budget | 15 |
-| Air kerma (full marks up to 400 mGy) | 10 |
+| Air kerma (full marks up to 400 mGy, more with the fluoro budget upgrade) | 10 |
 | Safety (catheter moved only under fluoro) | 10 |
 
 A complication caps the score at 35. The report says which projection showed each lesion best, and estimates the flow in each diseased vessel before and after: maximal flow as a share of normal (roughly what an FFR wire would read), the FFR itself and the TIMI grade, taking lesions in series and any complication left at the end into account.

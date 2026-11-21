@@ -7,7 +7,9 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 /* ---------- operator profile (saved on this device only) ---------- */
 const STORE='cathlabrun.profile.v1';
 function loadProfile(){try{const p=JSON.parse(localStorage.getItem(STORE)||'null');if(p&&typeof p.name==='string'&&p.name){
-  const q={tokens:0,best:{},diff:'easy',avatar:0,owned:[],...p};delete q.lut;
+  const q={tokens:0,best:{},diff:'easy',avatar:0,owned:[],tiers:{},...p};delete q.lut;q.tiers={...(q.tiers||{})};
+  // the old single-tier perks become tier 1 of their upgrade
+  q.owned=(q.owned||[]).filter(id=>{const u=UPGRADE_FROM_PERK[id];if(u){q.tiers[u]=Math.max(q.tiers[u]||0,1);return false}return true});
   // refund anything the shop no longer sells (the monitor colour filters)
   let back=0;q.owned=(q.owned||[]).filter(id=>{if(RETIRED_SHOP[id]){back+=RETIRED_SHOP[id];return false}return true});
   if(back){q.tokens+=back;q.refunded=back;try{localStorage.setItem(STORE,JSON.stringify({...q,refunded:undefined}))}catch(e){}}
@@ -15,8 +17,11 @@ function loadProfile(){try{const p=JSON.parse(localStorage.getItem(STORE)||'null
 function saveProfile(){try{localStorage.setItem(STORE,JSON.stringify(profile))}catch(e){}}
 let profile=loadProfile();
 const owns=id=>!!(profile&&profile.owned&&profile.owned.includes(id));
+const tierOf=id=>(profile&&profile.tiers&&profile.tiers[id])||0;
+/* the effect of an upgrade at the operator's current tier (its base value if not bought) */
+function upgradeVal(id){const u=UPGRADES.find(x=>x.id===id),t=tierOf(id);return t?u.tiers[t-1].val:u.base}
 /* Contrast budget for a case on a difficulty (null = no limit), including the power injector. */
-function caseBudget(c,D){return D.budgetX==null?null:Math.round(c.budget*D.budgetX*(owns('injector')?1.25:1))}
+function caseBudget(c,D){return D.budgetX==null?null:Math.round(c.budget*D.budgetX*upgradeVal('injector'))}
 function caseTask(c,D){const b=caseBudget(c,D);return c.task+(c.budgetInTask&&b!=null?` Aim for under ${b} mL of contrast.`:'')}
 
 function avatarSVG(i,size){
@@ -36,19 +41,11 @@ function renderWho(){const w=$('who');if(!profile){w.hidden=true;return}w.hidden
 /* ---------- menu ---------- */
 let menuView='home',draft=null;
 const LEVEL_BARS=n=>`<span class="lvl" aria-hidden="true">${[1,2,3].map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}</span>`;
-/* A two-beat strip of the case's baseline ECG (the lead with T-wave inversion if there is one). */
-function miniECG(c){
-  const lead=(c.ecg&&c.ecg.twi&&c.ecg.twi[0])||'II',twi=!!(c.ecg&&c.ecg.twi);let d='';
-  for(let i=0;i<=140;i++){const ph=(i/70+0.55)%1,x=i*1.2,y=19-ecgAt(ph,0,twi,1)*14;d+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)}
-  return `<svg class="mini" viewBox="0 0 170 30" aria-hidden="true"><path d="${d}" fill="none" stroke="#2b2a33" stroke-width="1.4"/><text x="164" y="9" text-anchor="end">${lead}</text></svg>`;
-}
 const ICONS={
   torque:'<circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M5 5l2.5 2.5M16.5 16.5L19 19"/><path d="M17 8a6 6 0 0 1 0 8" />',
   wire:'<path d="M2 16c3-8 5 6 8-2s5 6 8-2 3 2 4 1"/>',
-  lowdose:'<circle cx="12" cy="12" r="2"/><path d="M12 4a8 8 0 0 1 6.9 4l-4.5 2.6M5.1 8A8 8 0 0 1 12 4M5.1 16a8 8 0 0 0 6.9 4M18.9 16a8 8 0 0 1-6.9 4"/><path d="M4 21L20 3"/>',
+  fluoro:'<circle cx="12" cy="12" r="2"/><path d="M12 4a8 8 0 0 1 6.9 4l-4.5 2.6M5.1 8A8 8 0 0 1 12 4M5.1 16a8 8 0 0 0 6.9 4M18.9 16a8 8 0 0 1-6.9 4"/><path d="M4 21L20 3"/>',
   injector:'<path d="M14 3l7 7M17.5 6.5L8 16l-3 1 1-3 9.5-9.5M3 21l3-3M11 9l4 4"/>',
-  warm:'<rect x="3" y="4" width="18" height="13" rx="1.5" fill="#c98b4b" stroke="none"/><path d="M8 21h8M12 17v4"/>',
-  cool:'<rect x="3" y="4" width="18" height="13" rx="1.5" fill="#5b88b8" stroke="none"/><path d="M8 21h8M12 17v4"/>',
 };
 function shopIcon(it){if(it.kind==='avatar')return avatarSVG(it.avatar,44);return `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[it.id]}</svg>`}
 function showMenu(view){
@@ -74,21 +71,28 @@ function renderMenu(){
   }
   if(menuView==='play'){
     const d=profile.diff;
-    ov.innerHTML=`<h1>Choose a case</h1>
+    ov.innerHTML=`<h1>New patient</h1>
       <div class="grouplabel">Difficulty</div>
-      <div class="diffs">${Object.entries(DIFFICULTY).map(([k,v])=>`<button class="diff${k===d?' sel':''}" data-diff="${k}"><b>${LEVEL_BARS(v.level)}${v.label}</b><span>${v.blurb}</span></button>`).join('')}</div>
-      <div class="grouplabel">Random patient</div>
-      <div class="randrow"><button class="btn primary" data-act="rand">${DICE} New random patient</button>
-        <input id="codeIn" maxlength="10" autocomplete="off" spellcheck="false" placeholder="CLR-XXXXX" aria-label="Case code"><button class="btn" data-act="code">Play code</button>
-        <span class="randinfo">${profile.randomDone?`${profile.randomDone} played`:'Different anatomy and disease every time'}${profile.best[d+'-R']!=null?` · best ${profile.best[d+'-R']}`:''}</span></div>
-      <div class="grouplabel">Teaching cases</div>
-      <div class="cases">${CASES.map((c,i)=>{const b=profile.best[d+'-'+i];return `<button class="case" data-ci="${i}"><span>CASE ${i+1} · ${c.pt}${b!=null?` · BEST ${b}`:''}</span><b>${c.title}</b>${miniECG(c)}<em>${caseTask(c,DIFFICULTY[d])}</em></button>`}).join('')}</div>
+      <div class="diffs">${Object.entries(DIFFICULTY).map(([k,v])=>`<button class="diff${k===d?' sel':''}" data-diff="${k}"><b>${LEVEL_BARS(v.level)}${v.label}</b><span>${v.blurb}</span>${profile.best[k+'-R']!=null?`<span class="best">Best ${profile.best[k+'-R']}</span>`:''}</button>`).join('')}</div>
+      <div class="grouplabel">Patient</div>
+      <div class="randrow"><button class="btn primary big" data-act="rand">${DICE} New random patient</button></div>
+      <p class="fine">Every patient is different: anatomy, disease, history and what goes wrong. ${profile.randomDone?`You have seen ${profile.randomDone}.`:''}</p>
+      <div class="grouplabel">Replay or share a patient</div>
+      <div class="randrow"><input id="codeIn" maxlength="10" autocomplete="off" spellcheck="false" placeholder="CLR-XXXXX" aria-label="Case code"><button class="btn" data-act="code">Play code</button>
+        <span class="randinfo">A code gives the same patient on the same difficulty.</span></div>
       <div class="row"><button class="btn" data-act="home">Back</button></div>`;
     return;
   }
   if(menuView==='shop'){
     ov.innerHTML=`<div class="shophead"><h1>Coffee cart</h1><span class="tokens big">${CUP} ${profile.tokens} tokens</span></div>
       <p>Spend the tokens you earn on cases. Gear works on every case once bought.</p>
+      <div class="grouplabel">Upgrades</div>
+      <div class="shop">${UPGRADES.map(u=>{const t=tierOf(u.id),next=u.tiers[t],need=next?next.price-profile.tokens:0;
+        const pips=`<span class="pips" aria-label="Tier ${t} of ${u.tiers.length}">${u.tiers.map((_,i)=>`<i class="${i<t?'on':''}"></i>`).join('')}</span>`;
+        const cta=next?`<button class="btn primary" data-up="${u.id}" ${need>0?'disabled':''}>${t?'Upgrade':'Buy'} · ${CUP} ${next.price}</button>${need>0?`<span class="need">${need} more</span>`:''}`:'<span class="owned">Top tier</span>';
+        return `<div class="item${t?' own':''}"><div class="ic perk">${shopIcon({id:u.id})}</div><div class="txt"><b>${u.name} ${pips}</b>
+          <span>${t?`Now: ${u.what(u.tiers[t-1].val)}.`:'Not bought yet.'}</span>${next?`<span class="nexttier">Tier ${['I','II','III'][t]}: ${u.what(next.val)}.</span>`:''}</div><div class="cta">${cta}</div></div>`}).join('')}</div>
+      <div class="grouplabel">Gear and avatars</div>
       <div class="shop">${SHOP.map(it=>{const own=owns(it.id),need=it.price-profile.tokens;
         const cta=own?`<span class="owned">${it.kind==='avatar'?'Owned · pick it in Change operator':'Owned'}</span>`
           :`<button class="btn primary" data-buy="${it.id}" ${need>0?'disabled':''}>${CUP} ${it.price}</button>${need>0?`<span class="need">${need} more</span>`:''}`;
@@ -111,9 +115,9 @@ $('startOv').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const d=b.dataset;
   if(d.av!=null){draft.name=($('opName')||{}).value||draft.name;draft.avatar=+d.av;renderMenu();return}
   if(d.diff){profile.diff=d.diff;saveProfile();renderMenu();renderWho();return}
-  if(d.ci!=null){startCase(+d.ci);return}
+  if(d.up){const u=UPGRADES.find(x=>x.id===d.up),t=tierOf(d.up),next=u&&u.tiers[t];if(!next||profile.tokens<next.price)return;profile.tokens-=next.price;profile.tiers={...(profile.tiers||{}),[u.id]:t+1};saveProfile();renderWho();renderMenu();toast(`${u.name} tier ${['I','II','III'][t]}: ${u.what(next.val)}.`);return}
   if(d.buy){const it=SHOP.find(x=>x.id===d.buy);if(!it||owns(it.id)||profile.tokens<it.price)return;profile.tokens-=it.price;profile.owned=[...(profile.owned||[]),it.id];saveProfile();renderWho();renderMenu();toast(`Bought: ${it.name}.`);return}
-  if(d.act==='saveop'){const n=($('opName').value||'').trim().slice(0,24);if(!n)return;profile=profile?{...profile,name:n,avatar:draft.avatar}:{name:n,avatar:draft.avatar,tokens:0,best:{},diff:'easy',owned:[]};draft=null;saveProfile();renderWho();menuView='home';renderMenu()}
+  if(d.act==='saveop'){const n=($('opName').value||'').trim().slice(0,24);if(!n)return;profile=profile?{...profile,name:n,avatar:draft.avatar}:{name:n,avatar:draft.avatar,tokens:0,best:{},diff:'easy',owned:[],tiers:{}};draft=null;saveProfile();renderWho();menuView='home';renderMenu()}
   else if(d.act==='editop'){draft=null;menuView='profile';renderMenu()}
   else if(d.act==='play'){menuView='play';renderMenu()}
   else if(d.act==='rand'){startCase(randomCode())}
@@ -127,16 +131,17 @@ $('who').addEventListener('click',()=>{if(!S||S.done)showMenu('home')});
 /* ---------- state ---------- */
 let S=null;
 const keys={};
-/* ci is a case index (0, 1, 2…) or a random patient's case code ('CLR-XXXXX'). */
-function caseFor(ci){return typeof ci==='string'?generatePatient(ci):CASES[ci]}
-const caseName=S=>S.c.code?'patient '+S.c.code:'case '+(S.ci+1);
+/* ci is a random patient's case code ('CLR-XXXXX'). */
+const caseName=S=>'patient '+S.c.code;
 function newState(ci){
-  const base=DIFFICULTY[profile.diff]||DIFFICULTY.easy,c=caseFor(ci);
-  buildAnatomy(c.anatomy); // fixed cases use the default anatomy
+  const base=DIFFICULTY[profile.diff]||DIFFICULTY.easy,ch=caseChallenge(ci,profile.diff),c={...generatePatient(ci)};
+  // a severe contrast restriction halves the budget and joins the story
+  if(ch.contrastX<1&&base.budgetX!=null){c.budget=Math.round(c.budget*ch.contrastX);c.budgetInTask=true;c.hx+=` Severe chronic kidney disease (eGFR ${12+(codeToSeed(ci)%14)}): every millilitre of contrast counts.`}
+  buildAnatomy(c.anatomy);
   HEART_MODE=['chambers','outline','none'][base.level-1]||'outline'; // the heart sketch: labelled chambers on Easy, outline on Medium, none on Hard
   // shop perks adjust a copy of the difficulty settings
-  const D={...base,tol:{...base.tol}};if(owns('torque')){D.tol.L+=6;D.tol.R+=6}
-  return {ci,c,D,diff:profile.diff,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,type:'JL'},exch:0,
+  const D={...base,tol:{...base.tol}},tq=upgradeVal('torque');D.tol.L+=tq;D.tol.R+=tq;
+  return {ci,c,D,ch,forced:ch.forced,diff:profile.diff,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,type:'JL'},exch:0,
     cL:0,cR:0,cRoot:0,hist:{L:[],R:[],root:[]},histN:0,contrast:0,ak:0,ftime:0,ctime:0,blind:0,wasted:0,
     cine:null,runs:[],marks:[],pending:null,review:null,imgAcc:0,frame:0,deepInj:0,rcaInj:0,complication:null,done:false,
     sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),events:[],drugs:[],hrDip:0,bpDip:0,isch:0,effusion:0,tamponade:false,pcT:0,pcCount:0,protamine:false,seals:[],prevEng:null,prevDeep:false,
@@ -327,6 +332,7 @@ const evRender=()=>S.events.map(e=>({kind:e.kind,vid:e.vid,ld:e.ld,len:e.len,flo
 const EV_NAME={dissection:'Dissection',noreflow:'No-reflow',perforation:'Perforation',spasm:'Spasm'};
 const isACS=()=>/STEMI/.test(S.c.title||'');
 function addEvent(kind,vid,ld,cause,opt={}){
+  if(!S.ch.randomX&&!S.ch.errX)return null; // Easy: no complications
   if(S.events.some(e=>e.kind===kind&&e.vid===vid&&!e.treated&&Math.abs(e.ld-ld)<15))return null;
   const v=VBY[vid];ld=clamp(ld,Math.min(4,v.len/2),Math.max(v.len/2,v.len-4));
   const ev={kind,vid,ld,len:kind==='dissection'?10:kind==='spasm'?8:0,label:segLabel(v,ld),cause,t0:S.clock,seen:false,treated:false,closed:false,progress:0,stain:0,flow:1,
@@ -349,16 +355,24 @@ function applyDevice(){
     for(const ev of S.events)if(ev.kind==='dissection'&&!ev.treated&&stentCovers(dev,ev)){ev.treated=true;ev.tx=S.clock;setTimeout(()=>{if(S&&!S.done)toast(`Dissection in the ${ev.label} covered: the flap is tacked back and flow restored.`)},2900)}
     const sigHit=dev.hits.find(h=>h.L.sev>=0.7),over=dev.hits.some(h=>h.o.over);
     // perforation from an oversized stent or excess pressure, else an edge dissection beyond the stent
-    if(!dev.covered&&Math.random()<perfRisk({diff,atm:dev.atm})*S.D.compX)addEvent('perforation',dev.vid,dev.ld,diff>1?'an oversized stent':'deploying above the rated burst pressure',{grade:'major'});
-    else if(Math.random()<dissectRisk({kind:'stent',over,atm:dev.atm})*(over?1:S.D.compX))addEvent('dissection',dev.vid,dev.ld+dev.len/2+3,over?'an oversized stent':dev.atm>16?'deploying above the rated burst pressure':'stent deployment (an edge tear)');
+    const nEv=S.events.length,risk=x=>x?S.ch.errX:S.ch.randomX; // operator-caused vs chance
+    if(!dev.covered&&Math.random()<perfRisk({diff,atm:dev.atm})*S.ch.errX)addEvent('perforation',dev.vid,dev.ld,diff>1?'an oversized stent':'deploying above the rated burst pressure',{grade:'major'});
+    else if(Math.random()<dissectRisk({kind:'stent',over,atm:dev.atm})*risk(over||dev.atm>16))addEvent('dissection',dev.vid,dev.ld+dev.len/2+3,over?'an oversized stent':dev.atm>16?'deploying above the rated burst pressure':'stent deployment (an edge tear)');
     // no-reflow: debris and spasm in the microcirculation beyond a freshly stented, often thrombotic, lesion
-    else if(sigHit&&Math.random()<noReflowRisk({acs:isACS(),sev:sigHit.L.sev,len:dev.len})*S.D.compX)addEvent('noreflow',dev.vid,dev.ld,'');
+    else if(sigHit&&Math.random()<noReflowRisk({acs:isACS(),sev:sigHit.L.sev,len:dev.len})*S.ch.randomX)addEvent('noreflow',dev.vid,dev.ld,'');
+    // this case's set-piece complication, if it hasn't happened yet
+    if(S.events.length===nEv&&!dev.covered){
+      if(S.forced==='noreflow'&&sigHit&&addEvent('noreflow',dev.vid,dev.ld,''))S.forced=null;
+      else if(S.forced==='dissection'&&addEvent('dissection',dev.vid,dev.ld+dev.len/2+3,'stent deployment (an edge tear)'))S.forced=null;
+    }
   }else{
     for(const L of S.lesions){const o=balloonOutcome(L,dev);if(o){L.cur=o.residual;if(!o.under&&!o.lowP)L.predil=true;dev.hits.push({L,o})}}
     S.balloons.push(dev);const over=dev.hits.some(h=>h.o.over);
     const hit=dev.hits[0];
-    if(!(hit&&hit.L.stented)&&Math.random()<perfRisk({diff,atm:dev.atm})*S.D.compX)addEvent('perforation',dev.vid,hit?hit.L.at:dev.ld,diff>1?'an oversized balloon':'inflating above the rated burst pressure',{grade:'major'});
-    else if(Math.random()<dissectRisk({kind:'balloon',over,atm:dev.atm,sev:hit?hit.L.sev:0,stented:hit&&hit.L.stented})*(over?1:S.D.compX))addEvent('dissection',dev.vid,hit?hit.L.at:dev.ld,over?'an oversized balloon':dev.atm>16?'inflating above the rated burst pressure':'balloon angioplasty of a hard lesion');
+    const nEv=S.events.length,risk=x=>x?S.ch.errX:S.ch.randomX;
+    if(!(hit&&hit.L.stented)&&Math.random()<perfRisk({diff,atm:dev.atm})*S.ch.errX)addEvent('perforation',dev.vid,hit?hit.L.at:dev.ld,diff>1?'an oversized balloon':'inflating above the rated burst pressure',{grade:'major'});
+    else if(Math.random()<dissectRisk({kind:'balloon',over,atm:dev.atm,sev:hit?hit.L.sev:0,stented:hit&&hit.L.stented})*risk(over||dev.atm>16))addEvent('dissection',dev.vid,hit?hit.L.at:dev.ld,over?'an oversized balloon':dev.atm>16?'inflating above the rated burst pressure':'balloon angioplasty of a hard lesion');
+    if(S.events.length===nEv&&S.forced==='dissection'&&hit&&!hit.L.stented&&addEvent('dissection',dev.vid,hit.L.at,'balloon angioplasty of a hard lesion'))S.forced=null;
     toast(over?'Balloon oversized: dissection flap at the lesion edge.':`Balloon ${P.diam.toFixed(1)} × ${P.len} mm inflated to ${dev.atm} atm.`,over);
   }
   P.stage='tools';P.kind=null;P.atm=0;P.maxAtm=0;P.warned=P.pain=false;P.ld=P.mark;renderPCI(true);
@@ -482,8 +496,9 @@ function tick(dt){
   }
   S.cs=cs;
   // catheter-induced spasm: on engaging an ostium, more so the RCA, and very likely if the catheter deep-seats
-  if(cs.eng&&cs.eng!==S.prevEng&&Math.random()<spasmRisk({cause:'eng',sys:cs.eng})*D.compX)addEvent('spasm',cs.eng==='L'?'LM':'RCA',4,'the catheter',{sev:0.55+Math.random()*0.37});
-  if(cs.deep&&!S.prevDeep&&Math.random()<spasmRisk({cause:'deep'})*D.compX)addEvent('spasm',cs.eng==='L'?'LM':'RCA',4,'the catheter',{sev:0.75+Math.random()*0.17});
+  if(cs.eng&&cs.eng!==S.prevEng&&S.forced==='spasm'&&S.runs.length&&addEvent('spasm',cs.eng==='L'?'LM':'RCA',4,'the catheter',{sev:0.84+Math.random()*0.1}))S.forced=null;
+  else if(cs.eng&&cs.eng!==S.prevEng&&Math.random()<spasmRisk({cause:'eng',sys:cs.eng})*S.ch.randomX)addEvent('spasm',cs.eng==='L'?'LM':'RCA',4,'the catheter',{sev:0.55+Math.random()*0.37});
+  if(cs.deep&&!S.prevDeep&&Math.random()<spasmRisk({cause:'deep'})*S.ch.errX)addEvent('spasm',cs.eng==='L'?'LM':'RCA',4,'the catheter',{sev:0.75+Math.random()*0.17});
   S.prevEng=cs.eng;S.prevDeep=cs.deep;
   // contrast dynamics at 50 Hz
   const inj=down('KeyJ')&&!S.complication&&S.exch<=0;
@@ -502,6 +517,7 @@ function tick(dt){
   S.clock+=dt;
   if(inj&&cs.u<=0&&S.wasted>1&&toastT<=0)toast('Injecting outside the aortic root wastes contrast.');
   if(inj&&cs.u>0&&!cs.eng&&toastT<=0)toast('Non-selective injection: contrast is refluxing into the aortic root.');
+  if(S.deepInj>0.45&&!S.complication&&!S.ch.errX){S.deepInj=0;toast('Damped trace! On Medium or Hard that injection would tear the ostium. Ease the catheter back.',true)}
   if(S.deepInj>0.45&&!S.complication){S.complication='Injection through a damped catheter caused an ostial dissection.';if(S.cine)stopCine();S.pci=null;toast('Ostial dissection. Stop and report.',true);renderMarks();renderPCI(true)}
   // bradycardia with RCA injection
   if(S.cR>0.7)S.rcaInj+=dt;else S.rcaInj=Math.max(0,S.rcaInj-dt*1.5);
@@ -553,8 +569,9 @@ function tick(dt){
   const P=S.pci,xray=down('Space','KeyF')||!!S.cine;
   if(P&&P.stage==='wire'&&xray){P.wire+=dt*(owns('wire')?1:0.5)*(P.slow?0.4:1);if(P.wire>=1){P.wire=1;P.stage='tools';toast('Wire is across. Choose a device.');
     const v=VBY[P.vid];
-    if(Math.random()<perfRisk({kind:'wire',hydrophilic:owns('wire')})*D.compX)addEvent('perforation',P.vid,v.len-3,'the wire tip',{grade:'distal'});
-    else if(Math.random()<spasmRisk({cause:'wire'})*D.compX)addEvent('spasm',P.vid,Math.min(v.len-6,P.ld+16+Math.random()*10),'the wire',{sev:0.5+Math.random()*0.35});
+    if(S.forced==='perforation'&&addEvent('perforation',P.vid,v.len-3,'the wire tip',{grade:'distal'}))S.forced=null;
+    else if(Math.random()<perfRisk({kind:'wire',hydrophilic:owns('wire')})*S.ch.randomX)addEvent('perforation',P.vid,v.len-3,'the wire tip',{grade:'distal'});
+    else if(Math.random()<spasmRisk({cause:'wire'})*S.ch.randomX)addEvent('spasm',P.vid,Math.min(v.len-6,P.ld+16+Math.random()*10),'the wire',{sev:0.5+Math.random()*0.35});
     renderPCI(true)}}
   if(P&&P.stage==='positioned'){
     const sealing=P.seal&&P.kind==='balloon';
@@ -576,7 +593,7 @@ function tick(dt){
   const fl=down('Space','KeyF')&&!S.complication;const imaging=fl||!!S.cine;
   if(imaging&&S.review)closeReview();
   const f=1/Math.pow(Math.cos(S.a*D2R)*Math.cos(S.b*D2R),1.5);
-  const doseX=owns('lowdose')?0.7:1;
+  const doseX=1;
   if(S.cine){S.ak+=165/60*dt*f*doseX;S.ctime+=dt}else if(fl){S.ak+=17/60*dt*f*doseX;S.ftime+=dt}
   S.imgAcc+=dt;
   if(S.review){if(S.review.playing){S.review.acc+=dt;if(S.review.acc>=1/15){S.review.acc=0;S.review.idx=(S.review.idx+1)%S.review.run.frames.length;drawReview()}}}
@@ -679,7 +696,7 @@ function finish(){
     notes.push({c:good?'good':'',t:`Stented ${L.label}: ${s.diam.toFixed(1)} × ${s.len} mm at ${s.atm} atm${post?', post-dilated':''}, residual ${Math.round(L.cur*100)}%.`+(iss.length?' But '+iss.join('; ')+'.':` Well sized for a ~${o.refD.toFixed(1)} mm vessel.`)});
   }
   for(const s of S.stents){if(s.sealed&&!s.hits.length)continue;if(!s.hits.some(h=>h.L.sev>=0.5)){tx-=8;notes.push({c:'bad',t:`Unnecessary stent in the ${s.label}: ${s.hits.length?'that lesion was not flow-limiting.':'there was no lesion there.'}`})}else if(s.hits.some(h=>h.o.over))tx-=4}
-  for(const b of S.balloons){if(b.hits.some(h=>h.o.over)){tx-=4;notes.push({c:'bad',t:`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm) caused an edge dissection.`})}if(!b.hits.some(h=>h.L.sev>=0.5)){tx-=4;notes.push({c:'bad',t:`Unnecessary balloon inflation in the ${b.label}.`})}}
+  for(const b of S.balloons){if(b.hits.some(h=>h.o.over)){tx-=4;notes.push({c:'bad',t:`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm)${S.ch.errX?' caused an edge dissection.':': on Medium or Hard that tears the vessel.'}`})}if(!b.hits.some(h=>h.L.sev>=0.5)){tx-=4;notes.push({c:'bad',t:`Unnecessary balloon inflation in the ${b.label}.`})}}
   for(const sy of new Set(S.stents.map(s=>VBY[s.vid].sys))){const t=Math.max(...S.stents.filter(s=>VBY[s.vid].sys===sy).map(s=>s.t));if(!S.runs.some(r=>r.sys===sy&&r.t0>t))notes.push({c:'',t:`Record a final cine run of the ${sy==='L'?'left':'right'} system after stenting to confirm the result.`})}
   // complications during the case
   let capEv=100;
@@ -720,11 +737,12 @@ function finish(){
   if(nL<3)notes.push({c:'',t:'A standard left system study uses at least three or four projections: RAO caudal, RAO cranial, LAO cranial and LAO caudal.'});
   if(nR<2)notes.push({c:'',t:'Image the RCA in at least two orthogonal views, for example LAO 40° and RAO 30°.'});
   const B=S.budget;const cm=B==null?15:Math.round(15*clamp(1-(S.contrast-B)/(B*2),0,1));rows.push([`Contrast ${Math.round(S.contrast)} mL (${B==null?'no limit on Easy':'budget '+B})`,cm,15]);
-  const rad=Math.round(10*clamp(1-(S.ak-400)/1000,0,1));rows.push([`Air kerma ${Math.round(S.ak)} mGy · fluoro ${fmtT(S.ftime)}`,rad,10]);
-  if(S.ak>400)notes.push({c:'',t:'Steep angles and long cine runs drive dose up. Keep runs to 3–4 seconds and collimate your pedal time.'});
+  const akMax=upgradeVal('fluoro'),rad=Math.round(10*clamp(1-(S.ak-akMax)/1000,0,1));rows.push([`Air kerma ${Math.round(S.ak)} mGy (full marks to ${akMax}) · fluoro ${fmtT(S.ftime)}`,rad,10]);
+  if(S.ak>akMax)notes.push({c:'',t:'Steep angles and long cine runs drive dose up. Keep runs to 3–4 seconds and collimate your pedal time.'});
   const saf=10-Math.min(10,Math.round(S.blind*2));rows.push(['Safety (catheter moved under fluoro)',saf,10]);
   let total=lesPts+tx+comp+cm+rad+saf;
   if(S.complication){total=Math.min(total,35);notes.unshift({c:'bad',t:S.complication+(/damped/.test(S.complication)?' A damped or ventricularised pressure trace means the tip is against the vessel wall. Withdraw before injecting.':' Seal a perforation early, reverse heparin, and drain the pericardium as soon as BP falls.')})}
+  notes.push({c:'',t:`This patient on ${S.D.label}: ${S.ch.label}.`});
   if(S.c.random){notes.push({c:'',t:`Anatomy: ${S.c.anatomyNote.join('; ')}.`});notes.push({c:'',t:`Case code <b>${S.c.code}</b>: enter it under Random patient to replay this exact patient, or share it.`})}
   if(capEv<100&&total>capEv){total=capEv}
   total=Math.round(total);
@@ -740,7 +758,7 @@ function finish(){
   <div class="rows">${rows.map(r=>`<span>${r[0]}</span><span class="v">${Math.round(r[1])} / ${r[2]}</span>`).join('')}</div>
   ${flowReport()}
   <div class="notes">${notes.map(n=>`<div class="${n.c}">${n.t}</div>`).join('')}</div>
-  <div class="row">${S.c.random?'<button class="btn primary" id="rNew">New random patient</button><button class="btn" id="rAgain">Repeat this patient</button>':'<button class="btn primary" id="rAgain">Repeat case</button>'}<button class="btn" id="rCases">Choose another case</button><button class="btn" id="rMenu">Main menu</button></div>`;
+  <div class="row"><button class="btn primary" id="rNew">New random patient</button><button class="btn" id="rAgain">Repeat this patient</button><button class="btn" id="rCases">Change difficulty</button><button class="btn" id="rMenu">Main menu</button></div>`;
   ov.hidden=false;
   $('rAgain').onclick=()=>startCase(S.ci);
   if($('rNew'))$('rNew').onclick=()=>startCase(randomCode());

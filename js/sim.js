@@ -285,6 +285,9 @@ const HEART_PARTS={
 };
 const PA_TRUNK=[[14,40,32],[20,54,24],[26,66,10],[30,71,-2]],PA_L=[[30,71,-2],[44,74,-12],[58,72,-20]],PA_R=[[30,71,-2],[12,72,-12],[-8,70,-16]];
 const SVC_LINE=[[-30,46,-14],[-29,80,-14],[-27,126,-14]],IVC_LINE=[[-30,-12,-30],[-29,-50,-32],[-28,-95,-34]];
+/* the three great branches off the top of the aortic arch, right to left: brachiocephalic, left common carotid,
+   left subclavian */
+const ARCH_BRANCHES=[[[-8,114,-2],[-12,132,-4],[-16,152,-6]],[[0,118,-16],[1,136,-17],[2,156,-18]],[[6,115,-30],[11,132,-32],[18,150,-34]]];
 function heartGeometry(){
   const ids=['LAD','D1','D2','RI','LCx','OM1','OM2','RCA','AM','PDA','PLV','LPDA','LPL'],pts=[];
   for(const id of ids){const v=VBY[id];if(!v)continue;const from=id==='RCA'?0.3:id==='LCx'?0.25:0;for(let i=Math.floor(v.n*from);i<v.n;i+=2)pts.push(v.p[i])}
@@ -303,7 +306,7 @@ function heartMask(B,geo){
     const q=pts3.map(P);m.beginPath();q.forEach((p,i)=>i?m.lineTo(p[0],p[1]):m.moveTo(p[0],p[1]));m.lineWidth=2*r*SCALE;m.stroke()}
   return c;
 }
-const heartTubes=()=>[[AO.p.filter((p,i)=>i%3===0&&p[1]>-110),13],[PA_TRUNK,13],[PA_L,8.5],[PA_R,8.5],[SVC_LINE,10],[IVC_LINE,11]];
+const heartTubes=()=>[[AO.p.filter((p,i)=>i%3===0&&p[1]>-110),13],[PA_TRUNK,13],[PA_L,8.5],[PA_R,8.5],[SVC_LINE,10],[IVC_LINE,11],[ARCH_BRANCHES[0],6],[ARCH_BRANCHES[1],4.5],[ARCH_BRANCHES[2],5]];
 function drawHeartSketch(g,B){
   if(HEART_MODE==='none')return;
   const P=q=>proj(q,B),ink=a=>`rgba(62,54,46,${a})`,geo=heartGeometry(),{V}=geo,parts=HEART_PARTS;
@@ -324,6 +327,13 @@ function drawHeartSketch(g,B){
     for(const [e,sd] of [[V,61],[parts.RA,41],[parts.LA,51],[parts.LAA,71],[parts.RAA,81]]){smoothClosed(g,hullOf(e),1.6,sd);g.lineWidth=0.9;g.strokeStyle=ink(0.16);g.stroke()}
     // great vessel walls
     for(const [pts,r] of tubes){const q=pts.map(P);for(const side of [-1,1]){g.beginPath();q.forEach((p,i)=>{const A=q[Math.max(0,i-1)],Bq=q[Math.min(q.length-1,i+1)];let nx=A[1]-Bq[1],ny=Bq[0]-A[0];const l=Math.hypot(nx,ny)||1;const x=p[0]+nx/l*r*SCALE*side,y=p[1]+ny/l*r*SCALE*side;i?g.lineTo(x,y):g.moveTo(x,y)});g.lineWidth=0.9;g.strokeStyle=ink(0.15);g.stroke()}}
+    // cardiac veins: the great cardiac vein runs up beside the LAD, then round the left AV groove with the circumflex
+    // to the coronary sinus at the back, which empties into the right atrium (dotted: it is behind the heart)
+    {const off=(id,o,from,to)=>{const v=VBY[id];if(!v)return [];const out=[];for(let i=Math.floor(v.n*from);i<v.n*to;i+=2){const p=v.p[i],q=v.p[Math.min(v.n-1,i+2)],t=norm(sub(q,p)),side=norm([t[1],-t[0],0.3]);out.push(add(p,mul(side,o)))}return out};
+     const gcv=off('LAD',4,0.05,0.85).reverse().concat(off('LCx',-4,0,1));
+     g.setLineDash([2,4]);g.beginPath();gcv.forEach((p,i)=>{const q=P(p);i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1])});
+     const cs=[[54,-12,-56],[30,-34,-50],[6,-44,-42],[-18,-34,-30]].map(P);cs.forEach(q=>g.lineTo(q[0],q[1]));
+     g.lineWidth=1.1;g.strokeStyle='rgba(47,93,138,0.35)';g.stroke();g.setLineDash([])}
     // grooves between the chambers: atrioventricular (RCA, circumflex) and interventricular (LAD, PDA)
     g.setLineDash([5,5]);
     for(const id of ['RCA','LCx','LAD','PDA','LPDA']){const v=VBY[id];if(!v)continue;g.beginPath();for(let i=0;i<v.n;i+=2){const q=P(v.p[i]);i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1])}g.lineWidth=1;g.strokeStyle=ink(0.2);g.stroke()}
@@ -332,7 +342,7 @@ function drawHeartSketch(g,B){
     const toward=id=>{const v=VBY[id];return v?norm(sub(v.p[Math.floor(v.n*0.6)],V.c)):[0,0,0]};
     const rv=add(V.c,add(mul(toward(VBY.AM?'AM':'RCA'),24),[0,0,14])),lv=add(V.c,mul(toward('OM1'),22));
     g.font='18px "Patrick Hand", "Kalam", cursive';g.fillStyle=ink(0.42);g.textAlign='center';g.textBaseline='middle';
-    for(const [t,c] of [['RA',parts.RA.c],['LA',parts.LA.c],['RV',rv],['LV',lv],['Ao',[-6,70,4]],['PA',[24,62,16]],['SVC',[-29,104,-14]]])
+    for(const [t,c] of [['RA',parts.RA.c],['LA',parts.LA.c],['RV',rv],['LV',lv],['Ao',[-6,70,4]],['PA',[24,62,16]],['SVC',[-29,104,-14]],...(B.u[1]>0.9?[['IVC',[-29,-84,-33]]]:[])])
       {const q=P(c);if(q[0]>16&&q[0]<W-16&&q[1]>16&&q[1]<W-16)g.fillText(t,q[0],q[1])}
     g.textAlign='left';g.textBaseline='alphabetic';
   }

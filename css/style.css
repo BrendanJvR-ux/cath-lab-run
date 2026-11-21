@@ -223,3 +223,10 @@ kbd{font-family:var(--f-mono);font-size:14px;border:1.5px solid var(--line);bord
 .flow .bar .pre{background:repeating-linear-gradient(-45deg,#e9b8ad 0 4px,#f7ddd5 4px 8px)}
 .flow .bar .post{top:4px;bottom:4px;background:var(--line);border-radius:3px}
 .flow .fx{grid-column:1/-1;font-size:15px}
+
+/* tiered upgrades */
+.pips{display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle}
+.pips i{width:10px;height:10px;border:1.5px solid var(--line);border-radius:50% 45% 55% 50%;background:var(--panel)}
+.pips i.on{background:var(--amber)}
+.nexttier{color:var(--muted)!important}
+.diff .best{font-size:13px;color:#8a5a12}

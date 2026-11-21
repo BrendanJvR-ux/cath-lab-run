@@ -75,11 +75,12 @@ const BALLOON_LENS=[12,15,20];
 /* Difficulty. tol = engagement window (deg) per system, seek = how far (deg) beyond the window the tip
    is pulled into the ostium (0 = no help), deep = how far past the ostium (u) before damping,
    budgetX scales each case's contrast budget (null = no limit), dissectT = seconds for an untreated dissection to
-   close the vessel, compX scales the chance of PCI complications, tokenX scales coffee tokens. */
+   close the vessel. Complications are set per case (caseChallenge in js/gen.js): none on Easy, some cases on
+   Medium, most cases on Hard (or a severe contrast restriction), tokenX scales coffee tokens. */
 const DIFFICULTY={
-  easy:{label:'Easy',blurb:'Wide engagement windows and the tip drops into the ostia. No contrast limit.',tol:{L:45,R:55},seek:70,seekSpeed:90,deep:1.5,budgetX:null,dissectT:80,compX:0.8,tokenX:1,level:1},
-  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Tokens ×1.5.',tol:{L:28,R:32},seek:30,seekSpeed:45,deep:1.42,budgetX:1,dissectT:55,compX:1,tokenX:1.5,level:2},
-  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, the catheter damps sooner, 25% less contrast. Tokens ×2.',tol:{L:16,R:18},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,dissectT:35,compX:1.3,tokenX:2,level:3},
+  easy:{label:'Easy',blurb:'Wide engagement windows, the tip drops into the ostia, no contrast limit and no complications.',tol:{L:45,R:55},seek:70,seekSpeed:90,deep:1.5,budgetX:null,dissectT:80,tokenX:1,level:1},
+  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Some cases have complications. Tokens ×1.5.',tol:{L:28,R:32},seek:30,seekSpeed:45,deep:1.42,budgetX:1,dissectT:55,tokenX:1.5,level:2},
+  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, 25% less contrast. Most cases bring a complication or a severe contrast restriction. Tokens ×2.',tol:{L:16,R:18},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,dissectT:35,tokenX:2,level:3},
 };
 
 /* Drugs. Intracoronary ones go down the engaged guide; iv ones do not need it. gain = how much they restore flow in
@@ -113,14 +114,21 @@ const AVATARS=[
    Retired items are refunded when a saved profile loads (RETIRED_SHOP). */
 const RETIRED_SHOP={warm:20,cool:20}; // the old monitor colour filters
 const SHOP=[
-  {id:'torque',kind:'perk',name:'Torque device',price:25,desc:'Finer control of the catheter: every engagement window is 6° wider.'},
-  {id:'wire',kind:'perk',name:'Hydrophilic wire',price:15,desc:'Crosses lesions twice as fast.'},
-  {id:'lowdose',kind:'perk',name:'Low-dose fluoro',price:30,desc:'Fluoro and cine give 30% less air kerma.'},
-  {id:'injector',kind:'perk',name:'Power injector',price:35,desc:'Contrast budgets are 25% bigger on Medium and Hard.'},
+  {id:'wire',kind:'perk',name:'Hydrophilic wire',price:15,desc:'Crosses lesions twice as fast, but pokes out of small vessels a little more often.'},
   {id:'av6',kind:'avatar',name:'Operator: red hair, pink cap',price:15,desc:'A new avatar for your operator.',avatar:6},
   {id:'av7',kind:'avatar',name:'Operator: silver crop',price:15,desc:'A new avatar for your operator.',avatar:7},
   {id:'av8',kind:'avatar',name:'Operator: amber cap',price:15,desc:'A new avatar for your operator.',avatar:8},
 ];
 
-/* Cases add themselves here (see cases/*.js). */
-const CASES=[];
+/* Tiered upgrades in the coffee cart: each tier replaces the one before. val = the effect at that tier.
+   Old single-tier perks carry over as tier 1 (see loadProfile in js/game.js). */
+const TYPICAL_BUDGET=70; // mL, to show what a contrast upgrade means in practice
+const UPGRADES=[
+  {id:'injector',name:'Power injector',base:1,tiers:[{price:20,val:1.15},{price:40,val:1.3},{price:70,val:1.5}],
+   what:v=>`Contrast budget ${Math.round((v-1)*100)}% bigger: +${Math.round(TYPICAL_BUDGET*(v-1))} mL on a typical ${TYPICAL_BUDGET} mL case`},
+  {id:'fluoro',name:'Fluoro budget',base:400,tiers:[{price:20,val:500},{price:40,val:650},{price:70,val:850}],
+   what:v=>`Full radiation marks up to ${v} mGy air kerma (standard 400 mGy)`},
+  {id:'torque',name:'Torque device',base:0,tiers:[{price:20,val:4},{price:40,val:8},{price:70,val:12}],
+   what:v=>`Every engagement window ${v}° wider`},
+];
+const UPGRADE_FROM_PERK={torque:'torque',injector:'injector',lowdose:'fluoro'};

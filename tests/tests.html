@@ -22,9 +22,6 @@ canvas{display:none}
 <ol id="out"></ol>
 <canvas id="img" width="512" height="512"></canvas>
 <script src="../config/config.js"></script>
-<script src="../cases/lad-exertional-angina.js"></script>
-<script src="../cases/rca-inferior-nstemi.js"></script>
-<script src="../cases/lcx-breathless-diabetic.js"></script>
 <script src="../js/sim.js"></script>
 <script src="../js/gen.js"></script>
 <script>
@@ -33,12 +30,11 @@ const results=[];
 function test(name,fn){try{const note=fn();results.push({name,ok:true,note})}catch(e){results.push({name,ok:false,note:e.message})}}
 function ok(cond,msg){if(!cond)throw new Error(msg||'assertion failed')}
 const inRoot=(type,th,u)=>cathState({type,th,s:S_ROOT+22*u});
+/* fixed lesions for the rule tests (the game itself only has random patients) */
+const FIX={lad:{vid:'LAD',at:13,len:9,sev:0.82,e:[1,0.3,-0.2]},rca:{vid:'RCA',at:52,len:8,sev:0.94,e:[0.2,0.1,1]},lcx:{vid:'LCx',at:31,len:10,sev:0.76,e:[0,1,0.2]},mild:{vid:'LAD',at:52,len:8,sev:0.38,e:[1,0,0]}};
+const fx=k=>prepLesions([FIX[k]])[0];
 
-test('Three cases load, and every lesion sits on a real vessel',()=>{
-  ok(CASES.length===3,'expected 3 cases, got '+CASES.length);
-  for(const c of CASES)for(const L of c.lesions){const v=VBY[L.vid];ok(v,'unknown vessel '+L.vid);ok(L.at>0&&L.at<v.len,`${L.vid} at ${L.at} mm is outside its ${v.len.toFixed(0)} mm length`);ok(L.sev>0&&L.sev<1,'severity must be 0–1')}
-  return CASES.map(c=>c.title).join(' · ');
-});
+test('Only random patients: no preset cases are loaded',()=>{ok(typeof CASES==='undefined','preset cases still loaded');ok(typeof generatePatient==='function')});
 test('Every branch joins its parent vessel',()=>{for(const v of VESSELS)if(v.parent){ok(v.base>0,v.id+' has no join point')}});
 test('Vessels are tortuous, but branches still meet their parents and the ostia stay put',()=>{
   let worst=0;for(const v of VESSELS)if(v.parent){const P=VBY[v.parent];worst=Math.max(worst,Math.min(...P.p.map(q=>dist3(q,v.p[0]))))}
@@ -66,31 +62,31 @@ test('An engaged catheter tip sits exactly in the ostium, in every view and ever
 });
 test('Catheter tip moves when torqued in the root',()=>{const a=inRoot('JL',-120,0.3).tip,b=inRoot('JL',60,0.3).tip;ok(Math.hypot(a[0]-b[0],a[2]-b[2])>10,'tip barely moved')});
 test('Lesion labels read like a report',()=>{
-  const labels=CASES.map(c=>prepLesions(c.lesions).map(L=>L.label).join(', '));
+  const labels=[['lad'],['rca'],['lcx','mild']].map(ks=>ks.map(k=>fx(k).label).join(', '));
   ok(labels[0]==='proximal LAD',labels[0]);ok(labels[1]==='mid RCA',labels[1]);return labels.join(' · ');
 });
 test('An eccentric lesion looks different in different projections, never worse than it is',()=>{
-  const L=prepLesions(CASES[0].lesions)[0];
+  const L=fx('lad');
   const vals=PRESETS.map(p=>apparent(L,basis(p[1],p[2])));
   const lo=Math.min(...vals),hi=Math.max(...vals);
   ok(hi<=L.sev+1e-9,'apparent exceeds true severity');ok(hi-lo>0.15,'too little difference between views');
   return `looks ${Math.round(lo*100)}–${Math.round(hi*100)}% (true ${Math.round(L.sev*100)}%)`;
 });
 test('A well-sized stent covering the lesion leaves a small residual',()=>{
-  const L=prepLesions(CASES[0].lesions)[0],ref=refDiam(L.vid,L.at),d=STENT_DIAMS.reduce((a,b)=>Math.abs(b-ref)<Math.abs(a-ref)?b:a);
+  const L=fx('lad'),ref=refDiam(L.vid,L.at),d=STENT_DIAMS.reduce((a,b)=>Math.abs(b-ref)<Math.abs(a-ref)?b:a);
   const o=stentOutcome(L,{vid:L.vid,ld:L.at,len:18,diam:d,atm:14});
   ok(o&&o.covered&&!o.under&&!o.over&&!o.lowP,'should be a clean result');ok(o.residual<=0.1,'residual '+o.residual);
   return `${d.toFixed(1)} mm stent in a ~${ref.toFixed(1)} mm vessel → residual ${Math.round(o.residual*100)}%`;
 });
 test('Undersizing, low pressure and a short off-centre stent each leave more narrowing',()=>{
-  const L=prepLesions(CASES[0].lesions)[0],ref=refDiam(L.vid,L.at);
+  const L=fx('lad'),ref=refDiam(L.vid,L.at);
   const good=stentOutcome(L,{vid:L.vid,ld:L.at,len:18,diam:3.5,atm:14}).residual;
   const under=stentOutcome(L,{vid:L.vid,ld:L.at,len:18,diam:ref-1,atm:14});ok(under.under&&under.residual>good,'undersize');
   const low=stentOutcome(L,{vid:L.vid,ld:L.at,len:18,diam:3.5,atm:9});ok(low.lowP&&low.residual>good,'low pressure');
   const miss=stentOutcome(L,{vid:L.vid,ld:L.at+8,len:12,diam:3.5,atm:14});ok(miss&&!miss.covered&&miss.residual>good,'geographic miss');
 });
 test('A stent away from the lesion, or in another vessel, does not touch it',()=>{
-  const L=prepLesions(CASES[0].lesions)[0];
+  const L=fx('lad');
   ok(stentOutcome(L,{vid:L.vid,ld:L.at+40,len:12,diam:3,atm:14})===null);ok(stentOutcome(L,{vid:'RCA',ld:L.at,len:18,diam:3,atm:14})===null);
 });
 test('Harder difficulties need more accurate torque',()=>{
@@ -99,19 +95,19 @@ test('Harder difficulties need more accurate torque',()=>{
   ok(DIFFICULTY.hard.deep<DIFFICULTY.easy.deep,'hard should damp sooner');
 });
 test('Balloon angioplasty alone leaves recoil; a stent afterwards does better',()=>{
-  const L=prepLesions(CASES[1].lesions)[0],ref=refDiam(L.vid,L.at);
+  const L=fx('rca'),ref=refDiam(L.vid,L.at);
   const b=balloonOutcome(L,{vid:L.vid,ld:L.at,len:15,diam:Math.round(ref*2)/2-0.5,atm:10});
   ok(b&&b.residual>=0.3&&b.residual<L.sev,'balloon residual '+b.residual);
   return `${Math.round(L.sev*100)}% → ${Math.round(b.residual*100)}% after the balloon`;
 });
 test('A subtotal lesion stented without predilation is underexpanded',()=>{
-  const L=prepLesions(CASES[1].lesions)[0];ok(L.sev>=0.9);
+  const L=fx('rca');ok(L.sev>=0.9);
   const s={vid:L.vid,ld:L.at,len:18,diam:3.5,atm:14};
   const raw=stentOutcome({...L},s),pre=stentOutcome({...L,predil:true,cur:0.4},s);
   ok(raw.noPre&&!pre.noPre&&raw.residual>pre.residual,`without ${raw.residual}, with ${pre.residual}`);
 });
 test('Oversized balloon flags a dissection; post-dilating a stent improves it',()=>{
-  const L=prepLesions(CASES[0].lesions)[0],ref=refDiam(L.vid,L.at);
+  const L=fx('lad'),ref=refDiam(L.vid,L.at);
   ok(balloonOutcome(L,{vid:L.vid,ld:L.at,len:15,diam:ref+1,atm:12}).over,'should be oversized');
   const st={...L,stented:true,cur:0.12};const o=balloonOutcome(st,{vid:L.vid,ld:L.at,len:15,diam:3.5,atm:16});ok(o.post&&o.residual<0.12,'post-dilation');
 });
@@ -149,7 +145,7 @@ test('A stent covers a dissection only if it spans it',()=>{
 test('Complication risks follow the clinical picture',()=>{
   ok(noReflowRisk({acs:true,sev:0.95,len:28})>2*noReflowRisk({acs:false,sev:0.75,len:12}),'no-reflow should be likelier in ACS with a subtotal lesion');
   ok(dissectRisk({kind:'balloon',over:true})===1,'oversized balloon always dissects');ok(dissectRisk({kind:'balloon',stented:true,sev:0.9,atm:12})===0,'post-dilating inside a stent cannot dissect');
-  ok(DIFFICULTY.hard.dissectT<DIFFICULTY.easy.dissectT&&DIFFICULTY.hard.compX>DIFFICULTY.easy.compX,'harder = faster closure, more complications');
+  ok(DIFFICULTY.hard.dissectT<DIFFICULTY.easy.dissectT,'harder = faster closure');
   ok(IC_DRUGS.find(d=>d.id==='vera').gain>IC_DRUGS.find(d=>d.id==='gtn').gain*4,'verapamil should beat GTN for no-reflow');
 });
 
@@ -196,6 +192,22 @@ test('Heart sketch: chambers in their anatomical places around the coronary tree
   return V.ax.map(a=>Math.round(a.r*2)).join(' × ')+' mm ventricles';
 });
 
+test('Complications by difficulty: none on Easy, some on Medium, most on Hard',()=>{
+  const n=400,codes=[...Array(n)].map((_,i)=>seedToCode((i*104729+7)%CODE_SPACE));
+  const st=d=>{let prone=0,anyChance=0;for(const c of codes){const h=caseChallenge(c,d);if(h.randomX>0.9)prone++;if(h.randomX||h.errX)anyChance++}return {prone,anyChance}};
+  const e=st('easy'),m=st('medium');
+  ok(e.anyChance===0,'Easy should have no complications');
+  ok(m.prone>n*0.2&&m.prone<n*0.5,'Medium: some cases, got '+m.prone);
+  const hardHit=codes.filter(c=>{const x=caseChallenge(c,'hard');return x.forced||x.contrastX<1}).length;ok(hardHit>n*0.8,'Hard: most cases, got '+hardHit);
+  ok(JSON.stringify(caseChallenge(codes[3],'hard'))===JSON.stringify(caseChallenge(codes[3],'hard')),'same code, same challenge');
+  return `Medium ${Math.round(m.prone/n*100)}% complication-prone · Hard ${Math.round(hardHit/n*100)}% with a set complication or severe contrast limit`;
+});
+test('Coffee-cart upgrades get better and dearer with each tier, and the contrast one says how many mL',()=>{
+  for(const u of UPGRADES){ok(u.tiers.length===3,u.id);for(let i=1;i<3;i++){ok(u.tiers[i].price>u.tiers[i-1].price,u.id+' price');ok(u.tiers[i].val>u.tiers[i-1].val,u.id+' effect')}}
+  ok(/mL/.test(UPGRADES.find(u=>u.id==='injector').what(1.3)),'contrast upgrade should show mL');
+  return UPGRADES.map(u=>u.name+': '+u.tiers.map(t=>t.price).join('/')).join(' · ');
+});
+
 /* random patients (run last; they rebuild the anatomy, and the final test restores the default) */
 test('Case codes round-trip, and a code always gives the same patient',()=>{
   for(const n of [0,1,12345,CODE_SPACE-1])ok(codeToSeed(seedToCode(n))===n,'round trip '+n);
@@ -222,7 +234,7 @@ test('A posteriorly placed RCA origin needs more clockwise torque than usual',()
   buildAnatomy();const base=OSTANG.R;buildAnatomy({rca:'posterior'});const post=OSTANG.R;buildAnatomy();
   ok(post-base>8,`${base.toFixed(0)}° → ${post.toFixed(0)}°`);return `${base.toFixed(0)}° → ${post.toFixed(0)}°`;
 });
-test('The default anatomy is restored for the teaching cases',()=>{buildAnatomy();ok(VBY.PLV&&VBY.PDA&&!VBY.RI&&!VBY.LPDA);ok(prepLesions(CASES[1].lesions)[0].label==='mid RCA')});
+test('The default anatomy can be restored after random patients',()=>{buildAnatomy();ok(VBY.PLV&&VBY.PDA&&!VBY.RI&&!VBY.LPDA);ok(fx('rca').label==='mid RCA')});
 
 const bad=results.filter(r=>!r.ok).length,sum=document.getElementById('sum');
 sum.textContent=bad?`${bad} of ${results.length} failed`:`All ${results.length} passed`;sum.className=bad?'bad':'ok';

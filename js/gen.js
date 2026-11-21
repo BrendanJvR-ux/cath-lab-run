@@ -79,3 +79,18 @@ function generatePatient(code){
   const budget=renal?50:70+10*(nSig-1)+5*(lesions.length-nSig);
   return {code:seedToCode(seed),random:true,title,pt:(male?'M':'F')+', '+age,hx,task,budget,budgetInTask:renal,ecg,lesions,anatomy,anatomyNote:describeAnatomy(buildAnatomy(anatomy))};
 }
+
+/* What a case throws at you on a difficulty, fixed by the case code and the difficulty (so a shared code plays the
+   same). randomX scales complications that strike by chance; errX scales those caused by the operator (oversizing,
+   over-pressure, deep-seating, damped injections); forced = a complication that will happen at the first chance;
+   contrastX scales the contrast budget (0.5 = severe restriction). */
+const CHALLENGE_KINDS=['dissection','noreflow','perforation','spasm','dissection','noreflow'];
+function caseChallenge(code,diffKey){
+  const seed=codeToSeed(code)||0,R=mulberry32((seed*31+({easy:1,medium:2,hard:3}[diffKey]||2)*7919)>>>0);R();R();
+  const pick=()=>CHALLENGE_KINDS[Math.floor(R()*CHALLENGE_KINDS.length)];
+  if(diffKey==='easy')return {randomX:0,errX:0,forced:null,contrastX:1,label:'no complications'};
+  if(diffKey==='medium'){const prone=R()<0.35,forced=prone&&R()<0.6?pick():null;
+    return {randomX:prone?1.4:0,errX:1,forced,contrastX:1,label:prone?'complication-prone':'straightforward'}}
+  const r=R(),comp=r<0.7,severe=r<0.15||(r>=0.7&&r<0.92);
+  return {randomX:comp?2:0.6,errX:1,forced:comp?pick():null,contrastX:severe?0.5:1,label:[comp&&'complication-prone',severe&&'severe contrast restriction'].filter(Boolean).join(' and ')||'straightforward'};
+}
