@@ -2,7 +2,7 @@
 "use strict";
 const img=document.getElementById('img');img.width=img.height=W*RES;ictx=img.getContext('2d');ictx.setTransform(RES,0,0,RES,0,0);
 /* touch devices: name the on-screen buttons instead of keys */
-const TOUCH=matchMedia('(pointer:coarse)').matches;
+const TOUCH=matchMedia('(pointer:coarse)').matches;document.body.classList.toggle('touch',TOUCH);
 const keyName=(k,btn)=>TOUCH?btn:k;
 /* if frames are slow (an older phone), drop to a lighter image resolution once */
 let renderEMA=0,lowRes=false;
@@ -108,6 +108,42 @@ function resumeCard(){
 window.addEventListener('pagehide',saveCase);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)saveCase()});
 
+/* A plain silhouette of a cath lab C-arm over the patient table, for the main menu. */
+const CARM_SVG=`<svg viewBox="0 0 360 320" role="img"><g fill="#24282B">
+  <rect x="40" y="292" width="280" height="8" rx="2"/>
+  <rect x="262" y="70" width="22" height="226" rx="3"/><rect x="236" y="58" width="74" height="22" rx="4"/>
+  <path d="M250 70 a118 118 0 1 0 0 196 l-12 -16 a98 98 0 1 1 0 -164 z"/>
+  <rect x="96" y="44" width="92" height="30" rx="3"/><rect x="118" y="74" width="48" height="10" rx="2"/>
+  <rect x="112" y="250" width="60" height="34" rx="4"/>
+  <rect x="34" y="176" width="236" height="10" rx="2"/><rect x="126" y="186" width="16" height="106"/><rect x="100" y="286" width="68" height="8" rx="2"/>
+  <path d="M60 176 q4 -20 26 -20 h40 q14 0 22 -6 l14 -10 q10 -6 22 -4 l34 6 q14 2 22 14 l6 20 z" fill="#4A5258"/>
+  <circle cx="72" cy="160" r="13" fill="#4A5258"/>
+</g><circle cx="296" cy="69" r="5" fill="#2855D9"/><rect x="128" y="84" width="28" height="3" fill="#2855D9"/></svg>`;
+/* ---------- case select: patient folders ---------- */
+let menuSel=null;const PCACHE=new Map();
+const patientOf=code=>{if(!PCACHE.has(code))PCACHE.set(code,generatePatient(code));return PCACHE.get(code)};
+function waitingList(){let w=(profile.waiting||[]).filter(c=>codeToSeed(c)!=null);while(w.length<4)w.push(randomCode());profile.waiting=w.slice(0,4);return profile.waiting}
+function caseFolders(){
+  const F=[],sv=loadSave(),today=dailyCode(),dd=profile.daily&&profile.daily.date===dateKey()?profile.daily:null;
+  if(sv)F.push({id:'resume',cls:'inprogress',tab:'In progress',title:sv.ci==='TUTORIAL'?'The tutorial':patientOf(sv.ci).title,sub:`${fmtT(sv.clock)} in · ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:''}`,tag:'Resume'});
+  const tp=patientOf(today);F.push({id:'today',cls:'today',tab:"Today's case",title:tp.title,sub:tp.pt,tag:dd?MEDAL_NAME[dd.medal]:'Medals',code:today});
+  for(const code of waitingList()){const p=patientOf(code);F.push({id:'w:'+code,tab:code,title:p.title,sub:p.pt,tag:p.ecg&&p.ecg.stemi?'Emergency':'',code})}
+  if(typeof careerOf==='function'){const c=careerOf();if(c.lvl<CAREER.length)F.push({id:'career',tab:'Career',title:CAREER[c.lvl].rank,sub:`${c.prog} of ${CAREER[c.lvl].need}`,tag:'Next goal'})}
+  F.push({id:'tutorial',cls:'tutorial',tab:'Tutorial',title:'Learn the ropes',sub:'One patient, step by step',tag:profile.tutDone?'Done':''});
+  return F;
+}
+function folderChart(f,D){
+  if(!f)return '';
+  if(f.id==='resume'){const sv=loadSave();return `<div class="chead"><h2>${f.title}</h2><span class="meta">${sv?sv.ci:''}</span></div><p>Pick up where you left off: same patient, your runs, marks, devices and any complications.</p>
+    <div class="row"><button class="btn primary go" data-act="resume">Resume case</button><button class="btn" data-act="discard">Discard</button></div>`}
+  if(f.id==='tutorial')return `<div class="chead"><h2>Tutorial</h2><span class="meta">Easy · about 5–10 minutes</span></div><p>One patient from start to finish. A coach under the monitor explains each step and waits for you to do it.</p><button class="btn primary go" data-act="exp">Start tutorial</button>`;
+  if(f.id==='career'){const c=careerOf(),g=CAREER[c.lvl];return `<div class="chead"><h2>${g.rank}</h2><span class="meta">${c.prog} of ${g.need}</span></div><dl><dt>Goal</dt><dd>${g.goal}</dd><dt>Plays on</dt><dd>${DIFFICULTY[g.diff].label}${g.kind==='stemi'?' · a STEMI':g.kind==='comp'?' · with a complication':''}</dd></dl><button class="btn primary go" data-act="careercase">Start case</button>`}
+  const p=patientOf(f.code),today=f.id==='today',th=MEDALS[profile.diff];
+  return `<div class="chead"><h2>${esc(p.title)}</h2><span class="meta">${esc(p.pt)} · ${f.code}</span></div>
+    <dl><dt>History</dt><dd>${esc(p.hx)}</dd><dt>Task</dt><dd>${esc(caseTask(p,D))}</dd>${today?`<dt>Medals</dt><dd>Bronze ${th.bronze} · silver ${th.silver} · gold ${th.gold} on ${D.label}. Everyone gets this patient today.</dd>`:''}</dl>
+    <button class="btn primary go" data-act="${today?'daily':'startcode'}" data-code="${f.code}">Start case</button>`;
+}
+
 /* ---------- daily case ---------- */
 const MEDAL_NAME={gold:'Gold',silver:'Silver',bronze:'Bronze',none:'No medal'};
 const medalBadge=m=>`<span class="medal ${m}" aria-label="${MEDAL_NAME[m]}">${m==='none'?'–':MEDAL_NAME[m][0]}</span>`;
@@ -165,17 +201,21 @@ function renderMenu(){
     return;
   }
   if(menuView==='play'){
-    const d=profile.diff;
-    ov.innerHTML=`<h1>New patient</h1>
-      <div class="grouplabel">Difficulty</div>
-      <div class="diffs">${Object.entries(DIFFICULTY).map(([k,v])=>`<button class="diff${k===d?' sel':''}" data-diff="${k}"><b>${LEVEL_BARS(v.level)}${v.label}</b><span>${v.blurb}</span>${profile.best[k+'-R']!=null?`<span class="best">Best ${profile.best[k+'-R']}</span>`:''}</button>`).join('')}</div>
-      <div class="grouplabel">Patient</div>
-      <div class="randrow"><button class="btn primary big" data-act="rand">${DICE} New random patient</button></div>
-      <p class="fine">Every patient is different: anatomy, disease, history and what goes wrong. ${profile.randomDone?`You have seen ${profile.randomDone}.`:''}</p>
-      <div class="grouplabel">Replay or share a patient</div>
-      <div class="randrow"><input id="codeIn" maxlength="10" autocomplete="off" spellcheck="false" placeholder="CLR-XXXXX" aria-label="Case code"><button class="btn" data-act="code">Play code</button>
-        <span class="randinfo">A code gives the same patient on the same difficulty.</span></div>
-      <div class="row"><button class="btn" data-act="home">Back</button></div>`;
+    const d=profile.diff,D=DIFFICULTY[d],F=caseFolders();if(!F.some(f=>f.id===menuSel))menuSel=F[0].id;
+    const sel=F.find(f=>f.id===menuSel);
+    ov.innerHTML=`<h1>Case select</h1>
+      <div><div class="grouplabel">Difficulty</div>
+        <div class="seg" role="group" aria-label="Difficulty">${Object.entries(DIFFICULTY).map(([k,v])=>`<button data-diff="${k}" aria-pressed="${k===d}">${LEVEL_BARS(v.level)}${v.label}</button>`).join('')}</div>
+        <p class="diffnote">${D.blurb}${profile.best[d+'-R']!=null?` Your best: ${profile.best[d+'-R']}.`:''}</p></div>
+      <div class="cs">
+        <div><div class="grouplabel">Patients waiting</div>
+          <div class="folders" role="group" aria-label="Patient folders">${F.map(f=>`<button class="folder ${f.cls||''}" data-folder="${f.id}" data-tab="${esc(f.tab)}" aria-pressed="${f.id===menuSel}"><b>${esc(f.title)}</b><span>${esc(f.sub)}</span>${f.tag?`<span class="tag">${esc(f.tag)}</span>`:''}</button>`).join('')}</div></div>
+        <div class="chart" aria-live="polite">${folderChart(sel,D)}</div>
+      </div>
+      <div class="cs-foot"><button class="btn" data-act="home">Back</button><button class="btn" data-act="newpts">New patients</button>
+        <input id="codeIn" maxlength="10" autocomplete="off" spellcheck="false" placeholder="CLR-XXXXX" aria-label="Case code"><button class="btn" data-act="code">Play code</button></div>`;
+    const fo=ov.querySelector('.folders');fo.addEventListener('keydown',e=>{const bs=[...fo.querySelectorAll('.folder')],k=bs.indexOf(document.activeElement);if(k<0)return;
+      const step={ArrowRight:1,ArrowDown:1,ArrowLeft:-1,ArrowUp:-1}[e.key];if(step){e.preventDefault();bs[(k+step+bs.length)%bs.length].focus()}});
     return;
   }
   if(menuView==='shop'){
@@ -195,10 +235,20 @@ function renderMenu(){
       <div class="row"><button class="btn" data-act="home">Back</button></div>`;
     return;
   }
-  ov.innerHTML=`<div class="hero"><img class="heroimg" src="assets/cardiologists.png" alt="Cartoon of two cardiologists, a woman with a stethoscope and a man holding a guide catheter, in scrubs and lead aprons"><div class="herotxt"><span class="kicker"><img class="steth" src="assets/stethoscope.svg" alt="" aria-hidden="true">Coronary angiography · PCI</span><h1>Cath Lab Run</h1><p>Drive the catheter to the aortic root, engage each coronary, record cine runs in the right projections, then find, grade and treat the stenosis.</p></div></div>
-    <div class="opcard">${avatarSVG(profile.avatar,64)}<div><b>${esc(profile.name)}</b><span>${typeof rankName==='function'?rankName()+' · ':''}${CUP} ${profile.tokens} coffee tokens · ${DIFFICULTY[profile.diff].label}</span></div><button class="btn" data-act="editop">Change operator</button></div>
-    ${resumeCard()}${dailyCard()}
-    <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button><button class="btn big" data-act="career">Career</button><button class="btn big" data-act="exp">Tutorial</button><button class="btn big" data-gl="">Glossary</button></div>
+  const sv=loadSave(),dd=profile.daily&&profile.daily.date===dateKey()?profile.daily:null;
+  ov.innerHTML=`<div class="mm"><div class="mm-left">
+      <span class="mm-kicker">Coronary angiography · PCI</span>
+      <h1 class="mm-title">Cath Lab Run</h1>
+      <p class="mm-sub">Steer a catheter to the heart, film its arteries with X-ray, find the narrowing and open it.</p>
+      <div class="mm-actions">
+        <button class="btn primary xl" data-act="startcase">Start case</button>
+        <div class="mm-secondary"><button class="btn" data-act="play">Case select</button></div>
+      </div>
+      ${sv?`<div class="mm-strip resume"><div><b>Unfinished case</b><span>${sv.ci==='TUTORIAL'?'The tutorial':'Patient '+sv.ci} · ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:''} · ${fmtT(sv.clock)} in</span></div><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="discard">Discard</button></div>`:''}
+      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button><button class="lnk" data-act="career">Career</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-gl="">Glossary</button></div>
+      <div class="mm-op">${avatarSVG(profile.avatar,32)}<span><b>${esc(profile.name)}</b> · ${typeof rankName==='function'?rankName()+' · ':''}${profile.tokens} tokens · ${DIFFICULTY[profile.diff].label}</span><button class="lnk" data-act="editop" style="background:none;border:0;padding:0;font:500 14px var(--f-ui);text-decoration:underline;cursor:pointer;color:inherit">Change</button></div>
+    </div>
+    <div class="mm-art" aria-hidden="true">${CARM_SVG}</div></div>
     <p class="fine">Teaching game with simplified anatomy and physics. Not a clinical training device.</p>`;
 }
 $('startOv').addEventListener('click',e=>{
@@ -217,6 +267,10 @@ $('startOv').addEventListener('click',e=>{
   else if(d.act==='tutorial'){startTutorial()}
   else if(d.act==='skiptut'||d.act==='notut'){profile.tutSkipped=true;saveProfile();menuView='play';renderMenu()}
   else if(d.act==='rand'){startCase(randomCode())}
+  else if(d.folder){menuSel=d.folder;renderMenu();const nb=$('startOv').querySelector(`[data-folder="${CSS.escape(d.folder)}"]`);if(nb)nb.focus();return}
+  else if(d.act==='startcode'){const code=d.code;profile.waiting=(profile.waiting||[]).filter(c=>c!==code);saveProfile();startCase(code)}
+  else if(d.act==='newpts'){profile.waiting=[];waitingList();saveProfile();menuSel=null;renderMenu()}
+  else if(d.act==='startcase'){if(profile.exp==null&&!returning()){menuView='exp';renderMenu()}else{const code=waitingList()[0];profile.waiting=profile.waiting.slice(1);saveProfile();startCase(code)}}
   else if(d.act==='resume'){resumeCase()}
   else if(d.act==='discard'){clearSave();renderMenu();toast('Unfinished case discarded.')}
   else if(d.act==='daily'){startCase(dailyCode(),{daily:true})}
@@ -224,7 +278,7 @@ $('startOv').addEventListener('click',e=>{
   else if(d.act==='shop'){menuView='shop';renderMenu()}
   else if(d.act==='home'){draft=null;menuView='home';renderMenu()}
 });
-$('who').addEventListener('click',()=>{if(!S||S.done)showMenu('home')});
+$('who').addEventListener('click',()=>{const mid=S&&!S.done;showMenu('home');if(mid)toast('Case saved. Resume it from the menu.')}); // mid-case: saved by showMenu, resumable
 
 
 /* ---------- state ---------- */
@@ -295,8 +349,11 @@ window.addEventListener('keyup',e=>{keys[e.code]=false});
 window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
 document.querySelectorAll('.hold[data-k]').forEach(b=>{
   const k=b.dataset.k;
-  b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);keys['btn_'+k]=true});
-  const up=()=>{keys['btn_'+k]=false};b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',up);
+  // press starts the action; it stops on release, when the pointer leaves the button, if the touch is cancelled,
+  // or when the window loses focus (see the blur handler above). One button, one action: nothing behind it moves.
+  b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();keys['btn_'+k]=true});
+  const up=()=>{keys['btn_'+k]=false};for(const ev of ['pointerup','pointercancel','pointerleave','lostpointercapture'])b.addEventListener(ev,up);
+  b.addEventListener('contextmenu',e=>e.preventDefault());
 });
 $('bCine').addEventListener('click',toggleCine);
 $('b3d').addEventListener('click',()=>{if(S&&!S.done&&S.D.level<3)open3D(false)});

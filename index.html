@@ -7,7 +7,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Patrick+Hand&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Patrick+Hand&family=Barlow+Semi+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -16,7 +16,7 @@
 
 <header class="top">
   <div class="brand">Cath Lab Run<small>Diagnostic coronary angiography simulator · femoral access · 6F</small></div>
-  <div class="topright"><button class="btn glbtn" data-gl="" title="Glossary of terms">? Glossary</button><button class="who" id="who" hidden title="Main menu"></button><div class="lamp" id="lamp"><i></i>X-RAY</div></div>
+  <div class="topright"><button class="btn glbtn" data-gl="" title="Glossary of terms">? Glossary</button><button class="who" id="who" hidden title="Main menu (a case in progress is saved)"></button><div class="lamp" id="lamp"><i></i>X-RAY</div></div>
 </header>
 
 <main class="lab">
@@ -42,24 +42,15 @@
     </div>
     <div class="coach" id="coach" hidden aria-live="polite"></div>
     <canvas class="hemo" id="hemo" aria-label="ECG and aortic pressure"></canvas>
-    <div class="pad">
-      <div>
-        <div class="grouplabel">Catheter</div>
-        <div class="group">
-          <button class="hold" data-k="ArrowLeft"><span>⟲ CCW</span><kbd>←</kbd></button>
-          <button class="hold" data-k="ArrowUp"><span>Advance</span><kbd>↑</kbd></button>
-          <button class="hold" data-k="ArrowDown"><span>Withdraw</span><kbd>↓</kbd></button>
-          <button class="hold" data-k="ArrowRight"><span>CW ⟳</span><kbd>→</kbd></button>
-        </div>
-      </div>
-      <div>
-        <div class="grouplabel">Pedals and syringe</div>
-        <div class="group ped">
-          <button class="hold" data-k="Space" id="bFluoro"><span>Fluoro</span><kbd>Space</kbd></button>
-          <button class="hold cine" id="bCine"><span>Cine</span><kbd>C</kbd></button>
-          <button class="hold inj" data-k="KeyJ" id="bInj"><span>Inject</span><kbd>J</kbd></button>
-        </div>
-      </div>
+    <div class="pad strip" role="group" aria-label="Catheter and X-ray controls">
+      <div class="sgroup"><span class="slabel">Turn catheter</span>
+        <div class="pair"><button class="hold sbtn arrow" data-k="ArrowLeft" aria-label="Turn anticlockwise"><span class="ico" aria-hidden="true">⟲</span><kbd>←</kbd></button><button class="hold sbtn arrow" data-k="ArrowRight" aria-label="Turn clockwise"><span class="ico" aria-hidden="true">⟳</span><kbd>→</kbd></button></div></div>
+      <div class="sgroup"><span class="slabel">Move catheter</span>
+        <div class="pair"><button class="hold sbtn" data-k="ArrowUp"><span class="ico" aria-hidden="true">▲</span><span>Advance</span><kbd>↑</kbd></button><button class="hold sbtn" data-k="ArrowDown"><span class="ico" aria-hidden="true">▼</span><span>Withdraw</span><kbd>↓</kbd></button></div></div>
+      <div class="sgroup"><span class="slabel">X-ray</span>
+        <div class="pair"><button class="hold sbtn" data-k="Space" id="bFluoro"><span class="ico round" aria-hidden="true"></span><span>Fluoro</span><kbd>Space</kbd></button><button class="hold sbtn cine" id="bCine"><span class="ico rec" aria-hidden="true"></span><span>Record</span><kbd>C</kbd></button></div></div>
+      <div class="sgroup grow"><span class="slabel">Contrast</span>
+        <button class="hold sbtn inj" data-k="KeyJ" id="bInj"><span class="ico syringe" aria-hidden="true">⟰</span><span>Hold to inject</span><kbd>J</kbd></button></div>
     </div>
   </section>
 
