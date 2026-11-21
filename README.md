@@ -4,7 +4,7 @@ A coronary angiography and stenting game with fictional patients. Drive a Judkin
 
 **Play it:** https://brendanjvr-ux.github.io/cath-lab-run/ (tests at [/tests/tests.html](https://brendanjvr-ux.github.io/cath-lab-run/tests/tests.html))
 
-Plain HTML, CSS and JavaScript with Canvas 2D: no build step. Drawn in a hand-drawn sketchbook style: ink and coloured pencil on paper, the X-ray as pencil anatomy with inked, cross-hatched shading and contrast that fills the vessels like an ink wash (the pen lines "boil" gently like hand-drawn animation), and the ECG on pink ECG paper. A very faint pencil sketch of the heart sits where the heart really is in every projection, following standard radiographic cardiac anatomy: the SVC and right atrium form the right border; the aortic knob, main pulmonary artery, left atrial appendage and left ventricle form the left border; the right ventricle lies in front and the left atrium behind. The ventricles are fitted to the patient's own coronary tree. Easy shows the chambers (RA, RV, LA, LV), the grooves, the great cardiac vein and coronary sinus, the great vessels including the three arch branches, and labels; Medium shows only the cardiac outline; Hard shows none. The only image file is the menu picture of two cardiologists (`assets/cardiologists.png`), rendered in Blender (cel shading with Freestyle ink outlines) by `tools/render_cardiologists.py`: run `/Applications/Blender.app/Contents/MacOS/Blender -b -P tools/render_cardiologists.py -- assets` from the repo root to re-render it. Fonts (Kalam, Patrick Hand) load from Google Fonts.
+Plain HTML, CSS and JavaScript with Canvas 2D (plus three.js for the optional 3D heart view): no build step. Drawn in a hand-drawn sketchbook style: ink and coloured pencil on paper, the X-ray as pencil anatomy with inked, cross-hatched shading and contrast that fills the vessels like an ink wash (the pen lines "boil" gently like hand-drawn animation), and the ECG on pink ECG paper. A very faint pencil sketch of the heart sits where the heart really is in every projection, following standard radiographic cardiac anatomy: the SVC and right atrium form the right border; the aortic knob, main pulmonary artery, left atrial appendage and left ventricle form the left border; the right ventricle lies in front and the left atrium behind. The ventricles are fitted to the patient's own coronary tree. Easy shows the chambers (RA, RV, LA, LV), the grooves, the great cardiac vein and coronary sinus, the great vessels including the three arch branches, and labels; Medium shows only the cardiac outline; Hard shows none. The only image file is the menu picture of two cardiologists (`assets/cardiologists.png`), rendered in Blender (cel shading with Freestyle ink outlines) by `tools/render_cardiologists.py`: run `/Applications/Blender.app/Contents/MacOS/Blender -b -P tools/render_cardiologists.py -- assets` from the repo root to re-render it. Fonts (Kalam, Patrick Hand) load from Google Fonts.
 
 ## Run it locally
 
@@ -21,6 +21,7 @@ Then open http://localhost:8767/ (the game) or http://localhost:8767/tests/tests
 | `config/config.js` | Anatomy (coronary tree, aorta), coronary flow speed, Judkins catheters, C-arm presets, grading buckets, stent and balloon sizes, difficulty settings, ECG territories and avatars. |
 | `js/gen.js` | Random patients: case codes, anatomy variants, lesions, a matching history, and each case's complications for the chosen difficulty (`caseChallenge`). |
 | `js/sim.js` | Geometry, anatomy builder (variants), catheter position and engagement, lesion appearance per projection, stent and balloon outcome rules, coverage segments, coronary tortuosity, ribs and spine, and the X-ray image renderer (including wire, balloon and stent struts). No game state. |
+| `js/heart3d.js` | The 3D heart view (three.js r128 from a CDN, loaded the first time you open it). |
 | `js/game.js` | Menu, operator profile and coffee tokens, game state, controls, cine runs and review, the PCI tools, the three-lead ECG and pressure strip, the main loop and scoring. |
 | `css/style.css` | Layout and look. |
 | `tools/render_cardiologists.py` | Blender script that renders the menu picture `assets/cardiologists.png`. |
@@ -104,6 +105,10 @@ A medal pays bonus tokens (bronze 5, silver 10, gold 20; improving a medal on th
 | Hard | About 9 in 10 cases bring a set complication (dissection, no-reflow, perforation or spasm), a severe contrast restriction (half the budget, severe kidney disease), or both |
 
 The same case code on the same difficulty always brings the same challenge. The generator is `js/gen.js`; the variants are `VARIANT_PARTS` in `config/config.js`.
+
+## 3D heart view
+
+**3D heart** (in the C-arm panel, Easy and Medium) opens an orbitable 3D model of this patient's heart: the four chambers, the aorta with its arch branches, the pulmonary artery, the cavae, and the patient's own coronary tree, drawn in the same sketchbook style. During a case it shows anatomy only and starts from your current C-arm angle, so you can see what the projection is looking at; buttons jump to AP, LAO 45 and RAO 30. **View in 3D** in the report adds every lesion (a ring coloured by what is left, labelled before → after), your stents and any complications. Drag to turn, scroll or pinch to zoom. The viewer needs an internet connection the first time (it loads three.js).
 
 ## Scoring (out of 100)
 

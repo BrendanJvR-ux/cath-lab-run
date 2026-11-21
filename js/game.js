@@ -49,6 +49,7 @@ const ICONS={
 };
 function shopIcon(it){if(it.kind==='avatar')return avatarSVG(it.avatar,44);return `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[it.id]}</svg>`}
 function showMenu(view){
+  if(typeof close3D==='function')close3D();
   menuView=view||(profile?'home':'profile');S=null;document.body.classList.add('inmenu');
   $('resultOv').hidden=true;$('startOv').hidden=false;$('reviewbar').hidden=true;
   demoFrame();syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
@@ -185,6 +186,7 @@ $('sA').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.a=+e.targ
 $('sB').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.b=+e.target.value;syncArm()});
 
 function startCase(ci,opt={}){
+  if(typeof close3D==='function')close3D();
   S=newState(ci);S.daily=!!opt.daily&&ci===dailyCode();document.body.classList.remove('inmenu');
   $('startOv').hidden=true;$('resultOv').hidden=true;closeReview();
   const c=S.c;$('caseHead').innerHTML=`<h2>${S.c.code?'Random patient · '+S.c.code:'Patient · '+caseName(S)} · ${S.D.label}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
@@ -213,6 +215,7 @@ document.querySelectorAll('.hold[data-k]').forEach(b=>{
   const up=()=>{keys['btn_'+k]=false};b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',up);
 });
 $('bCine').addEventListener('click',toggleCine);
+$('b3d').addEventListener('click',()=>{if(S&&!S.done&&S.D.level<3)open3D(false)});
 const down=(...ks)=>ks.some(k=>keys[k]||keys['btn_'+k]);
 
 function exchangeTo(type){
@@ -671,6 +674,7 @@ function updateUI(){
   $('rdAK').querySelector('b').innerHTML=`${Math.round(S.ak)}<small>mGy</small>`;$('rdAK').classList.toggle('hot',S.ak>800);
   $('rdCM').querySelector('b').innerHTML=`${Math.round(S.contrast)}<small>${S.budget==null?'mL':'/ '+S.budget+' mL'}</small>`;$('rdCM').classList.toggle('hot',S.budget!=null&&S.contrast>S.budget);
   $('rdHD').querySelector('b').innerHTML=`${Math.round(S.hr)}<small>${Math.round(S.sysP)}/${Math.round(S.diaP)}</small>`;$('rdHD').classList.toggle('hot',S.hr<55||(S.cs&&S.cs.deep));
+  {const b=$('b3d'),off=!S||S.done||S.D.level>=3;if(b.disabled!==off){b.disabled=off;b.title=S&&S.D.level>=3?'No 3D help on Hard':'An orbitable 3D model of this patient\'s heart and coronaries (anatomy only during the case)'}}
   $('cathType').textContent=S.exch>0?'Exchanging…':(S.pci?'6F guide':'6F');
   {const tgt=S.exch>0?(S.cath.type==='JL'?'JR':'JL'):S.cath.type,lock=S.exch>0||!!S.complication||!!S.pci;
    for(const b of $('cathToggle').querySelectorAll('button')){const on=b.dataset.cath===tgt;if(b.getAttribute('aria-pressed')!==String(on))b.setAttribute('aria-pressed',on);b.disabled=lock&&!on;b.classList.toggle('busy',on&&S.exch>0)}}
@@ -825,10 +829,11 @@ function finish(){
   ${txBreakdown()}
   ${flowReport()}
   <div class="notes">${notes.map(n=>`<div class="${n.c}">${n.t}</div>`).join('')}</div>
-  <div class="row"><button class="btn primary" id="rNew">New random patient</button><button class="btn" id="rAgain">Repeat this patient</button><button class="btn" id="rCases">Change difficulty</button><button class="btn" id="rMenu">Main menu</button></div>`;
+  <div class="row"><button class="btn primary" id="rNew">New random patient</button><button class="btn" id="r3d">View in 3D</button><button class="btn" id="rAgain">Repeat this patient</button><button class="btn" id="rCases">Change difficulty</button><button class="btn" id="rMenu">Main menu</button></div>`;
   ov.hidden=false;
   $('rAgain').onclick=()=>startCase(S.ci,{daily:S.daily});
   if($('rNew'))$('rNew').onclick=()=>startCase(randomCode());
+  $('r3d').onclick=()=>open3D(true);
   $('rCases').onclick=()=>showMenu('play');
   $('rMenu').onclick=()=>showMenu('home');
   renderMarks();renderPCI(true);
