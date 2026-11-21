@@ -313,3 +313,7 @@ body.inmenu #startOv,body.inreport #resultOv{position:relative;inset:auto;min-he
   .top{margin-bottom:8px}.brand{font-size:26px}.brand small{font-size:13px}
   .hold{padding:10px 2px 8px;font-size:15px}
 }
+
+/* stethoscope beside the menu kicker */
+.kicker{display:flex;align-items:center;gap:10px}
+.steth{width:clamp(66px,11vw,100px);height:auto;transform:rotate(-8deg);filter:url(#rough);flex:none}

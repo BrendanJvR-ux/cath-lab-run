@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 170" role="img" aria-label="Sketch of a stethoscope">
+  <!-- Cath Lab Run: original hand-drawn illustration (ink and coloured pencil). -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- pencil shadow under the tubing -->
+    <path d="M70 92 C66 136 104 162 136 146 C164 132 172 104 162 84" stroke="#2b2a33" stroke-width="3" opacity="0.12" transform="translate(4 6)"/>
+    <!-- rubber tubing: ink outline, then colour, then a highlight -->
+    <path d="M68 86 C64 132 102 158 134 142 C162 128 170 100 160 80" stroke="#2b2a33" stroke-width="13"/>
+    <path d="M68 86 C64 132 102 158 134 142 C162 128 170 100 160 80" stroke="#2f5d8a" stroke-width="8"/>
+    <path d="M70 100 C70 128 96 148 124 142" stroke="#7fa6cf" stroke-width="2.2" opacity="0.8"/>
+    <!-- metal headset (binaurals) meeting at the Y -->
+    <path d="M42 24 C38 50 52 70 66 84 M96 18 C100 46 84 68 70 84" stroke="#2b2a33" stroke-width="9"/>
+    <path d="M42 24 C38 50 52 70 66 84 M96 18 C100 46 84 68 70 84" stroke="#c9c4b6" stroke-width="5"/>
+    <path d="M44 30 C42 48 50 62 60 74" stroke="#fbf6ea" stroke-width="1.6" opacity="0.9"/>
+    <!-- Y joint -->
+    <circle cx="68" cy="86" r="7" fill="#c9c4b6" stroke="#2b2a33" stroke-width="2.6"/>
+    <!-- ear tips -->
+    <ellipse cx="42" cy="20" rx="8" ry="6" fill="#2b2a33" transform="rotate(-20 42 20)"/>
+    <ellipse cx="96" cy="14" rx="8" ry="6" fill="#2b2a33" transform="rotate(20 96 14)"/>
+    <!-- chest piece: stem, bell rim, diaphragm -->
+    <path d="M160 80 L160 72" stroke="#2b2a33" stroke-width="7"/>
+    <path d="M160 80 L160 72" stroke="#c9c4b6" stroke-width="3.5"/>
+    <circle cx="160" cy="54" r="20" fill="#c9c4b6" stroke="#2b2a33" stroke-width="3"/>
+    <circle cx="160" cy="54" r="13" fill="#ece7dc" stroke="#2b2a33" stroke-width="1.8"/>
+    <path d="M152 46 C156 42 164 42 168 46" stroke="#fbf6ea" stroke-width="2.2" opacity="0.9"/>
+    <!-- a few pencil strokes of shading on the rim -->
+    <path d="M146 64 L150 60 M150 68 L155 63 M156 71 L160 67" stroke="#2b2a33" stroke-width="1.2" opacity="0.35"/>
+  </g>
+</svg>
