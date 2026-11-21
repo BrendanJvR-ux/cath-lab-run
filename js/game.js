@@ -6,7 +6,12 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 
 /* ---------- operator profile (saved on this device only) ---------- */
 const STORE='cathlabrun.profile.v1';
-function loadProfile(){try{const p=JSON.parse(localStorage.getItem(STORE)||'null');if(p&&typeof p.name==='string'&&p.name)return {tokens:0,best:{},diff:'easy',avatar:0,owned:[],lut:null,...p}}catch(e){}return null}
+function loadProfile(){try{const p=JSON.parse(localStorage.getItem(STORE)||'null');if(p&&typeof p.name==='string'&&p.name){
+  const q={tokens:0,best:{},diff:'easy',avatar:0,owned:[],...p};delete q.lut;
+  // refund anything the shop no longer sells (the monitor colour filters)
+  let back=0;q.owned=(q.owned||[]).filter(id=>{if(RETIRED_SHOP[id]){back+=RETIRED_SHOP[id];return false}return true});
+  if(back){q.tokens+=back;q.refunded=back;try{localStorage.setItem(STORE,JSON.stringify({...q,refunded:undefined}))}catch(e){}}
+  return q}}catch(e){}return null}
 function saveProfile(){try{localStorage.setItem(STORE,JSON.stringify(profile))}catch(e){}}
 let profile=loadProfile();
 const owns=id=>!!(profile&&profile.owned&&profile.owned.includes(id));
@@ -46,11 +51,10 @@ const ICONS={
   cool:'<rect x="3" y="4" width="18" height="13" rx="1.5" fill="#5b88b8" stroke="none"/><path d="M8 21h8M12 17v4"/>',
 };
 function shopIcon(it){if(it.kind==='avatar')return avatarSVG(it.avatar,44);return `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[it.id]}</svg>`}
-function applyLut(){const it=SHOP.find(x=>x.id===(profile&&profile.lut));img.style.filter=it&&owns(it.id)?it.filter:''}
 function showMenu(view){
   menuView=view||(profile?'home':'profile');S=null;
   $('resultOv').hidden=true;$('startOv').hidden=false;$('reviewbar').hidden=true;
-  applyLut();demoFrame();syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
+  demoFrame();syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   $('caseHead').innerHTML='<h2>Patient</h2><b>No case loaded</b><p>Pick a case on the monitor to begin.</p>';$('status').textContent='Catheter in the femoral sheath.';$('status').className='status';
   renderMenu();
 }
@@ -83,14 +87,12 @@ function renderMenu(){
     return;
   }
   if(menuView==='shop'){
-    const lutRow=`<button class="lutpick${!profile.lut?' sel':''}" data-lut="">Standard monitor</button>${SHOP.filter(x=>x.kind==='lut'&&owns(x.id)).map(x=>`<button class="lutpick${profile.lut===x.id?' sel':''}" data-lut="${x.id}">${x.name.replace(' monitor','')}</button>`).join('')}`;
     ov.innerHTML=`<div class="shophead"><h1>Coffee cart</h1><span class="tokens big">${CUP} ${profile.tokens} tokens</span></div>
       <p>Spend the tokens you earn on cases. Gear works on every case once bought.</p>
       <div class="shop">${SHOP.map(it=>{const own=owns(it.id),need=it.price-profile.tokens;
-        const cta=own?(it.kind==='lut'?(profile.lut===it.id?'<span class="owned">In use</span>':`<button class="btn" data-lut="${it.id}">Use</button>`):`<span class="owned">${it.kind==='avatar'?'Owned · pick it in Change operator':'Owned'}</span>`)
+        const cta=own?`<span class="owned">${it.kind==='avatar'?'Owned · pick it in Change operator':'Owned'}</span>`
           :`<button class="btn primary" data-buy="${it.id}" ${need>0?'disabled':''}>${CUP} ${it.price}</button>${need>0?`<span class="need">${need} more</span>`:''}`;
         return `<div class="item${own?' own':''}"><div class="ic ${it.kind}">${shopIcon(it)}</div><div class="txt"><b>${it.name}</b><span>${it.desc}</span></div><div class="cta">${cta}</div></div>`}).join('')}</div>
-      <div class="grouplabel">Monitor look</div><div class="row">${lutRow}</div>
       <div class="row"><button class="btn" data-act="home">Back</button></div>`;
     return;
   }
@@ -110,9 +112,8 @@ $('startOv').addEventListener('click',e=>{
   if(d.av!=null){draft.name=($('opName')||{}).value||draft.name;draft.avatar=+d.av;renderMenu();return}
   if(d.diff){profile.diff=d.diff;saveProfile();renderMenu();renderWho();return}
   if(d.ci!=null){startCase(+d.ci);return}
-  if(d.buy){const it=SHOP.find(x=>x.id===d.buy);if(!it||owns(it.id)||profile.tokens<it.price)return;profile.tokens-=it.price;profile.owned=[...(profile.owned||[]),it.id];if(it.kind==='lut')profile.lut=it.id;saveProfile();renderWho();applyLut();renderMenu();toast(`Bought: ${it.name}.`);return}
-  if(d.lut!=null){profile.lut=d.lut||null;saveProfile();applyLut();renderMenu();return}
-  if(d.act==='saveop'){const n=($('opName').value||'').trim().slice(0,24);if(!n)return;profile=profile?{...profile,name:n,avatar:draft.avatar}:{name:n,avatar:draft.avatar,tokens:0,best:{},diff:'easy',owned:[],lut:null};draft=null;saveProfile();renderWho();menuView='home';renderMenu()}
+  if(d.buy){const it=SHOP.find(x=>x.id===d.buy);if(!it||owns(it.id)||profile.tokens<it.price)return;profile.tokens-=it.price;profile.owned=[...(profile.owned||[]),it.id];saveProfile();renderWho();renderMenu();toast(`Bought: ${it.name}.`);return}
+  if(d.act==='saveop'){const n=($('opName').value||'').trim().slice(0,24);if(!n)return;profile=profile?{...profile,name:n,avatar:draft.avatar}:{name:n,avatar:draft.avatar,tokens:0,best:{},diff:'easy',owned:[]};draft=null;saveProfile();renderWho();menuView='home';renderMenu()}
   else if(d.act==='editop'){draft=null;menuView='profile';renderMenu()}
   else if(d.act==='play'){menuView='play';renderMenu()}
   else if(d.act==='rand'){startCase(randomCode())}
@@ -158,7 +159,7 @@ function startCase(ci){
   S=newState(ci);
   $('startOv').hidden=true;$('resultOv').hidden=true;closeReview();
   const c=S.c;$('caseHead').innerHTML=`<h2>${S.c.code?'Random patient · '+S.c.code:'Patient · '+caseName(S)} · ${S.D.label}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
-  ictx.fillStyle='#000';ictx.fillRect(0,0,W,W);applyLut();
+  ictx.fillStyle=PAPER;ictx.fillRect(0,0,W,W);
   syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   toast('Sheath in the right femoral artery. Hold Space for fluoro and advance.');
 }
@@ -305,6 +306,7 @@ function drawHemo(){
 }
 
 /* ---------- PCI: wire, balloon, stent ---------- */
+const INFLATE_RATE=2.8; // atm per second while Inflate is held (12 atm takes about 4 s)
 function pciRender(){
   if(!S)return null;const P=S.pci;
   return {stents:S.stents.map(s=>({vid:s.vid,ld:s.ld,len:s.len,diam:s.diam})),
@@ -555,7 +557,7 @@ function tick(dt){
     renderPCI(true)}}
   if(P&&P.stage==='positioned'){
     const sealing=P.seal&&P.kind==='balloon';
-    if(down('KeyB')){P.atm=Math.min(sealing?6:18,P.atm+7*dt);P.maxAtm=Math.max(P.maxAtm,P.atm);if(P.atm>=16.5&&!P.warned){P.warned=true;toast('Above the 16 atm rated burst pressure.',true)}if(P.atm>4&&!P.pain){P.pain=true;toast(`Balloon up. Chest pain, ST rising in ${P.vid==='LM'?'V3 and V5':TERRITORY[P.vid]}.`)}}
+    if(down('KeyB')){P.atm=Math.min(sealing?6:18,P.atm+INFLATE_RATE*dt);P.maxAtm=Math.max(P.maxAtm,P.atm);if(P.atm>=16.5&&!P.warned){P.warned=true;toast('Above the 16 atm rated burst pressure.',true)}if(P.atm>4&&!P.pain){P.pain=true;toast(`Balloon up. Chest pain, ST rising in ${P.vid==='LM'?'V3 and V5':TERRITORY[P.vid]}.`)}}
     else if(P.atm>0){if(sealing){S.seals.push({how:'balloon',label:P.label,t:S.clock,atm:Math.round(P.maxAtm)});P.stage='tools';P.kind=null;P.atm=P.maxAtm=0;P.pain=false;toast('Balloon deflated.');renderPCI(true)}
       else if(P.maxAtm>=4)applyDevice();else{P.atm=Math.max(0,P.atm-20*dt);if(P.atm===0)P.maxAtm=0}}
   }
@@ -626,6 +628,20 @@ function updateUI(){
 
 /* ---------- scoring and coffee tokens ---------- */
 $('bFinish').addEventListener('click',finish);
+/* Estimated flow in each diseased vessel at the start and at the end of the case. */
+function flowReport(){
+  const ids=[];for(const L of S.lesions)if(L.sev>=0.5&&!ids.includes(L.vid))ids.push(L.vid);
+  for(const e of S.events)if(e.kind!=='perforation'&&!ids.includes(e.vid))ids.push(e.vid);
+  if(!ids.length)return '';
+  const pct=f=>Math.round(f*100),ffr=f=>Math.min(1,f).toFixed(2);
+  const rows=ids.map(id=>{
+    const pre=vesselFlow(id,S.lesions.map(L=>({...L,cur:null})),null,false),post=vesselFlow(id,S.lesions,S.events,true),d=pct(post.f)-pct(pre.f);
+    const verdict=d>=15?`up ${d} points`:d<=-5?`down ${-d} points`:'no real change';
+    return `<div class="flow"><b>${VBY[id].name}</b><span class="bar" role="img" aria-label="${pct(pre.f)}% before, ${pct(post.f)}% after"><i class="pre" style="width:${pct(pre.f)}%"></i><i class="post" style="width:${pct(post.f)}%"></i></span>
+      <span class="fx">${pct(pre.f)}% → <strong>${pct(post.f)}%</strong> of normal · FFR ≈ ${ffr(pre.f)} → ${ffr(post.f)} · TIMI ${pre.timi} → ${post.timi} · ${verdict}</span></div>`}).join('');
+  return `<div class="flows"><div class="grouplabel">Flow in each diseased vessel (estimates)</div>${rows}
+    <div class="fine">Maximal flow as a share of a normal vessel, estimated from the remaining narrowing (about what an FFR wire would read; ischaemic below 0.80), with any complication left at the end. Pale bar: before, ink bar: after. Teaching model.</div></div>`;
+}
 function finish(){
   if(!S||S.done)return;if(S.cine)stopCine();closeReview();S.done=true;S.pci=null;
   const notes=[],rows=[];
@@ -721,6 +737,7 @@ function finish(){
   <div class="score"><b>${total}</b><span>${grade}</span></div>
   <div class="tokens">${CUP} +${earned} coffee token${earned===1?'':'s'}${S.D.tokenX>1?` (×${S.D.tokenX} for ${S.D.label})`:''} · ${profile.tokens} banked${prev!=null&&total>prev?' · new best':''}</div>
   <div class="rows">${rows.map(r=>`<span>${r[0]}</span><span class="v">${Math.round(r[1])} / ${r[2]}</span>`).join('')}</div>
+  ${flowReport()}
   <div class="notes">${notes.map(n=>`<div class="${n.c}">${n.t}</div>`).join('')}</div>
   <div class="row">${S.c.random?'<button class="btn primary" id="rNew">New random patient</button><button class="btn" id="rAgain">Repeat this patient</button>':'<button class="btn primary" id="rAgain">Repeat case</button>'}<button class="btn" id="rCases">Choose another case</button><button class="btn" id="rMenu">Main menu</button></div>`;
   ov.hidden=false;
@@ -732,4 +749,5 @@ function finish(){
 }
 
 sizeHemo();showMenu();
+if(profile&&profile.refunded){toast(`The monitor colour filters are gone: ${profile.refunded} coffee tokens refunded.`);delete profile.refunded;saveProfile();renderWho()}
 requestAnimationFrame(loop);

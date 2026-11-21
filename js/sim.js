@@ -49,7 +49,9 @@ function anatomyDefs(sp){
   }
   return defs;
 }
+let ANAT_VER=0; // bumps on every rebuild so the cached backgrounds redraw the heart sketch for the new tree
 function buildAnatomy(spec){
+  ANAT_VER++;
   const sp=ANATOMY={...ANATOMY_DEFAULT,...(spec||{}),tort:{...ANATOMY_DEFAULT.tort,...((spec&&spec.tort)||{})}};
   const defs=anatomyDefs(sp);
   const o={L:defs.find(v=>v.id==='LM').ctrl[0].slice(),R:defs.find(v=>v.id==='RCA').ctrl[0].slice()};
@@ -201,6 +203,27 @@ function stentCovers(st,ev){return st.vid===ev.vid&&Math.abs(st.ld-ev.ld)<=st.le
 function noReflowRisk(x){return Math.min(0.45,0.06+(x.acs?0.16:0)+(x.sev>=0.9?0.1:0)+(x.len>=24?0.05:0))}
 function dissectRisk(x){if(x.over)return 1;if(x.atm>16)return 0.5;return x.kind==='balloon'?(x.stented?0:x.sev>=0.85?0.1:0.03):0.04}
 
+/* ---------- flow estimates (end-of-case report) ----------
+   Maximal (hyperaemic) flow through a stenosis as a share of a normal vessel, from the diameter stenosis: about
+   0.9 at 50%, 0.7 at 70%, 0.5 at 80%, 0.2 at 90%. This is roughly what the FFR measures. Lesions in series multiply. */
+function stenFlow(ds){ds=clamp(ds,0,0.995);const r=ds/(1-ds);return 1/(1+0.1*Math.pow(r,1.6))}
+/* Flow at the far end of a vessel: its own lesions, lesions upstream of where it branches off, and (after
+   treatment) any complication still present upstream. after = use treated severities and the events. */
+function vesselFlow(vid,lesions,events,after){
+  const v=VBY[vid];if(!v)return {f:1,timi:3,worst:0};
+  let f=1,worst=0;
+  for(const L of lesions){
+    let up=L.vid===vid;
+    if(!up&&v.anc.has(L.vid)){let cur=v;while(cur.parent!==L.vid)cur=VBY[cur.parent];up=VBY[L.vid].ld[cur.joinIdx]>L.at}
+    if(!up)continue;const ds=after&&L.cur!=null?L.cur:L.sev;worst=Math.max(worst,ds);f*=stenFlow(ds);
+  }
+  let nr=null,closed=false;
+  if(after&&events)for(const ev of events){if(ev.treated&&ev.kind!=='noreflow')continue;if(!evDownstream(v,v.n-1,ev)&&!(ev.vid===vid))continue;
+    const e=evFlow(ev);f*=e;if(ev.kind==='noreflow')nr=ev.flow;if(e<0.03)closed=true}
+  const timi=closed||f<0.03?0:nr!=null&&nr<0.35?1:worst>=0.9||(nr!=null&&nr<0.92)||f<0.3?2:3;
+  return {f,timi,worst};
+}
+
 function segLabel(v,ld){if(v.id==='LM')return 'left main';const f=ld/v.len;return (f<0.33?'proximal ':f<0.66?'mid ':'distal ')+v.name}
 
 /* ---------- static image layers ---------- */
@@ -215,8 +238,48 @@ function hatch(g,deg,gap,lw,col,seed){
   for(let k=-R,n=0;k<=R;k+=gap,n++){const j=(hsh(seed,n)-0.5)*gap*0.5,cx=W/2+nx*(k+j),cy=W/2+ny*(k+j),l=R*(0.8+0.4*hsh(seed+1,n));
     g.lineWidth=lw*(0.7+0.6*hsh(seed+2,n));g.beginPath();g.moveTo(cx-dx*l,cy-dy*l);g.lineTo(cx+dx*l,cy+dy*l);g.stroke()}
 }
+/* A very light pencil sketch of the heart where it really lies, built from the live coronary tree (which runs on the
+   heart's surface), so it fits every projection and every patient's anatomy: the cardiac outline round the
+   ventricles and atria, the atrioventricular and interventricular grooves, the aortic root and arch, the pulmonary
+   trunk and the superior vena cava, with small handwritten chamber labels. */
+const FIBO=(()=>{const out=[],n=48,g=Math.PI*(3-Math.sqrt(5));for(let i=0;i<n;i++){const y=1-2*(i+0.5)/n,r=Math.sqrt(1-y*y);out.push([Math.cos(g*i)*r,y,Math.sin(g*i)*r])}return out})();
+const sphere=(c,r)=>FIBO.map(u=>add(c,mul(u,r)));
+function hull2(P){P=P.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);const lo=[],up=[];
+  for(const p of P){while(lo.length>1&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p)}
+  for(let i=P.length-1;i>=0;i--){const p=P[i];while(up.length>1&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p)}
+  return lo.slice(0,-1).concat(up.slice(0,-1))}
+function smoothClosed(g,pts,jit,seed){const n=pts.length;g.beginPath();
+  for(let i=0;i<=n;i++){const a=pts[i%n],b=pts[(i+1)%n],m=[(a[0]+b[0])/2+(hsh(seed,i)-0.5)*jit,(a[1]+b[1])/2+(hsh(seed+9,i)-0.5)*jit];i?g.quadraticCurveTo(a[0],a[1],m[0],m[1]):g.moveTo(m[0],m[1])}}
+const HEART_RA=[-36,14,-12],HEART_LA=[20,30,-42];
+function drawHeartSketch(g,B){
+  const P=q=>proj(q,B),ink=a=>`rgba(62,54,46,${a})`;
+  // ventricles: the coronary tree pushed out a few millimetres (epicardial fat), plus the two atria
+  const vc=[22,-12,-6],pts=[];
+  for(const v of VESSELS)for(let i=0;i<v.n;i+=3){const p=v.p[i];pts.push(add(p,mul(norm(sub(p,vc)),5)))}
+  pts.push(...sphere(HEART_RA,21),...sphere(HEART_LA,20));
+  const H=hull2(pts.map(P));
+  g.save();g.lineCap='round';g.lineJoin='round';
+  smoothClosed(g,H,0,1);g.save();g.clip();hatch(g,-32,8,0.9,ink(0.09),3);g.restore();
+  for(let k=0;k<2;k++){smoothClosed(g,H.map(q=>[q[0]+k*1.3,q[1]-k*0.9]),2.2,5+k);g.lineWidth=1.5-k*0.5;g.strokeStyle=ink(0.3-k*0.1);g.stroke()}
+  // tubes: great vessels as two pencil walls
+  const tube=(pts3,r,a,seed)=>{const q=pts3.map(P);for(const side of [-1,1]){g.beginPath();q.forEach((p,i)=>{const A=q[Math.max(0,i-1)],Bq=q[Math.min(q.length-1,i+1)];let nx=A[1]-Bq[1],ny=Bq[0]-A[0];const l=Math.hypot(nx,ny)||1;const o=r*SCALE+(hsh(seed+side,i)-0.5)*1.5;const x=p[0]+nx/l*o*side,y=p[1]+ny/l*o*side;i?g.lineTo(x,y):g.moveTo(x,y)});g.lineWidth=1.2;g.strokeStyle=ink(a);g.stroke()}};
+  tube(AO_ASC.filter((_,i)=>i%2===0),14,0.26,11);
+  tube([[10,44,26],[16,56,22],[24,66,12],[30,72,2]],12,0.24,21);
+  tube([[-30,44,-12],[-29,70,-12],[-27,100,-12],[-26,126,-12]],10,0.2,31);
+  // atria
+  for(const [c,r,sd] of [[HEART_RA,21,41],[HEART_LA,20,51]]){const q=P(c),rr=r*SCALE*0.92;g.beginPath();g.ellipse(q[0]+(hsh(sd,1)-0.5)*2,q[1],rr,rr*0.86,hsh(sd,2),0.4,5.9);g.lineWidth=1;g.strokeStyle=ink(0.16);g.stroke()}
+  // grooves: AV groove along the RCA and circumflex, interventricular groove along the LAD and PDA (dashed, very faint)
+  g.setLineDash([5,5]);
+  for(const id of ['RCA','LCx','LAD','PDA','LPDA']){const v=VBY[id];if(!v)continue;g.beginPath();for(let i=0;i<v.n;i+=2){const q=P(add(v.p[i],mul(norm(sub(v.p[i],vc)),3)));i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1])}g.lineWidth=1;g.strokeStyle=ink(0.16);g.stroke()}
+  g.setLineDash([]);
+  // labels
+  g.font='17px "Patrick Hand", "Kalam", cursive';g.fillStyle=ink(0.34);g.textAlign='center';
+  for(const [t,c] of [['RA',HEART_RA],['LA',HEART_LA],['RV',[8,-18,34]],['LV',[56,-26,-12]],['Ao',[-4,62,2]],['PA',[24,64,14]],['SVC',[-28,104,-12]]])
+    {const q=P(c);if(q[0]>14&&q[0]<W-14&&q[1]>14&&q[1]<W-14)g.fillText(t,q[0],q[1])}
+  g.textAlign='left';g.restore();
+}
 function getBg(a,b){
-  const key=Math.round(a)+'|'+Math.round(b);if(bgCache.has(key))return bgCache.get(key);
+  const key=Math.round(a)+'|'+Math.round(b)+'|'+ANAT_VER;if(bgCache.has(key))return bgCache.get(key);
   const c=document.createElement('canvas');c.width=c.height=W;const B=basis(a,b);
   // the anatomy is drawn in black on a transparent layer, then laid on paper as graphite (see the end)
   const lay=document.createElement('canvas');lay.width=lay.height=W;const g=lay.getContext('2d');
@@ -281,18 +344,16 @@ function getBg(a,b){
      g.beginPath();g.ellipse((m[0]+sp[0])/2,(m[1]+sp[1])/2,4*sx+1,Math.max(3,Math.abs(sp[1]-m[1])/2+3),0,0,7);g.fillStyle='rgba(0,0,0,0.07)';g.fill();g.strokeStyle='rgba(0,0,0,0.1)';g.lineWidth=1.5;g.stroke()}
    }}
   // diaphragm
-  g.beginPath();for(let x=-150;x<=150;x+=6){const y=-58-Math.pow((x-6)/60,2)*12+(x>20?-8:0)*Math.min(1,(x-20)/40);const q=proj([x,y,0],B);x===-150?g.moveTo(q[0],q[1]):g.lineTo(q[0],q[1])}
+  g.beginPath();for(let x=-150;x<=150;x+=6){const y=-76-Math.pow((x-6)/60,2)*12+(x>20?-8:0)*Math.min(1,(x-20)/40);const q=proj([x,y,0],B);x===-150?g.moveTo(q[0],q[1]):g.lineTo(q[0],q[1])}
   g.lineTo(W+50,W+400);g.lineTo(-50,W+400);g.closePath();
   g.save();g.clip();hatch(g,-38,6,1.1,'rgba(0,0,0,0.22)',7);hatch(g,52,9,0.9,'rgba(0,0,0,0.1)',8);g.restore();
-  g.beginPath();for(let x=-150;x<=150;x+=6){const y=-58-Math.pow((x-6)/60,2)*12+(x>20?-8:0)*Math.min(1,(x-20)/40);const q=proj([x,y,0],B);x===-150?g.moveTo(q[0],q[1]):g.lineTo(q[0],q[1])}
+  g.beginPath();for(let x=-150;x<=150;x+=6){const y=-76-Math.pow((x-6)/60,2)*12+(x>20?-8:0)*Math.min(1,(x-20)/40);const q=proj([x,y,0],B);x===-150?g.moveTo(q[0],q[1]):g.lineTo(q[0],q[1])}
   g.lineWidth=2.2;g.strokeStyle='rgba(0,0,0,0.45)';g.stroke();
   // ECG electrodes and leads on the skin
   for(const e of [[-74,-30,96],[82,-48,90],[-60,110,70]]){const q=proj(e,B);g.beginPath();g.arc(q[0],q[1],9,0,7);g.strokeStyle='rgba(0,0,0,0.42)';g.lineWidth=2.5;g.stroke();g.beginPath();g.arc(q[0],q[1],3,0,7);g.fillStyle='rgba(0,0,0,0.5)';g.fill();g.beginPath();g.moveTo(q[0],q[1]);g.bezierCurveTo(q[0]+30,q[1]+40,q[0]-10,q[1]+120,q[0]+40,q[1]+260);g.lineWidth=1.6;g.strokeStyle='rgba(0,0,0,0.32)';g.stroke()}
   // compose: paper, cross-hatched heart shadow, then the anatomy as graphite drawn twice slightly offset (a sketchy pencil line)
   const gc=c.getContext('2d');gc.fillStyle=PAPER;gc.fillRect(0,0,W,W);
-  {const q=proj(add(HC,[-2,-8,0]),B),rx=70*SCALE*(0.75+0.25*Math.abs(Math.cos(a*D2R))),ry=64*SCALE*Math.max(0.6,Math.abs(Math.cos(b*D2R)));
-   gc.save();gc.beginPath();gc.ellipse(q[0],q[1],rx,ry,-0.35,0,7);gc.clip();hatch(gc,-30,7,1,'rgba(70,60,50,0.13)',3);hatch(gc,35,11,0.9,'rgba(70,60,50,0.07)',4);gc.restore();
-   for(let p=0;p<2;p++){gc.beginPath();gc.ellipse(q[0]+p*1.6,q[1]-p*1.1,rx*(1+p*0.012),ry*(1-p*0.01),-0.35+p*0.02,0.15*p,6.2+p*0.1);gc.lineWidth=1.6-p*0.6;gc.strokeStyle='rgba(70,60,50,0.28)';gc.stroke()}}
+  drawHeartSketch(gc,B);
   const tint=document.createElement('canvas');tint.width=tint.height=W;{const t=tint.getContext('2d');t.drawImage(lay,0,0);t.globalCompositeOperation='source-in';t.fillStyle='rgb(62,54,46)';t.fillRect(0,0,W,W)}
   gc.globalAlpha=1;gc.drawImage(tint,0,0);gc.globalAlpha=0.55;gc.drawImage(tint,1.4,-1);gc.globalAlpha=0.3;gc.drawImage(tint,-1,1.3);gc.globalAlpha=1;
   if(bgCache.size>40)bgCache.delete(bgCache.keys().next().value);

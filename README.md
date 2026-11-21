@@ -4,7 +4,7 @@ A coronary angiography and stenting game with fictional patients. Drive a Judkin
 
 **Play it:** https://brendanjvr-ux.github.io/cath-lab-run/ (tests at [/tests/tests.html](https://brendanjvr-ux.github.io/cath-lab-run/tests/tests.html))
 
-Plain HTML, CSS and JavaScript with Canvas 2D: no build step. Drawn in a hand-drawn sketchbook style: ink and coloured pencil on paper, the X-ray as pencil anatomy with inked, cross-hatched shading and contrast that fills the vessels like an ink wash (the pen lines "boil" gently like hand-drawn animation), and the ECG on pink ECG paper. The only image is the menu heart (`assets/heart.svg`). Fonts (Kalam, Patrick Hand) load from Google Fonts.
+Plain HTML, CSS and JavaScript with Canvas 2D: no build step. Drawn in a hand-drawn sketchbook style: ink and coloured pencil on paper, the X-ray as pencil anatomy with inked, cross-hatched shading and contrast that fills the vessels like an ink wash (the pen lines "boil" gently like hand-drawn animation), and the ECG on pink ECG paper. A very faint pencil sketch of the heart (outline, atria, ventricles, grooves, aorta, pulmonary trunk and SVC, with chamber labels) sits where the heart really is in every projection, built from the patient's own coronary tree. The only image file is the menu heart (`assets/heart.svg`). Fonts (Kalam, Patrick Hand) load from Google Fonts.
 
 ## Run it locally
 
@@ -40,10 +40,9 @@ Create an operator (name and one of six avatars), then pick a difficulty and a c
 | Hydrophilic wire | 15 | Crosses lesions twice as fast |
 | Low-dose fluoro | 30 | 30% less air kerma |
 | Power injector | 35 | Contrast budgets 25% bigger on Medium and Hard |
-| Warm film / Cool blue monitor | 20 each | A different look for the X-ray image; switch between owned looks in the cart |
 | Three extra avatars | 15 each | Pick them in Change operator |
 
-Items are defined in `SHOP` in `config/config.js`.
+Items are defined in `SHOP` in `config/config.js`. The old monitor colour filters were retired; anyone who bought one gets the tokens back when their profile loads.
 
 | Difficulty | Engagement window (left / right) | Help finding the ostia | Contrast budget | Extras |
 |---|---|---|---|---|
@@ -63,7 +62,7 @@ Items are defined in `SHOP` in `config/config.js`.
 | Report | Replay a run, click the narrowing and grade it (<50%, 50–69%, 70–89%, ≥90%). |
 | Wire | With the guide engaged, press Wire it next to a marked lesion and hold fluoro while a 0.014" wire crosses. |
 | Balloon | Plain balloon angioplasty: 8–12 atm. Alone it recoils to about 30–45%. Use it to predilate a subtotal (≥90%) lesion before stenting, or to post-dilate a stent. Oversizing by more than 0.5 mm causes a dissection. |
-| Stent | Pick a diameter and length (the 6F guide is 2 mm wide for scale), nudge the markers around the narrowing, then hold Inflate to deploy at 12–14 atm. Take a final shot, remove the wire, finish. |
+| Stent | Pick a diameter and length (the 6F guide is 2 mm wide for scale), nudge the markers around the narrowing, then hold Inflate to deploy at 12–14 atm (pressure rises about 2.8 atm a second, so 12 atm takes about 4 s). Take a final shot, remove the wire, finish. |
 | Complications | **Dissection**: an oversized balloon or stent, inflating above 16 atm, or (occasionally) balloon angioplasty of a hard lesion or a stent edge can tear the vessel wall. It shows as a flap, a second channel of contrast beside the lumen and staining that lingers after the injection. Left alone it narrows and then closes the vessel (Easy 80 s, Medium 55 s, Hard 35 s): cover it with a stent (**Aim devices here**, or **Wire it** again if the wire is out). **No-reflow**: after a stent, more often in an NSTEMI, a subtotal lesion or a long stent, the stent stays open but contrast crawls beyond it. Give intracoronary **verapamil** or **adenosine** through the engaged guide until flow is brisk; GTN does little. Both start with chest pain, ST elevation in the territory lead and falling blood pressure, and are only named once you inject and see them. |
 | Perforation and tamponade | **Perforation**: a balloon or stent more than 1 mm too big, or inflated above 16 atm, can tear right through the vessel: a jet of contrast squirts out and pools beside the heart. A wire can also exit the tip of a small distal vessel (hydrophilic wires do this more often). Blood fills the pericardium: an untreated big hole tamponades in about 36 s (BP collapses with a narrow pulse pressure, HR races) and a cardiac arrest ends the case. Seal a big hole with a **covered stent**; a distal wire exit with a **coil** or a 15 s low-pressure balloon inflation (**Aim devices here** caps the balloon at 6 atm and stops the leak while held). **IV protamine** slows the leak; **Pericardiocentesis** drains the effusion and restores BP, but it reaccumulates until the hole is sealed. |
 | Spasm | Engaging an ostium (the RCA more than the left), deep-seating the catheter, or passing the wire can cause **spasm**: a smooth, concentric narrowing that looks the same in every view. Tight spasm causes chest pain and ST elevation. **Intracoronary GTN** relieves it (verapamil partly, adenosine not); it also settles by itself once the catheter or wire is gone. Don't grade or stent it: a mark or stent on spasm is penalised. On Easy the panel names it once imaged; on Medium and Hard only tight, symptomatic spasm gets an alert. |
@@ -103,7 +102,7 @@ The report names the anatomy at the end. Random patients keep their own best sco
 | Air kerma (full marks up to 400 mGy) | 10 |
 | Safety (catheter moved only under fluoro) | 10 |
 
-A complication caps the score at 35. The report says which projection showed each lesion best.
+A complication caps the score at 35. The report says which projection showed each lesion best, and estimates the flow in each diseased vessel before and after: maximal flow as a share of normal (roughly what an FFR wire would read), the FFR itself and the TIMI grade, taking lesions in series and any complication left at the end into account.
 
 ## Controls
 

@@ -206,8 +206,6 @@ kbd{font-family:var(--f-mono);font-size:14px;border:1.5px solid var(--line);bord
 .item .cta .btn{display:flex;align-items:center;gap:5px}
 .owned{font-size:15px;color:var(--ok)}
 .need{font-size:14px;color:var(--muted)}
-.lutpick{font-size:15px;padding:4px 10px;border-radius:var(--wob-s);border:1.5px solid var(--line);background:var(--panel);cursor:pointer}
-.lutpick.sel{background:var(--hi)}
 
 /* PCI complications */
 .alert{border:2px solid var(--danger);background:#fbe3dc;border-radius:var(--wob-s);padding:7px 10px;margin-bottom:8px;display:flex;flex-direction:column;gap:3px;transform:rotate(-.3deg)}
@@ -215,3 +213,13 @@ kbd{font-family:var(--f-mono);font-size:14px;border:1.5px solid var(--line);bord
 .alert span{font-size:15px;color:var(--fg)}
 .alert .btn{align-self:flex-start;margin-top:2px}
 .drugs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+
+/* end-of-case flow estimates */
+.flows{display:flex;flex-direction:column;gap:7px;max-width:620px;border:2px dashed var(--faint);border-radius:var(--wob-s);padding:10px 12px;background:var(--panel)}
+.flow{display:grid;grid-template-columns:minmax(80px,auto) minmax(90px,1fr);gap:2px 12px;align-items:center}
+.flow b{font-family:var(--f-display);font-size:17px}
+.flow .bar{position:relative;height:14px;border:1.5px solid var(--line);border-radius:var(--wob-s);background:var(--panel2);overflow:hidden}
+.flow .bar i{position:absolute;left:0;top:0;bottom:0}
+.flow .bar .pre{background:repeating-linear-gradient(-45deg,#e9b8ad 0 4px,#f7ddd5 4px 8px)}
+.flow .bar .post{top:4px;bottom:4px;background:var(--line);border-radius:3px}
+.flow .fx{grid-column:1/-1;font-size:15px}

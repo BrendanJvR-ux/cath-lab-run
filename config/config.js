@@ -109,14 +109,14 @@ const AVATARS=[
   {skin:'#e0ac86',hair:'#1f2a44',style:'bun',scrub:'#1d6b5f',cap:'#f2a53b',shop:'av8'},
 ];
 
-/* Coffee-token shop. kind: perk (always on once bought), lut (monitor look, pick one), avatar. */
+/* Coffee-token shop. kind: perk (always on once bought) or avatar.
+   Retired items are refunded when a saved profile loads (RETIRED_SHOP). */
+const RETIRED_SHOP={warm:20,cool:20}; // the old monitor colour filters
 const SHOP=[
   {id:'torque',kind:'perk',name:'Torque device',price:25,desc:'Finer control of the catheter: every engagement window is 6° wider.'},
   {id:'wire',kind:'perk',name:'Hydrophilic wire',price:15,desc:'Crosses lesions twice as fast.'},
   {id:'lowdose',kind:'perk',name:'Low-dose fluoro',price:30,desc:'Fluoro and cine give 30% less air kerma.'},
   {id:'injector',kind:'perk',name:'Power injector',price:35,desc:'Contrast budgets are 25% bigger on Medium and Hard.'},
-  {id:'warm',kind:'lut',name:'Warm film monitor',price:20,desc:'An amber, film-style look for the X-ray image.',filter:'sepia(.45) saturate(1.25) contrast(1.05)'},
-  {id:'cool',kind:'lut',name:'Cool blue monitor',price:20,desc:'A blue-tinted look for the X-ray image.',filter:'sepia(.35) hue-rotate(175deg) saturate(1.4) contrast(1.05)'},
   {id:'av6',kind:'avatar',name:'Operator: red hair, pink cap',price:15,desc:'A new avatar for your operator.',avatar:6},
   {id:'av7',kind:'avatar',name:'Operator: silver crop',price:15,desc:'A new avatar for your operator.',avatar:7},
   {id:'av8',kind:'avatar',name:'Operator: amber cap',price:15,desc:'A new avatar for your operator.',avatar:8},

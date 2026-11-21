@@ -172,6 +172,19 @@ test('Spasm: tight spasm limits flow, mild spasm does not; GTN relieves it, aden
   ok(spasmRisk({cause:'eng',sys:'R'})>spasmRisk({cause:'eng',sys:'L'})&&spasmRisk({cause:'deep'})>spasmRisk({cause:'eng',sys:'R'}),'RCA and deep-seating are touchier');
 });
 
+test('Flow estimates: calibrated to the stenosis, multiplied in series, and only downstream',()=>{
+  const near=(a,b,t)=>Math.abs(a-b)<=t;
+  ok(near(stenFlow(0.5),0.9,0.04)&&near(stenFlow(0.7),0.72,0.05)&&near(stenFlow(0.8),0.52,0.06)&&near(stenFlow(0.9),0.23,0.05),'calibration');
+  const L={vid:'LAD',at:40,sev:0.8,cur:null};
+  const pre=vesselFlow('LAD',[L],null,false),post=vesselFlow('LAD',[{...L,cur:0.08}],[],true);ok(pre.f<0.6&&post.f>0.95,`${pre.f.toFixed(2)} → ${post.f.toFixed(2)}`);
+  ok(vesselFlow('LAD',[L,{vid:'LAD',at:90,sev:0.7}],null,false).f<pre.f,'two lesions in series should be worse than one');
+  // a branch leaving above the lesion is unaffected, one leaving below it is
+  const lad=VBY.LAD;for(const b of VESSELS)if(b.parent==='LAD'){const j=lad.ld[b.joinIdx],f=vesselFlow(b.id,[L],null,false).f;ok(j<L.at?f===1:f<0.6,b.id)}
+  const closed=vesselFlow('LAD',[{...L,cur:0.05}],[{kind:'dissection',vid:'LAD',ld:60,closed:true,treated:false,progress:1}],true);ok(closed.timi===0&&closed.f<0.03,'closed vessel');
+  return `80% LAD: ${Math.round(pre.f*100)}% of normal (TIMI ${pre.timi}) → stented ${Math.round(post.f*100)}% (TIMI ${post.timi})`;
+});
+test('The shop no longer sells monitor filters, and old purchases are refundable',()=>{ok(!SHOP.some(x=>x.kind==='lut'),'filters still on sale');ok(RETIRED_SHOP.warm>0&&RETIRED_SHOP.cool>0)});
+
 /* random patients (run last; they rebuild the anatomy, and the final test restores the default) */
 test('Case codes round-trip, and a code always gives the same patient',()=>{
   for(const n of [0,1,12345,CODE_SPACE-1])ok(codeToSeed(seedToCode(n))===n,'round trip '+n);
