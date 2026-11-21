@@ -60,7 +60,7 @@ Upgrades are `UPGRADES` and other items `SHOP` in `config/config.js`. Old single
 | Report | Replay a run, click the narrowing and grade it (<50%, 50–69%, 70–89%, ≥90%). |
 | Wire | With the guide engaged, press Wire it next to a marked lesion and hold fluoro while a 0.014" wire crosses. |
 | Balloon | Plain balloon angioplasty: 8–12 atm. Alone it recoils to about 30–45%. Use it to predilate a subtotal (≥90%) lesion before stenting, or to post-dilate a stent. Oversizing by more than 0.5 mm causes a dissection. |
-| Stent | Pick a diameter and length (the 6F guide is 2 mm wide for scale), nudge the markers around the narrowing, then hold Inflate to deploy at 12–14 atm (pressure rises about 2.8 atm a second, so 12 atm takes about 4 s). Take a final shot, remove the wire, finish. |
+| Stent | Pick a diameter and length. Sizing help: on Easy the panel shows the vessel's size and the narrowing's length and stars the best-fitting device; on Medium a size range (compared with the 2 mm guide) and a rough length; on Hard the rules only (stent 1:1 with the vessel and 2–3 mm longer than the narrowing each side; predilating balloon 0.5 mm smaller; post-dilating balloon the stent's size or up to 0.5 mm bigger). For scale, the 6F guide is 2 mm wide. nudge the markers around the narrowing, then hold Inflate to deploy at 12–14 atm (pressure rises about 2.8 atm a second, so 12 atm takes about 4 s). Take a final shot, remove the wire, finish. |
 | Complications | **Dissection**: an oversized balloon or stent, inflating above 16 atm, or (occasionally) balloon angioplasty of a hard lesion or a stent edge can tear the vessel wall. It shows as a flap, a second channel of contrast beside the lumen and staining that lingers after the injection. Left alone it narrows and then closes the vessel (Easy 80 s, Medium 55 s, Hard 35 s): cover it with a stent (**Aim devices here**, or **Wire it** again if the wire is out). **No-reflow**: after a stent, more often in an NSTEMI, a subtotal lesion or a long stent, the stent stays open but contrast crawls beyond it. Give intracoronary **verapamil** or **adenosine** through the engaged guide until flow is brisk; GTN does little. Both start with chest pain, ST elevation in the territory lead and falling blood pressure, and are only named once you inject and see them. |
 | Perforation and tamponade | **Perforation**: a balloon or stent more than 1 mm too big, or inflated above 16 atm, can tear right through the vessel: a jet of contrast squirts out and pools beside the heart. A wire can also exit the tip of a small distal vessel (hydrophilic wires do this more often). Blood fills the pericardium: an untreated big hole tamponades in about 36 s (BP collapses with a narrow pulse pressure, HR races) and a cardiac arrest ends the case. Seal a big hole with a **covered stent**; a distal wire exit with a **coil** or a 15 s low-pressure balloon inflation (**Aim devices here** caps the balloon at 6 atm and stops the leak while held). **IV protamine** slows the leak; **Pericardiocentesis** drains the effusion and restores BP, but it reaccumulates until the hole is sealed. |
 | Spasm | Engaging an ostium (the RCA more than the left), deep-seating the catheter, or passing the wire can cause **spasm**: a smooth, concentric narrowing that looks the same in every view. Tight spasm causes chest pain and ST elevation. **Intracoronary GTN** relieves it (verapamil partly, adenosine not); it also settles by itself once the catheter or wire is gone. Don't grade or stent it: a mark or stent on spasm is penalised. On Easy the panel names it once imaged; on Medium and Hard only tight, symptomatic spasm gets an alert. |
@@ -83,6 +83,18 @@ Each patient gets:
 
 The report names the anatomy at the end. Your best score is kept per difficulty.
 
+### Today's case and medals
+
+The main menu has **Today's case**: one patient a day, the same for everyone (the code comes from the date). Play it as often as you like; your best result of the day counts. Medals depend on the difficulty you play it on:
+
+| Difficulty | Bronze | Silver | Gold |
+|---|---|---|---|
+| Easy | 65 | 80 | 92 |
+| Medium | 58 | 72 | 85 |
+| Hard | 50 | 65 | 78 |
+
+A medal pays bonus tokens (bronze 5, silver 10, gold 20; improving a medal on the same day pays the difference). A medal on consecutive days builds a streak. The medal cabinet on the menu counts them.
+
 ### What goes wrong, by difficulty
 
 | Difficulty | Complications |
@@ -98,7 +110,7 @@ The same case code on the same difficulty always brings the same challenge. The 
 | Part | Points |
 |---|---|
 | Lesion detection and grading (a significant lesion you imaged but didn't mark earns 30% of its share) | 35 |
-| Treatment: every ≥70% lesion stented, complications recognised and managed (−6 untreated dissection, −5 persistent no-reflow, −8 and a score cap of 45 for an unsealed perforation, −10 and the same cap for a vessel left closed, −3 for protamine with nothing bleeding), covered, sized within 0.4 mm smaller / 0.75 mm larger than the vessel, deployed at ≥12 atm, subtotal lesions predilated. Balloon only earns 40%. −8 per unnecessary stent, −4 per oversized or unnecessary balloon | 15 |
+| Treatment (itemised in the report: each lesion's share, every deduction with the size that would have fitted, and each penalty): every ≥70% lesion stented, complications recognised and managed (−6 untreated dissection, −5 persistent no-reflow, −8 and a score cap of 45 for an unsealed perforation, −10 and the same cap for a vessel left closed, −3 for protamine with nothing bleeding), covered, sized within 0.4 mm smaller / 0.75 mm larger than the vessel, deployed at ≥12 atm, subtotal lesions predilated. Balloon only earns 40%. −8 per unnecessary stent, −4 per oversized or unnecessary balloon | 15 |
 | Complete study: views (LCA 3+, RCA 2+) up to 8, plus up to 7 for the share of the 36 coronary segments you opacified | 15 |
 | Contrast against the case budget | 15 |
 | Air kerma (full marks up to 400 mGy, more with the fluoro budget upgrade) | 10 |

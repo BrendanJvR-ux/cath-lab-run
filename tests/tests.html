@@ -208,6 +208,14 @@ test('Coffee-cart upgrades get better and dearer with each tier, and the contras
   return UPGRADES.map(u=>u.name+': '+u.tiers.map(t=>t.price).join('/')).join(' · ');
 });
 
+test('Daily case: one code per day, the same for everyone; medals by difficulty',()=>{
+  const a=dailyCode('2026-11-21'),b=dailyCode('2026-11-21'),c=dailyCode('2026-11-22');ok(a===b&&a!==c&&codeToSeed(a)!=null,'daily codes');
+  ok(medalFor(MEDALS.hard.gold,'hard')==='gold'&&medalFor(MEDALS.hard.gold-1,'hard')==='silver'&&medalFor(10,'easy')==='none','thresholds');
+  for(const d of Object.keys(DIFFICULTY))ok(MEDALS[d].gold>MEDALS[d].silver&&MEDALS[d].silver>MEDALS[d].bronze,d);
+  ok(MEDALS.easy.gold>MEDALS.hard.gold,'Easy should ask more for gold');
+  return `today ${dailyCode()} · gold needs ${MEDALS.easy.gold}/${MEDALS.medium.gold}/${MEDALS.hard.gold}`;
+});
+
 /* random patients (run last; they rebuild the anatomy, and the final test restores the default) */
 test('Case codes round-trip, and a code always gives the same patient',()=>{
   for(const n of [0,1,12345,CODE_SPACE-1])ok(codeToSeed(seedToCode(n))===n,'round trip '+n);

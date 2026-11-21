@@ -49,11 +49,38 @@ const ICONS={
 };
 function shopIcon(it){if(it.kind==='avatar')return avatarSVG(it.avatar,44);return `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[it.id]}</svg>`}
 function showMenu(view){
-  menuView=view||(profile?'home':'profile');S=null;
+  menuView=view||(profile?'home':'profile');S=null;document.body.classList.add('inmenu');
   $('resultOv').hidden=true;$('startOv').hidden=false;$('reviewbar').hidden=true;
   demoFrame();syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   $('caseHead').innerHTML='<h2>Patient</h2><b>No case loaded</b><p>Pick a case on the monitor to begin.</p>';$('status').textContent='Catheter in the femoral sheath.';$('status').className='status';
   renderMenu();
+}
+/* ---------- daily case ---------- */
+const MEDAL_NAME={gold:'Gold',silver:'Silver',bronze:'Bronze',none:'No medal'};
+const medalBadge=m=>`<span class="medal ${m}" aria-label="${MEDAL_NAME[m]}">${m==='none'?'–':MEDAL_NAME[m][0]}</span>`;
+function dailyCard(){
+  const today=dateKey(),dd=profile.daily&&profile.daily.date===today?profile.daily:null,m=dd?dd.medal:'none',st=profile.streak||{n:0};
+  const md=profile.medals||{},th=MEDALS[profile.diff];
+  const streakLive=st.last===today||st.last===dateKey(new Date(Date.now()-864e5));
+  return `<div class="daily">${medalBadge(m)}<div><b>Today's case · ${new Date().toLocaleDateString(undefined,{day:'numeric',month:'short'})}</b>
+    <span>${dd?`Best today ${dd.score} on ${DIFFICULTY[dd.diff].label}: ${MEDAL_NAME[m].toLowerCase()}.`:'Everyone gets the same patient today.'} ${DIFFICULTY[profile.diff].label}: bronze ${th.bronze}, silver ${th.silver}, gold ${th.gold}.</span>
+    <span class="cabinet">${streakLive&&st.n?`🔥 ${st.n}-day streak · `:''}<span><i style="background:#f2c94c"></i>${md.gold||0}</span><span><i style="background:#cfd4da"></i>${md.silver||0}</span><span><i style="background:#d99a62"></i>${md.bronze||0}</span></span></div>
+    <button class="btn primary" data-act="daily">${dd?'Try again':'Play today\'s case'}</button></div>`;
+}
+/* record a daily result: keep the day's best medal, pay the difference in medal tokens, keep the streak */
+function recordDaily(score){
+  const today=dateKey(),medal=medalFor(score,S.diff),prev=profile.daily&&profile.daily.date===today?profile.daily:null,old=prev?prev.medal:'none';
+  let bonus=0;
+  if(!prev||MEDAL_RANK[medal]>MEDAL_RANK[old]||(medal===old&&score>prev.score)){
+    if(MEDAL_RANK[medal]>MEDAL_RANK[old]){
+      bonus=(MEDAL_TOKENS[medal]||0)-(MEDAL_TOKENS[old]||0);
+      profile.medals={...(profile.medals||{})};if(old!=='none')profile.medals[old]=Math.max(0,(profile.medals[old]||0)-1);profile.medals[medal]=(profile.medals[medal]||0)+1;
+      if(old==='none'){const st=profile.streak||{n:0},y=dateKey(new Date(Date.now()-864e5));profile.streak={n:st.last===y?st.n+1:st.last===today?st.n:1,last:today}}
+    }
+    profile.daily={date:today,score,medal,diff:S.diff};
+  }
+  profile.tokens+=bonus;
+  return {medal,bonus};
 }
 function renderMenu(){
   const ov=$('startOv');ov.dataset.view=menuView;
@@ -102,6 +129,7 @@ function renderMenu(){
   }
   ov.innerHTML=`<div class="hero"><img class="heroimg" src="assets/cardiologists.png" alt="Cartoon of two cardiologists, a woman with a stethoscope and a man holding a guide catheter, in scrubs and lead aprons"><div class="herotxt"><span class="kicker">Coronary angiography · PCI</span><h1>Cath Lab Run</h1><p>Drive the catheter to the aortic root, engage each coronary, record cine runs in the right projections, then find, grade and treat the stenosis.</p></div></div>
     <div class="opcard">${avatarSVG(profile.avatar,64)}<div><b>${esc(profile.name)}</b><span>${CUP} ${profile.tokens} coffee tokens · ${DIFFICULTY[profile.diff].label}</span></div><button class="btn" data-act="editop">Change operator</button></div>
+    ${dailyCard()}
     <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button></div>
     <div class="keys">
       <div><kbd>Space</kbd> hold for fluoro (live X-ray)</div><div><kbd>X</kbd> switch catheter (JL4 / JR4)</div><div><kbd>C</kbd> start / stop a cine run</div>
@@ -121,6 +149,7 @@ $('startOv').addEventListener('click',e=>{
   else if(d.act==='editop'){draft=null;menuView='profile';renderMenu()}
   else if(d.act==='play'){menuView='play';renderMenu()}
   else if(d.act==='rand'){startCase(randomCode())}
+  else if(d.act==='daily'){startCase(dailyCode(),{daily:true})}
   else if(d.act==='code'){const v=($('codeIn').value||'').trim(),n=codeToSeed(v);if(n==null){toast('That is not a case code. Codes look like CLR-7KQ2M.',true);return}startCase(seedToCode(n))}
   else if(d.act==='shop'){menuView='shop';renderMenu()}
   else if(d.act==='home'){draft=null;menuView='home';renderMenu()}
@@ -161,8 +190,8 @@ function syncArm(){$('sA').value=S?S.a:0;$('sB').value=S?S.b:0;const a=S?S.a:0,b
 $('sA').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.a=+e.target.value;syncArm()});
 $('sB').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.b=+e.target.value;syncArm()});
 
-function startCase(ci){
-  S=newState(ci);
+function startCase(ci,opt={}){
+  S=newState(ci);S.daily=!!opt.daily&&ci===dailyCode();document.body.classList.remove('inmenu');
   $('startOv').hidden=true;$('resultOv').hidden=true;closeReview();
   const c=S.c;$('caseHead').innerHTML=`<h2>${S.c.code?'Random patient · '+S.c.code:'Patient · '+caseName(S)} · ${S.D.label}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
   ictx.fillStyle=PAPER;ictx.fillRect(0,0,W,W);
@@ -396,7 +425,27 @@ function giveDrug(id){
   renderPCI(true);
 }
 let pciSig='';
-function sizeChips(list,cur,attr,fmt){return `<div class="sev">${list.map(v=>`<button data-${attr}="${v}" class="${v===cur?'sel':''}">${fmt(v)}</button>`).join('')}</div>`}
+function sizeChips(list,cur,attr,fmt,fit){return `<div class="sev">${list.map(v=>`<button data-${attr}="${v}" class="${v===cur?'sel':''}${v===fit?' fit':''}"${v===fit?' title="Best fit"':''}>${fmt(v)}</button>`).join('')}</div>`}
+/* Sizing help for the device being chosen. Easy: the vessel size, the narrowing's length and a starred best fit;
+   Medium: a size range and rough length, judged against the guide; Hard: the rules only. */
+function sizingAdvice(P){
+  const lvl=S.D.level,ref=refDiam(P.vid,P.ld),near=(list,x)=>(list.length?list:[BALLOON_DIAMS[0]]).reduce((a,b)=>Math.abs(b-x)<Math.abs(a-x)?b:a);
+  const L=S.lesions.filter(l=>l.vid===P.vid&&Math.abs(l.at-P.ld)<=l.len/2+7).sort((a,b)=>Math.abs(a.at-P.ld)-Math.abs(b.at-P.ld))[0];
+  const st=S.stents.find(x=>x.vid===P.vid&&Math.abs(x.ld-P.ld)<=x.len/2+2),post=P.kind==='balloon'&&!!st,len=L?L.len:8;
+  let fitD,fitL,rule;
+  if(P.kind==='balloon'&&P.seal){fitD=near(BALLOON_DIAMS,ref);fitL=BALLOON_LENS[0];rule='Sealing a perforation: a balloon about the vessel\'s size, inflated at low pressure (it is capped at 6 atm) over the hole.'}
+  else if(post){fitD=near(BALLOON_DIAMS.filter(d=>d>=st.diam),st.diam+0.25)||st.diam;fitL=BALLOON_LENS.find(l=>l<=st.len)||BALLOON_LENS[0];
+    rule=`Post-dilating the ${st.diam.toFixed(1)} mm stent: a balloon its own size or up to 0.5 mm bigger, no longer than the stent, at 14–18 atm (non-compliant). It drives the stent fully open.`}
+  else if(P.kind==='balloon'){fitD=near(BALLOON_DIAMS.filter(d=>d<=ref),ref-0.5);fitL=BALLOON_LENS.find(l=>l>=len)||BALLOON_LENS[BALLOON_LENS.length-1];
+    rule='Predilating: a balloon about 0.5 mm smaller than the vessel and no longer than the narrowing, at 8–12 atm. More than 0.5 mm bigger than the vessel tears it.'}
+  else{fitD=near(STENT_DIAMS,ref);fitL=STENT_LENS.find(l=>l>=len+4)||STENT_LENS[STENT_LENS.length-1];
+    rule=`${P.kind==='covered'?'Covered stent':'Stent'}: match the vessel (from 0.4 mm under to 0.75 mm over counts as well sized), long enough to cover the narrowing with 2–3 mm to spare each side, deployed at 12–14 atm.${L&&L.sev>=0.9&&!L.predil?' This narrowing is subtotal: predilate it with a balloon first.':''}`}
+  const r4=x=>(Math.round(x*4)/4).toFixed(2).replace(/0$/,'');
+  let est='';
+  if(lvl===1)est=`<div>Vessel here <b>≈ ${ref.toFixed(1)} mm</b>${L?` · narrowing <b>≈ ${len} mm</b> long`:' · no tight narrowing here'}. Best fit: <b>${fitD.toFixed(1)} × ${fitL} mm</b> (★).</div>`;
+  else if(lvl===2)est=`<div>Vessel here about <b>${r4(ref-0.3)}–${r4(ref+0.3)} mm</b> (about ${(ref/2).toFixed(1)}× the 2 mm guide)${L?` · narrowing roughly <b>${Math.max(4,Math.round(len/4)*4)}–${Math.round(len/4)*4+4} mm</b>`:''}.</div>`;
+  return {html:`<div class="sizing">${est}<div>${rule}</div></div>`,fitD:lvl===1?fitD:null,fitL:lvl===1?fitL:null};
+}
 function renderPCI(force){
   const el=$('pci');
   const sig=!S?'none':JSON.stringify([S.done,S.cs&&S.cs.eng,S.cs&&S.cs.deep,S.events.map(e=>[e.seen,e.closed,e.treated,e.doses.length,e.sealed,e.temporised,Math.round(e.sev*10)]),Math.round(S.effusion*5),S.pcT>0,S.tamponade,S.protamine,S.pci&&[S.pci.stage,S.pci.kind,S.pci.diam,S.pci.len,Math.round(S.pci.ld)],S.marks.map(m=>m.vid+m.ld+canTreat(m)),S.stents.length,S.balloons.length]);
@@ -430,9 +479,10 @@ function renderPCI(force){
       <div class="row"><button class="btn" data-finish="1">Remove wire</button></div></div>`;
   }else if(P.stage==='size'){
     const isS=P.kind!=='balloon',nm=P.kind==='covered'?'covered stent':P.kind;
-    h=`<div class="pending"><div>Choose the ${nm} for the ${P.label}. For scale, the 6F guide is 2 mm wide.</div>
-      <div class="grouplabel">Diameter (mm)</div>${sizeChips(isS?STENT_DIAMS:BALLOON_DIAMS,P.diam,'d',v=>v.toFixed(1))}
-      <div class="grouplabel">Length (mm)</div>${sizeChips(isS?STENT_LENS:BALLOON_LENS,P.len,'l',v=>v)}
+    const adv=sizingAdvice(P);
+    h=`<div class="pending"><div>Choose the ${nm} for the ${P.label}. For scale, the 6F guide is 2 mm wide.</div>${adv.html}
+      <div class="grouplabel">Diameter (mm)</div>${sizeChips(isS?STENT_DIAMS:BALLOON_DIAMS,P.diam,'d',v=>v.toFixed(1),adv.fitD)}
+      <div class="grouplabel">Length (mm)</div>${sizeChips(isS?STENT_LENS:BALLOON_LENS,P.len,'l',v=>v,adv.fitL)}
       <div class="row"><button class="btn primary" data-pos="1">Position ${nm}</button><button class="btn" data-back="1">Back</button></div></div>`;
   }else if(P.stage==='positioned'){
     h=`<div class="pending"><div>${P.diam.toFixed(1)} × ${P.len} mm ${P.kind==='covered'?'covered stent':P.kind} across the ${P.label}. ${P.seal&&P.kind==='balloon'?'Sealing inflation: hold Inflate at low pressure (capped at 6 atm) over the hole; release when it is sealed.':`Line the markers up around the narrowing, then hold Inflate. ${P.kind!=='balloon'?'Deploy at 12–14 atm.':'Inflate to 8–12 atm.'}`}</div>
@@ -646,6 +696,13 @@ function updateUI(){
 
 /* ---------- scoring and coffee tokens ---------- */
 $('bFinish').addEventListener('click',finish);
+/* Where the treatment points went: each lesion's share, what was lost and why, and every penalty. */
+function txBreakdown(){
+  const B=S.txb;if(!B)return '';
+  const f=p=>p==null?'':(p>0?'+':p<0?'−':'')+Math.abs(p).toFixed(1);
+  return `<div class="txb"><div class="grouplabel" style="grid-column:1/-1">Treatment breakdown</div>${B.lines.map(l=>`<span class="${l.cls==='sub'?'sub':''}">${l.label}</span><span class="v ${l.pts==null?'':l.pts<0||l.cls==='minus'?'minus':l.cls==='plus'?'plus':''}">${f(l.pts)}</span>`).join('')}
+    <span class="tot">Treatment total${B.raw<0?' (below 0 counts as 0)':B.raw>15?' (capped at 15)':''}</span><span class="v tot">${B.total.toFixed(1)} / 15</span></div>`;
+}
 /* Estimated flow in each diseased vessel at the start and at the end of the case. */
 function flowReport(){
   const ids=[];for(const L of S.lesions)if(L.sev>=0.5&&!ids.includes(L.vid))ids.push(L.vid);
@@ -683,20 +740,32 @@ function finish(){
   const fp=S.marks.filter((m,i)=>!used.has(i)).length;
   if(fp){lesPts-=6*fp;notes.push({c:'bad',t:`${fp} mark${fp>1?'s':''} on normal vessel.`})}
   lesPts=clamp(lesPts,0,35);rows.push(['Lesion detection and grading',lesPts,35]);
-  // treatment
-  const targets=S.lesions.filter(L=>L.sev>=0.7);let tx=0;const perT=15/Math.max(1,targets.length);
+  // treatment, itemised: each significant lesion is worth an equal share of 15; device and complication penalties follow
+  const targets=S.lesions.filter(L=>L.sev>=0.7);let tx=0;const perT=15/Math.max(1,targets.length),txb=[];
+  const T=(label,pts,cls)=>{txb.push({label,pts,cls});tx+=pts};
+  const near=(list,x)=>list.reduce((a,b)=>Math.abs(b-x)<Math.abs(a-x)?b:a);
+  if(!targets.length)T('No lesion needed treatment',15,'plus');
   for(const L of targets){
+    const head=`${Math.round(L.sev*100)}% ${L.label} (worth ${perT.toFixed(1)})`;
     const sh=[];for(const s of S.stents)for(const h of s.hits)if(h.L===L)sh.push({s,o:h.o});
     const bh=[];for(const b of S.balloons)for(const h of b.hits)if(h.L===L)bh.push({b,o:h.o});
-    if(!sh.length&&!bh.length){notes.push({c:'bad',t:`Not treated: the ${Math.round(L.sev*100)}% ${L.label} needed treatment.`});continue}
-    if(!sh.length){tx+=perT*0.4;notes.push({c:'',t:`Balloon angioplasty only on the ${L.label}: residual ${Math.round(L.cur*100)}% from elastic recoil. A stent gives a durable result.`});continue}
-    const {s,o}=sh[sh.length-1],good=o.covered&&!o.under&&!o.over&&!o.lowP&&!o.noPre;tx+=perT*(good?1:0.5);
-    const iss=[];if(!o.covered)iss.push('it did not cover the whole lesion');if(o.under)iss.push(`undersized for a ~${o.refD.toFixed(1)} mm vessel`);if(o.over)iss.push(`oversized for a ~${o.refD.toFixed(1)} mm vessel, with edge dissection risk`);if(o.lowP)iss.push(`deployed at only ${s.atm} atm (aim for 12–14)`);if(o.noPre)iss.push('a subtotal lesion should be predilated with a balloon first');
-    const post=bh.some(x=>x.o.post);
-    notes.push({c:good?'good':'',t:`Stented ${L.label}: ${s.diam.toFixed(1)} × ${s.len} mm at ${s.atm} atm${post?', post-dilated':''}, residual ${Math.round(L.cur*100)}%.`+(iss.length?' But '+iss.join('; ')+'.':` Well sized for a ~${o.refD.toFixed(1)} mm vessel.`)});
+    if(!sh.length&&!bh.length){txb.push({label:head,pts:0,cls:'minus'});txb.push({label:'Not treated: wire it, predilate if subtotal, then stent',pts:null,cls:'sub'});notes.push({c:'bad',t:`Not treated: the ${Math.round(L.sev*100)}% ${L.label} needed treatment.`});continue}
+    if(!sh.length){T(head,perT*0.4,'');txb.push({label:`Balloon only: recoil left ${Math.round(L.cur*100)}% (−${(perT*0.6).toFixed(1)}); a stent gives a durable result`,pts:null,cls:'sub'});notes.push({c:'',t:`Balloon angioplasty only on the ${L.label}: residual ${Math.round(L.cur*100)}% from elastic recoil. A stent gives a durable result.`});continue}
+    const {s,o}=sh[sh.length-1],ded=[];
+    const fitD=near(STENT_DIAMS,o.refD),fitL=STENT_LENS.find(l=>l>=L.len+4)||STENT_LENS[STENT_LENS.length-1];
+    if(!o.covered)ded.push([0.3,`didn't cover the whole narrowing (${L.len} mm long): use ${fitL} mm, centred on it`]);
+    if(o.under)ded.push([0.25,`undersized: ${s.diam.toFixed(1)} mm in a ~${o.refD.toFixed(1)} mm vessel (a ${fitD.toFixed(1)} mm stent fits)`]);
+    if(o.over)ded.push([0.2,`oversized: ${s.diam.toFixed(1)} mm in a ~${o.refD.toFixed(1)} mm vessel (a ${fitD.toFixed(1)} mm stent fits)`]);
+    if(o.lowP)ded.push([0.15,`deployed at only ${s.atm} atm: 12–14 atm expands it fully`]);
+    if(o.noPre)ded.push([0.15,'subtotal narrowing stented without predilating it with a balloon first']);
+    const frac=Math.max(0.2,1-ded.reduce((a,d)=>a+d[0],0)),post=bh.some(x=>x.o.post);
+    T(head,perT*frac,ded.length?'':'plus');
+    txb.push({label:`Stent ${s.diam.toFixed(1)} × ${s.len} mm at ${s.atm} atm${post?', post-dilated':''}: residual ${Math.round(L.cur*100)}%${ded.length?'':' · well sized and placed'}`,pts:null,cls:'sub'});
+    for(const d of ded)txb.push({label:`−${(perT*d[0]).toFixed(1)} ${d[1]}`,pts:null,cls:'sub'});
+    notes.push({c:ded.length?'':'good',t:`Stented ${L.label}: ${s.diam.toFixed(1)} × ${s.len} mm at ${s.atm} atm${post?', post-dilated':''}, residual ${Math.round(L.cur*100)}%.`+(ded.length?' But '+ded.map(d=>d[1]).join('; ')+'.':` Well sized for a ~${o.refD.toFixed(1)} mm vessel.`)});
   }
-  for(const s of S.stents){if(s.sealed&&!s.hits.length)continue;if(!s.hits.some(h=>h.L.sev>=0.5)){tx-=8;notes.push({c:'bad',t:`Unnecessary stent in the ${s.label}: ${s.hits.length?'that lesion was not flow-limiting.':'there was no lesion there.'}`})}else if(s.hits.some(h=>h.o.over))tx-=4}
-  for(const b of S.balloons){if(b.hits.some(h=>h.o.over)){tx-=4;notes.push({c:'bad',t:`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm)${S.ch.errX?' caused an edge dissection.':': on Medium or Hard that tears the vessel.'}`})}if(!b.hits.some(h=>h.L.sev>=0.5)){tx-=4;notes.push({c:'bad',t:`Unnecessary balloon inflation in the ${b.label}.`})}}
+  for(const s of S.stents){if(s.sealed&&!s.hits.length)continue;if(!s.hits.some(h=>h.L.sev>=0.5)){T(`Unnecessary stent in the ${s.label}`,-8,'minus');notes.push({c:'bad',t:`Unnecessary stent in the ${s.label}: ${s.hits.length?'that lesion was not flow-limiting.':'there was no lesion there.'}`})}else if(s.hits.some(h=>h.o.over))T(`Oversized stent in the ${s.label} (edge dissection risk)`,-4,'minus')}
+  for(const b of S.balloons){if(b.hits.some(h=>h.o.over)){T(`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm)`,-4,'minus');notes.push({c:'bad',t:`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm)${S.ch.errX?' caused an edge dissection.':': on Medium or Hard that tears the vessel.'}`})}if(!b.hits.some(h=>h.L.sev>=0.5)){T(`Unnecessary balloon inflation in the ${b.label}`,-4,'minus');notes.push({c:'bad',t:`Unnecessary balloon inflation in the ${b.label}.`})}}
   for(const sy of new Set(S.stents.map(s=>VBY[s.vid].sys))){const t=Math.max(...S.stents.filter(s=>VBY[s.vid].sys===sy).map(s=>s.t));if(!S.runs.some(r=>r.sys===sy&&r.t0>t))notes.push({c:'',t:`Record a final cine run of the ${sy==='L'?'left':'right'} system after stenting to confirm the result.`})}
   // complications during the case
   let capEv=100;
@@ -705,12 +774,12 @@ function finish(){
     if(e.kind==='dissection'){
       const cause=e.cause?` after ${e.cause}`:'';
       if(e.treated)notes.push({c:'good',t:`Dissection in the ${e.label} at ${when}${cause}: ${e.seen?'recognised and ':''}covered with a stent${e.closed?' after it had closed the vessel':''}. Bailout stenting is the right response.`});
-      else if(e.closed){tx-=10;capEv=45;notes.push({c:'bad',t:`Abrupt closure of the ${e.label}: the dissection${cause} progressed and occluded the vessel. Recross it with a wire and stent it; a closed vessel means an infarct.`})}
-      else{tx-=6;notes.push({c:'bad',t:`Untreated dissection in the ${e.label}${cause}. It can close the vessel after you leave the lab: cover it with a stent.`})}
+      else if(e.closed){T(`Dissection left closing the ${e.label} (score capped at 45)`,-10,'minus');capEv=45;notes.push({c:'bad',t:`Abrupt closure of the ${e.label}: the dissection${cause} progressed and occluded the vessel. Recross it with a wire and stent it; a closed vessel means an infarct.`})}
+      else{T(`Untreated dissection in the ${e.label}`,-6,'minus');notes.push({c:'bad',t:`Untreated dissection in the ${e.label}${cause}. It can close the vessel after you leave the lab: cover it with a stent.`})}
     }else if(e.kind==='perforation'){
       const what=e.grade==='major'?`Perforation of the ${e.label} after ${e.cause}`:`Distal wire perforation of the ${e.label}`;
       if(e.sealed)notes.push({c:'good',t:`${what} at ${when}: sealed with ${e.sealedBy}${e.prot?', heparin reversed with protamine':''}${e.pc?`, effusion drained by pericardiocentesis${e.pc>1?' ×'+e.pc:''}`:''}.`});
-      else{tx-=8;capEv=Math.min(capEv,45);notes.push({c:'bad',t:`${what} was never sealed: it keeps bleeding into the pericardium. ${e.grade==='major'?'A covered stent':'A coil or a 15 s low-pressure balloon inflation'} seals it; protamine and pericardiocentesis only buy time.`})}
+      else{T(`Unsealed perforation of the ${e.label} (score capped at 45)`,-8,'minus');capEv=Math.min(capEv,45);notes.push({c:'bad',t:`${what} was never sealed: it keeps bleeding into the pericardium. ${e.grade==='major'?'A covered stent':'A coil or a 15 s low-pressure balloon inflation'} seals it; protamine and pericardiocentesis only buy time.`})}
     }else if(e.kind==='spasm'){
       const nearMark=S.marks.some(m=>m.vid===e.vid&&Math.abs(m.ld-e.ld)<10&&!S.lesions.some(L=>L.vid===m.vid&&Math.abs(m.ld-L.at)<=L.len/2+7));
       const by=e.cause==='the wire'?'the wire':'the catheter tip';
@@ -722,12 +791,13 @@ function finish(){
     }else{
       const dz=e.doses.length?` with ${e.doses.join(', ')}`:'';
       if(e.treated)notes.push({c:'good',t:`No-reflow in the ${e.label} at ${when}: ${e.seen?'recognised and ':''}treated${dz} through the guide; flow restored.`});
-      else{tx-=5;notes.push({c:'bad',t:`Persistent no-reflow in the ${e.label}${dz?` despite ${e.doses.join(', ')}`:''}. Give intracoronary adenosine or verapamil (repeat doses) until distal flow is brisk. GTN alone does little for the microcirculation.`})}
+      else{T(`Persistent no-reflow in the ${e.label}`,-5,'minus');notes.push({c:'bad',t:`Persistent no-reflow in the ${e.label}${dz?` despite ${e.doses.join(', ')}`:''}. Give intracoronary adenosine or verapamil (repeat doses) until distal flow is brisk. GTN alone does little for the microcirculation.`})}
     }
   }
   const idle=S.drugs.filter(x=>!x.useful&&x.id!=='gtn'&&x.id!=='prot').length;if(idle)notes.push({c:'',t:`${idle} dose${idle>1?'s':''} of vasodilator given with nothing for it to treat.`});
-  if(S.drugs.some(x=>x.id==='prot'&&!x.useful)){tx-=3;notes.push({c:'bad',t:'Protamine reversed the heparin with no bleeding to stop, which risks clotting a fresh stent.'})}
-  tx=clamp(tx,0,15);rows.push(['Treatment (balloon and stent)',tx,15]);
+  if(S.drugs.some(x=>x.id==='prot'&&!x.useful)){T('Protamine with nothing bleeding',-3,'minus');notes.push({c:'bad',t:'Protamine reversed the heparin with no bleeding to stop, which risks clotting a fresh stent.'})}
+  const txRaw=tx;tx=clamp(tx,0,15);rows.push(['Treatment (balloon and stent)',tx,15]);
+  S.txb={lines:txb,raw:txRaw,total:tx};
   // study quality
   const distinct=sys=>{const v=[];for(const r of S.runs){if(r.sys!==sys)continue;if(!v.some(o=>Math.abs(o.a-r.a)<15&&Math.abs(o.b-r.b)<15))v.push(r)}return v.length};
   const nL=distinct('L'),nR=distinct('R');
@@ -750,17 +820,20 @@ function finish(){
   // coffee tokens: one per 10 points, scaled by difficulty; none after a complication
   const earned=S.complication?0:Math.round(total/10*S.D.tokenX);
   profile.tokens+=earned;if(S.c.random)profile.randomDone=(profile.randomDone||0)+1;
+  const daily=S.daily?recordDaily(S.complication?0:total):null;
   const key=S.diff+'-'+(S.c.random?'R':S.ci),prev=profile.best[key];if(prev==null||total>prev)profile.best[key]=total;saveProfile();renderWho();
   const ov=$('resultOv');
   ov.innerHTML=`<div class="rephead">${avatarSVG(profile.avatar,48)}<div><h1>Report · ${caseName(S)}</h1><span class="fine">${esc(profile.name)} · ${S.D.label}</span></div></div>
   <div class="score"><b>${total}</b><span>${grade}</span></div>
   <div class="tokens">${CUP} +${earned} coffee token${earned===1?'':'s'}${S.D.tokenX>1?` (×${S.D.tokenX} for ${S.D.label})`:''} · ${profile.tokens} banked${prev!=null&&total>prev?' · new best':''}</div>
+  ${daily?`<div class="medalrow">${medalBadge(daily.medal)}<span><b>Today's case: ${MEDAL_NAME[daily.medal]}</b>${daily.bonus?` · +${daily.bonus} medal tokens`:''} · bronze ${MEDALS[S.diff].bronze}, silver ${MEDALS[S.diff].silver}, gold ${MEDALS[S.diff].gold} on ${S.D.label}${profile.streak&&profile.streak.n>1?` · 🔥 ${profile.streak.n}-day streak`:''}</span></div>`:''}
   <div class="rows">${rows.map(r=>`<span>${r[0]}</span><span class="v">${Math.round(r[1])} / ${r[2]}</span>`).join('')}</div>
+  ${txBreakdown()}
   ${flowReport()}
   <div class="notes">${notes.map(n=>`<div class="${n.c}">${n.t}</div>`).join('')}</div>
   <div class="row"><button class="btn primary" id="rNew">New random patient</button><button class="btn" id="rAgain">Repeat this patient</button><button class="btn" id="rCases">Change difficulty</button><button class="btn" id="rMenu">Main menu</button></div>`;
   ov.hidden=false;
-  $('rAgain').onclick=()=>startCase(S.ci);
+  $('rAgain').onclick=()=>startCase(S.ci,{daily:S.daily});
   if($('rNew'))$('rNew').onclick=()=>startCase(randomCode());
   $('rCases').onclick=()=>showMenu('play');
   $('rMenu').onclick=()=>showMenu('home');
