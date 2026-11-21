@@ -16,6 +16,8 @@ function loadProfile(){try{const p=JSON.parse(localStorage.getItem(STORE)||'null
   return q}}catch(e){}return null}
 function saveProfile(){try{localStorage.setItem(STORE,JSON.stringify(profile))}catch(e){}}
 let profile=loadProfile();
+/* someone who has already played (or chose to skip) never has the tutorial put in their way */
+const returning=()=>!!(profile&&(profile.tutDone||profile.tutSkipped||profile.randomDone>0||Object.keys(profile.best||{}).length||profile.daily));
 const owns=id=>!!(profile&&profile.owned&&profile.owned.includes(id));
 const tierOf=id=>(profile&&profile.tiers&&profile.tiers[id])||0;
 /* the effect of an upgrade at the operator's current tier (its base value if not bought) */
@@ -101,14 +103,14 @@ function renderMenu(){
     ov.innerHTML=`<h1>How much angiography have you done?</h1>
       <p>The tutorial is a short play-through of one patient. Your answer sets how much it explains and where you start afterwards.</p>
       <div class="diffs">${EXPERIENCE.map(e=>`<button class="diff${profile.exp===e.k?' sel':''}" data-exp="${e.k}"><b>${e.name}</b><span>${e.desc}</span></button>`).join('')}</div>
-      <div class="row"><button class="btn" data-act="home">Back</button></div>`;
+      <div class="row"><button class="btn" data-act="notut">Skip the tutorial: go to the cases</button><button class="btn" data-act="home">Back</button></div>`;
     return;
   }
   if(menuView==='tutoffer'){
     const e=EXPERIENCE[profile.exp];
     ov.innerHTML=`<h1>Ready for a quick tutorial?</h1>
       <p>${e.k===0?'One patient, start to finish: getting the catheter to the heart, filming the arteries, finding the narrowing and stenting it. The coach under the monitor explains each step and waits for you. About ten minutes.':e.k===1?'One patient, start to finish, with the game\'s controls explained as you go. About five minutes.':'A fast run through this game\'s controls on one patient: torque, cine, marking, the PCI panel and the report. A couple of minutes.'}</p>
-      <div class="row"><button class="btn primary big" data-act="tutorial">Start the tutorial</button><button class="btn big" data-act="skiptut">Skip: new patient on ${DIFFICULTY[e.diff].label}</button></div>`;
+      <div class="row"><button class="btn primary big" data-act="tutorial">Start the tutorial</button><button class="btn big" data-act="skiptut">Skip the tutorial: go to the cases</button></div>`;
     return;
   }
   if(menuView==='play'){
@@ -157,10 +159,10 @@ $('startOv').addEventListener('click',e=>{
   if(d.buy){const it=SHOP.find(x=>x.id===d.buy);if(!it||owns(it.id)||profile.tokens<it.price)return;profile.tokens-=it.price;profile.owned=[...(profile.owned||[]),it.id];saveProfile();renderWho();renderMenu();toast(`Bought: ${it.name}.`);return}
   if(d.act==='saveop'){const n=($('opName').value||'').trim().slice(0,24);if(!n)return;profile=profile?{...profile,name:n,avatar:draft.avatar}:{name:n,avatar:draft.avatar,tokens:0,best:{},diff:'easy',owned:[],tiers:{}};const isNew=profile.exp==null;draft=null;saveProfile();renderWho();menuView=isNew?'exp':'home';renderMenu()}
   else if(d.act==='editop'){draft=null;menuView='profile';renderMenu()}
-  else if(d.act==='play'){menuView=profile.exp==null?'exp':'play';renderMenu()}
+  else if(d.act==='play'){menuView=profile.exp==null&&!returning()?'exp':'play';renderMenu()}
   else if(d.act==='exp'){menuView='exp';renderMenu()}
   else if(d.act==='tutorial'){startTutorial()}
-  else if(d.act==='skiptut'){menuView='play';renderMenu()}
+  else if(d.act==='skiptut'||d.act==='notut'){profile.tutSkipped=true;saveProfile();menuView='play';renderMenu()}
   else if(d.act==='rand'){startCase(randomCode())}
   else if(d.act==='daily'){startCase(dailyCode(),{daily:true})}
   else if(d.act==='code'){const v=($('codeIn').value||'').trim(),n=codeToSeed(v);if(n==null){toast('That is not a case code. Codes look like CLR-7KQ2M.',true);return}startCase(seedToCode(n))}
