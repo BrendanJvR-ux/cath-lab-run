@@ -8,7 +8,9 @@ Plain HTML, CSS and JavaScript with Canvas 2D (plus three.js for the optional 3D
 
 ## Look
 
-The **menus and controls** use a restrained console style: warm ivory (#F4F1E8), charcoal (#24282B) and cobalt (#2855D9) for the primary action and anything active, Barlow Semi Condensed headings and Inter labels, crisp edges and a small pressed step. The **main menu** puts the title and **Start case** first, with **Case select** as the secondary action and a C-arm silhouette on wide screens. **Case select** shows patients as folders (today's case, an unfinished case, four waiting patients, your career case, the tutorial); selecting one opens its chart (history and task) with **Start case**; arrow keys move between folders. In a case, a charcoal **control strip** sits on the monitor's lower edge: paired buttons to turn the catheter, Advance and Withdraw, Fluoro and Record, and a broad **Hold to inject** that fills cobalt while held and stops on release, when the pointer leaves it, if the touch is cancelled or when the window loses focus. Key hints show on desktop and hide on touchscreens. The X-ray image, the console and the report keep the hand-drawn sketchbook style. The operator button in the header returns to the menu at any time; a case in progress is saved and resumable.
+The **menus and controls** are drawn in the same hand-drawn sketchbook style as the rest of the game (ink on cream paper, wobbly pen boxes, Kalam and Patrick Hand). The **main menu** puts the title and **Start case** first, with **Case select** as the secondary action. **Case select** shows patients as paper folders (today's case, an unfinished case, four waiting patients, your career case, the tutorial); selecting one opens its chart (history and task) with **Start case**; arrow keys move between folders. In a case, a **control strip** sits on the monitor's lower edge: buttons to turn the catheter, Advance and Withdraw, Fluoro and Record, and a broad **Hold to inject** that stops on release, when the pointer leaves it, if the touch is cancelled or when the window loses focus. Each button shows the input it is bound to on desktop; the hints hide on touchscreens. The operator button in the header returns to the menu at any time; a case in progress is saved and resumable.
+
+**Treatment pop-up.** Once you have marked a lesion correctly on a cine run, the treatment options (FFR, Wire it, the device choice and sizing, Inflate, Remove wire, drugs and complication alerts) open in a pop-up on the X-ray beside the lesion, which is ringed. A wrong mark opens nothing. Close the pop-up with ✕ and reopen it from **Treatment** in the side panel; it reopens by itself if a complication starts or you mark another lesion correctly. When the lesion is treated (stented, or shown by FFR not to need it) and the wire is out, the pop-up goes away and the side panel keeps a log of the balloons and stents.
 
 ## Run it locally
 
@@ -29,6 +31,7 @@ Then open http://localhost:8767/ (the game) or http://localhost:8767/tests/tests
 | `js/career.js` | Career mode: the ranks, their goals and promotions. |
 | `js/tutorial.js` | The play-through tutorial: experience levels, the tutorial patient and the coach's steps. |
 | `js/heart3d.js` | The 3D heart view (three.js r128 from a CDN, loaded the first time you open it). |
+| `js/controls.js` | Key and mouse bindings, the mouse input over the X-ray (buttons, wheel, drag to turn) and the Controls dialog. |
 | `js/game.js` | Menu, operator profile and coffee tokens, game state, controls, cine runs and review, the PCI tools, the three-lead ECG and pressure strip, the main loop and scoring. |
 | `css/style.css` | Layout and look. |
 | `tools/render_cardiologists.py` | Blender script that renders the menu picture `assets/cardiologists.png`. |
@@ -157,6 +160,8 @@ A complication caps the score at 35. The report says which projection showed eac
 
 ## Controls
 
-Space hold fluoro · X switch catheter · C start/stop cine · J hold to inject · ↑/↓ advance/withdraw · ←/→ torque counter-clockwise/clockwise · B hold to inflate a balloon or stent · 1–7 C-arm presets. Touch devices use the on-screen buttons.
+Defaults: Space (or F) hold fluoro · X switch catheter · C start/stop cine · J hold to inject · ↑/↓ (or W/S) advance/withdraw · ←/→ (or A/D) torque counter-clockwise/clockwise · B hold to inflate a balloon or stent · 1–7 C-arm presets. Touch devices use the on-screen buttons.
+
+**Choose your own.** **⌨ Controls** in the header (or **Controls** on the main menu) lets you bind every action to two inputs: any key, a mouse button or the scroll wheel. Click a box, then press the key, click the mouse button or scroll; Backspace clears a box and Esc cancels. An input already in use moves to the new action. The **Mouse + keyboard** layout sets left click for fluoro, right click to inject, the wheel to advance and withdraw and middle click to record, and turns on **drag to turn**: hold the left button on the X-ray and drag sideways to torque the catheter. Mouse buttons and the wheel act only over the live X-ray image (not on buttons, pop-ups or menus, and not while reviewing a run, when a click marks a lesion). Bindings are saved in this browser (`js/controls.js`).
 
 Teaching game with simplified anatomy and physics. Not a clinical training device.

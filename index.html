@@ -7,7 +7,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Patrick+Hand&family=Barlow+Semi+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Patrick+Hand&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -16,7 +16,7 @@
 
 <header class="top">
   <div class="brand">Cath Lab Run<small>Diagnostic coronary angiography simulator · femoral access · 6F</small></div>
-  <div class="topright"><button class="btn glbtn" data-gl="" title="Glossary of terms">? Glossary</button><button class="who" id="who" hidden title="Main menu (a case in progress is saved)"></button><div class="lamp" id="lamp"><i></i>X-RAY</div></div>
+  <div class="topright"><button class="btn glbtn" data-ctrl="" title="Choose your keys and mouse buttons">⌨ Controls</button><button class="btn glbtn" data-gl="" title="Glossary of terms">? Glossary</button><button class="who" id="who" hidden title="Main menu (a case in progress is saved)"></button><div class="lamp" id="lamp"><i></i>X-RAY</div></div>
 </header>
 
 <main class="lab">
@@ -36,6 +36,11 @@
         <input type="range" id="rvSlider" min="0" max="10" value="0" aria-label="Cine frame">
         <button class="btn" id="rvLabels" hidden title="Teaching mode: vessel names on the image">Labels on</button>
         <button class="btn" id="rvClose">Back to live</button>
+      </div>
+      <div class="txdot" id="txDot" hidden aria-hidden="true"></div>
+      <div class="txpop" id="txPop" hidden role="dialog" aria-label="Treatment options">
+        <div class="txhead"><b id="txTitle">Treatment</b><button class="txclose" id="txClose" title="Close the treatment options (reopen them from Treatment in the side panel)" aria-label="Close treatment options">✕</button></div>
+        <div id="pci"></div>
       </div>
       <div class="overlay" id="startOv"></div>
       <div class="overlay" id="resultOv" hidden></div>
@@ -92,7 +97,7 @@
     </div>
     <div class="sec">
       <h2>Treatment</h2>
-      <div id="pci"><div class="empty">Load a case to begin.</div></div>
+      <div id="txSide"><div class="empty">Load a case to begin.</div></div>
       <button class="btn primary" id="bFinish" disabled>Finish and report</button>
     </div>
   </aside>
@@ -102,6 +107,7 @@
 <script src="js/sim.js"></script>
 <script src="js/gen.js"></script>
 <script src="js/game.js"></script>
+<script src="js/controls.js"></script>
 <script src="js/heart3d.js"></script>
 <script src="js/career.js"></script>
 <script src="js/tutorial.js"></script>

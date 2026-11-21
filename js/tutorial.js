@@ -46,18 +46,18 @@ const TUT_STEPS=[
          'Open a run, scrub to a well-filled frame, click the narrowing in the proximal LAD and grade it.',
          'Open a run in Cine runs, click the stenosis on the frame and grade it. Marks score for detection and grading.'],
    done:S=>S.marks.length>0},
-  {id:'wire',who:[0,1,2],hl:'#pci',title:'Cross it with a wire',
-   text:['To treat it, a very thin guidewire (0.014") goes down the catheter and across the narrowing. Make sure the catheter is still engaged, press <b>Wire it</b> next to your mark under Treatment, and hold fluoro while the wire crosses.',
-         'Re-engage if needed, press <b>Wire it</b> under Treatment and hold fluoro while the wire crosses.',
-         '<b>Wire it</b> under Treatment (guide engaged, fluoro on).'],
+  {id:'wire',who:[0,1,2],hl:'#txPop',title:'Cross it with a wire',
+   text:['To treat it, a very thin guidewire (0.014") goes down the catheter and across the narrowing. Make sure the catheter is still engaged, press <b>Wire it</b> in the treatment pop-up that opens beside your mark on the X-ray, and hold fluoro while the wire crosses.',
+         'Re-engage if needed, press <b>Wire it</b> in the pop-up beside your mark and hold fluoro while the wire crosses.',
+         '<b>Wire it</b> in the pop-up beside the lesion (guide engaged, fluoro on).'],
    done:S=>(S.pci&&S.pci.stage!=='wire')||S.stents.length>0},
-  {id:'stent',who:[0,1,2],hl:'#pci',title:'Place a stent',
+  {id:'stent',who:[0,1,2],hl:'#txPop',title:'Place a stent',
    text:['Choose <b>Stent</b>. The sizing box tells you how wide the artery is and how long the narrowing is, and stars the best fit: pick those sizes, press Position, line the markers up over the narrowing, then hold <kbd>B</kbd> (Inflate) until it reads 12 to 14 atm and let go. The stent props the artery open.',
          'Choose <b>Stent</b>, take the starred size, position it over the narrowing and hold <kbd>B</kbd> to 12–14 atm.',
          'Stent: sizing help depends on difficulty (Easy stars the best fit). Hold <kbd>B</kbd> to inflate; release to deploy.'],
    done:S=>S.stents.length>0},
   {id:'final',who:[0,1],hl:'#bCine',title:'Check the result',
-   text:['Record one more cine run to check the artery is now wide open, then press <b>Remove wire</b> under Treatment.',
+   text:['Record one more cine run to check the artery is now wide open, then press <b>Remove wire</b> in the treatment pop-up.',
          'Record a final run to check the result, then <b>Remove wire</b>.'],
    done:S=>!S.pci&&S.stents.length>0&&S.runs.some(r=>r.t0>Math.max(...S.stents.map(s=>s.t)))},
   {id:'finish',who:[0,1,2],hl:'#bFinish',title:'Finish and read your report',
@@ -78,6 +78,7 @@ function renderCoach(){
   if(!st){el.hidden=true;return}
   let txt=st.text[Math.min(S.tut.exp,st.text.length-1)];
   if(typeof TOUCH!=='undefined'&&TOUCH){txt=txt.replace('<kbd>Space</kbd> (or the Fluoro pedal)','the <b>Fluoro</b> button').replace('<kbd>↑</kbd> (Advance)','<b>Advance</b>').replace('<kbd>B</kbd> (Inflate)','<b>Inflate</b>').replace('<kbd>Space</kbd> (Fluoro pedal)','the <b>Fluoro</b> button');for(const [k,b] of [['Space','Fluoro'],['↑','Advance'],['↓','Withdraw'],['←','CCW'],['→','CW'],['C','Cine'],['J','Inject'],['B','Inflate'],['X','the catheter toggle']])txt=txt.split(`<kbd>${k}</kbd>`).join(`<b>${b}</b>`)}
+  else if(typeof shortKey==='function'){for(const [k,id] of [['Space','Space'],['↑','ArrowUp'],['↓','ArrowDown'],['←','ArrowLeft'],['→','ArrowRight'],['C','KeyC'],['J','KeyJ'],['B','KeyB'],['X','KeyX']])txt=txt.split(`<kbd>${k}</kbd>`).join(`<kbd>${shortKey(id)}</kbd>`)}
   el.hidden=false;
   el.innerHTML=`<div class="coachhead"><b>Step ${S.tut.i+1} of ${steps.length} · ${st.title}</b><button class="btn" data-coach="skip">Skip tutorial</button></div><p>${typeof glossLink==='function'?glossLink(txt):txt}</p>
     <div class="coachdots">${steps.map((_,i)=>`<i class="${i<S.tut.i?'done':i===S.tut.i?'now':''}"></i>`).join('')}</div>`;

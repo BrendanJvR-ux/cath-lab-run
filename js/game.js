@@ -97,7 +97,7 @@ function resumeCase(){
   S.stents=sv.stents.map(relink);S.balloons=sv.balloons.map(relink);
   S.daily=!!sv.daily&&sv.ci===dailyCode();S.cine=null;S.review=null;
   syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);if(typeof renderCoach==='function')renderCoach();
-  toast(`Resumed ${caseName(S)} at ${fmtT(S.clock)}. ${keyName('Hold Space','Hold the Fluoro button')} for fluoro to pick up where you left off.`);
+  toast(`Resumed ${caseName(S)} at ${fmtT(S.clock)}. ${keyName('Hold '+shortKey('Space'),'Hold the Fluoro button')} for fluoro to pick up where you left off.`);
 }
 function resumeCard(){
   const sv=loadSave();if(!sv)return '';
@@ -245,8 +245,8 @@ function renderMenu(){
         <div class="mm-secondary"><button class="btn" data-act="play">Case select</button></div>
       </div>
       ${sv?`<div class="mm-strip resume"><div><b>Unfinished case</b><span>${sv.ci==='TUTORIAL'?'The tutorial':'Patient '+sv.ci} · ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:''} · ${fmtT(sv.clock)} in</span></div><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="discard">Discard</button></div>`:''}
-      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button><button class="lnk" data-act="career">Career</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-gl="">Glossary</button></div>
-      <div class="mm-op">${avatarSVG(profile.avatar,32)}<span><b>${esc(profile.name)}</b> · ${typeof rankName==='function'?rankName()+' · ':''}${profile.tokens} tokens · ${DIFFICULTY[profile.diff].label}</span><button class="lnk" data-act="editop" style="background:none;border:0;padding:0;font:500 14px var(--f-ui);text-decoration:underline;cursor:pointer;color:inherit">Change</button></div>
+      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button><button class="lnk" data-act="career">Career</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Controls</button><button class="lnk" data-gl="">Glossary</button></div>
+      <div class="mm-op">${avatarSVG(profile.avatar,32)}<span><b>${esc(profile.name)}</b> · ${typeof rankName==='function'?rankName()+' · ':''}${profile.tokens} tokens · ${DIFFICULTY[profile.diff].label}</span><button class="lnk" data-act="editop" style="background:none;border:0;padding:0;font:inherit;text-decoration:underline;cursor:pointer;color:inherit">Change</button></div>
     </div>
     <div class="mm-art" aria-hidden="true">${CARM_SVG}</div></div>
     <p class="fine">Teaching game with simplified anatomy and physics. Not a clinical training device.</p>`;
@@ -330,23 +330,11 @@ function startCase(ci,opt={}){
   const c=S.c;$('caseHead').innerHTML=`<h2>${S.c.code?'Random patient · '+S.c.code:'Patient · '+caseName(S)} · ${S.D.label}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
   ictx.fillStyle=PAPER;ictx.fillRect(0,0,W,W);
   syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
-  toast(`Sheath in the right femoral artery. ${keyName('Hold Space','Hold Fluoro')} for X-ray and ${keyName('↑','Advance')} to advance.`);
+  toast(`Sheath in the right femoral artery. ${keyName('Hold '+shortKey('Space'),'Hold Fluoro')} for X-ray and ${keyName(shortKey('ArrowUp'),'Advance')} to advance.`);
 }
 
 /* ---------- input ---------- */
-const GAME_KEYS=new Set(['Space','KeyJ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyW','KeyS','KeyA','KeyD','KeyC','KeyF','KeyB','KeyX']);
-window.addEventListener('keydown',e=>{
-  if(e.target&&(e.target.tagName==='INPUT'&&e.target.type!=='range'))return;
-  if(e.target&&e.target.type==='range'&&e.code.startsWith('Arrow'))return;
-  if(GAME_KEYS.has(e.code)||/^Digit[1-7]$/.test(e.code)){if(S&&!S.done)e.preventDefault()}else return;
-  if(e.repeat)return;
-  if(e.code==='KeyC'){toggleCine();return}
-  if(e.code==='KeyX'){if(S&&!S.done)exchangeTo(S.cath.type==='JL'?'JR':'JL');return}
-  if(e.code.startsWith('Digit')){setPreset(+e.code.slice(5)-1);return}
-  keys[e.code]=true;
-});
-window.addEventListener('keyup',e=>{keys[e.code]=false});
-window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
+// keys, mouse buttons and the wheel are bound to actions in js/controls.js
 document.querySelectorAll('.hold[data-k]').forEach(b=>{
   const k=b.dataset.k;
   // press starts the action; it stops on release, when the pointer leaves the button, if the touch is cancelled,
@@ -597,12 +585,12 @@ function sizingAdvice(P){
 }
 function renderPCI(force){
   const el=$('pci');
-  const sig=!S?'none':JSON.stringify([S.done,S.cs&&S.cs.eng,S.cs&&S.cs.deep,S.events.map(e=>[e.seen,e.closed,e.treated,e.doses.length,e.sealed,e.temporised,Math.round(e.sev*10)]),Math.round(S.effusion*5),S.pcT>0,S.tamponade,S.protamine,S.pci&&[S.pci.stage,S.pci.kind,S.pci.diam,S.pci.len,Math.round(S.pci.ld)],S.marks.map(m=>m.vid+m.ld+canTreat(m)),S.stents.length,S.balloons.length]);
+  const sig=!S?'none':JSON.stringify([S.done,S.cs&&S.cs.eng,S.cs&&S.cs.deep,S.events.map(e=>[e.seen,e.closed,e.treated,e.doses.length,e.sealed,e.temporised,Math.round(e.sev*10)]),Math.round(S.effusion*5),S.pcT>0,S.tamponade,S.protamine,S.pci&&[S.pci.stage,S.pci.kind,S.pci.diam,S.pci.len,Math.round(S.pci.ld)],S.marks.map(m=>m.vid+m.ld+canTreat(m)),S.stents.length,S.balloons.length,S.ffr.length,!!S.txClosed,S.marks.length]);
   if(!force&&sig===pciSig)return;pciSig=sig;
-  if(!S){el.innerHTML='<div class="empty">Load a case to begin.</div>';return}
+  if(!S){el.innerHTML='';$('txSide').innerHTML='<div class="empty">Load a case to begin.</div>';return}
   const P=S.pci;let h='';
   // complications come first: what the patient shows, and once imaged, what it is and what to do
-  const active=S.events.filter(e=>!e.treated&&!(e.kind==='spasm'&&!(e.sev>0.8||(e.seen&&S.D.level===1))));
+  const active=activeEvents();
   const aimBtn=(e,i)=>!P?`<button class="btn" data-rewire="${i}" ${canTreat(e)?'':'disabled'}>Wire it</button>`:P.vid===e.vid&&P.stage!=='wire'?`<button class="btn" data-aim="${i}">Aim devices here</button>`:'';
   let alerts=active.map(e=>{const i=S.events.indexOf(e),l=TERRITORY[e.vid];
     if(!e.seen)return e.kind==='perforation'?`<div class="alert"><b>Restless · BP falling · HR rising</b><span>Inject and look at the vessel you just treated.</span></div>`
@@ -617,9 +605,9 @@ function renderPCI(force){
   const resolved=S.events.filter(e=>e.treated).map(e=>`<div class="mark"><span>${EV_NAME[e.kind]} · ${e.label} · ${e.kind==='perforation'?'sealed':'resolved'}</span></div>`).join('');
   const log=[...S.balloons.map(b=>`Balloon ${b.diam.toFixed(1)} × ${b.len} mm · ${b.label} · ${b.atm} atm`),...S.stents.map(s=>`Stent ${s.diam.toFixed(1)} × ${s.len} mm · ${s.label} · ${s.atm} atm`)].map(t=>`<div class="mark"><span>${t}</span></div>`).join('');
   if(!P){
-    if(!S.marks.length)h='<div class="empty">Mark a lesion on a cine run, then treat it here with the guide engaged.</div>';
-    else{h=S.marks.map((m,i)=>`<div class="mark"><span>${i+1}. ${m.label} · ${BUCKETS[m.bucket].k}</span><span class="row"><button class="btn" data-ffr="${i}" ${canTreat(m)?'':'disabled'} title="Measure the pressure drop across it (FFR)">FFR</button><button class="btn" data-treat="${i}" ${canTreat(m)?'':'disabled'}>Wire it</button></span></div>`).join('');
-      if(!S.marks.some(canTreat))h+='<div class="empty">Engage the matching coronary to treat a marked lesion.</div>'}
+    const tg=txTargets();
+    if(tg.length){h=tg.map(m=>[m,S.marks.indexOf(m)]).map(([m,i])=>`<div class="mark"><span>${i+1}. ${m.label} · ${BUCKETS[m.bucket].k}</span><span class="row"><button class="btn" data-ffr="${i}" ${canTreat(m)?'':'disabled'} title="Measure the pressure drop across it (FFR)">FFR</button><button class="btn" data-treat="${i}" ${canTreat(m)?'':'disabled'}>Wire it</button></span></div>`).join('');
+      if(!tg.some(canTreat))h+='<div class="empty">Engage the matching coronary to treat it.</div>'}
   }else if(P.stage==='wire'){
     h=`<div class="pending"><div>Crossing the ${P.label} with a 0.014" ${P.ffr?'pressure ':''}wire. Hold fluoro. <b id="pciWire" class="pci-read">0%</b></div><div class="row"><button class="btn" data-cancel="1">Cancel</button></div></div>`;
   }else if(P.stage==='ffr'){
@@ -642,10 +630,55 @@ function renderPCI(force){
   }else if(P.stage==='positioned'){
     h=`<div class="pending"><div>${P.diam.toFixed(1)} × ${P.len} mm ${P.kind==='covered'?'covered stent':P.kind} across the ${P.label}. ${P.seal&&P.kind==='balloon'?'Sealing inflation: hold Inflate at low pressure (capped at 6 atm) over the hole; release when it is sealed.':`Line the markers up around the narrowing, then hold Inflate. ${P.kind!=='balloon'?'Deploy at 12–14 atm.':'Inflate to 8–12 atm.'}`}</div>
       <div class="row"><button class="btn" data-nudge="-2">◀ Proximal</button><button class="btn" data-nudge="2">Distal ▶</button></div>
-      <div class="row"><button class="hold" data-hold="1"><span>Inflate</span><kbd>B</kbd></button><b id="pciAtm" class="pci-read">0.0 atm</b><button class="btn" data-back="1">Back</button></div></div>`;
+      <div class="row"><button class="hold" data-hold="1"><span>Inflate</span><kbd>${typeof shortKey==='function'?shortKey('KeyB'):'B'}</kbd></button><b id="pciAtm" class="pci-read">0.0 atm</b><button class="btn" data-back="1">Back</button></div></div>`;
   }
-  el.innerHTML=alerts+h+(S.events.length||S.drugs.length||eng?drugs:'')+resolved+log;
+  el.innerHTML=alerts+h+(S.events.length||S.drugs.length||eng?drugs:'');
+  $('txSide').innerHTML=txSideHTML()+resolved+log;
+  txPlaced='';
 }
+/* ---------- the treatment pop-up: beside the lesion on the X-ray, once a lesion has been marked correctly ---------- */
+function activeEvents(){return S.events.filter(e=>!e.treated&&!(e.kind==='spasm'&&!(e.sev>0.8||(e.seen&&S.D.level===1))))}
+function lesionOfMark(m){return S.lesions.find(L=>m.vid===L.vid&&Math.abs(m.ld-L.at)<=L.len/2+7)||null}
+function markDone(m){const L=lesionOfMark(m);return !!L&&(!!L.stented||S.ffr.some(f=>f.vid===m.vid&&f.value>0.8&&Math.abs(f.ld-L.at)<=L.len/2+15))}
+function txTargets(){return S.marks.filter(m=>lesionOfMark(m)&&!markDone(m)).filter((m,i,a)=>a.findIndex(x=>lesionOfMark(x)===lesionOfMark(m))===i)}
+function txAlertCount(){return activeEvents().length+(S.effusion>0.3?1:0)}
+function txWanted(){return !!(S&&!S.done&&!S.complication&&(S.pci||txAlertCount()||txTargets().length))}
+function txSideHTML(){
+  if(!S)return '';
+  if(txWanted())return S.txClosed?'<button class="btn" id="txOpen">Show treatment options</button>':'<div class="empty">Treatment options are open on the X-ray, beside the lesion.</div>';
+  if(S.done||S.complication)return '';
+  if(!S.marks.length)return '<div class="empty">Mark a narrowing on a cine run. Once it is marked correctly, the treatment options open beside it on the X-ray.</div>';
+  if(S.marks.some(m=>lesionOfMark(m)&&markDone(m))&&!S.marks.some(m=>lesionOfMark(m)&&!markDone(m)))return '<div class="empty">Treatment done for the lesions you marked.</div>';
+  return '<div class="empty">No treatment options yet: the options open beside a lesion once it is marked correctly.</div>';
+}
+let txPlaced='',txLastN=0,txLastT=0;
+function txUpdate(){
+  const pop=$('txPop'),dot=$('txDot');
+  if(!S){pop.hidden=dot.hidden=true;return}
+  // reopen if something new needs the player: a new complication or a newly identified lesion
+  const n=txAlertCount(),t=txTargets().length;if(n>txLastN||t>txLastT)S.txClosed=false;txLastN=n;txLastT=t;
+  const want=txWanted(),show=want&&!S.txClosed;
+  if(pop.hidden===show){pop.hidden=!show;renderPCI(true)}
+  if(!show){dot.hidden=true;return}
+  const P=S.pci,e=activeEvents().find(x=>x.seen),m=txTargets()[0];
+  const an=P?{vid:P.vid,ld:P.ld}:e?{vid:e.vid,ld:e.ld}:m?{vid:m.vid,ld:m.ld}:null;
+  $('txTitle').textContent=P?`Treating the ${P.label}`:e?`${EV_NAME[e.kind]} · ${e.label}`:m?`Treat the ${m.label}`:'Treatment';
+  const mon=$('monitor'),mw=mon.clientWidth,mh=mon.clientHeight;
+  const a=S.review?S.review.run.a:S.a,b=S.review?S.review.run.b:S.b;
+  const key=[an&&an.vid,an&&Math.round(an.ld),a,b,mw,mh,pop.offsetHeight].join();if(key===txPlaced)return;txPlaced=key;
+  const dock=mw<470;pop.classList.toggle('dock',dock);
+  if(!an){dot.hidden=true;pop.style.left=pop.style.top='';return}
+  const v=VBY[an.vid];let i=0;while(i<v.n-1&&v.ld[i]<an.ld)i++;
+  const q=proj(motion(v.p[i],contraction(0.3)),basis(a,b)),lx=q[0]/W*mw,ly=q[1]/W*mh;
+  dot.hidden=false;dot.style.left=lx+'px';dot.style.top=ly+'px';
+  if(dock){pop.style.left=pop.style.top='';return}
+  const pw=pop.offsetWidth,ph=pop.offsetHeight,right=lx<mw/2;
+  pop.style.left=clamp(right?lx+34:lx-34-pw,8,mw-pw-8)+'px';
+  pop.style.top=clamp(ly-ph/2,8,Math.max(8,mh-ph-58))+'px';
+  pop.classList.toggle('left',!right);
+}
+$('txClose').addEventListener('click',()=>{if(!S)return;S.txClosed=true;txLastN=txAlertCount();txLastT=txTargets().length;txUpdate();renderPCI(true)});
+$('txSide').addEventListener('click',e=>{if(e.target.closest('#txOpen')&&S){S.txClosed=false;txUpdate();renderPCI(true)}});
 $('pci').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b||!S||S.done)return;const P=S.pci,d=b.dataset;
   if(d.treat!=null)startPCI(+d.treat);
@@ -697,6 +730,7 @@ function tick(dt){
     const axial=down('ArrowUp','KeyW','ArrowDown','KeyS');
     if(down('ArrowRight','KeyD')){c.hub+=170*dt;moved=true}
     if(down('ArrowLeft','KeyA')){c.hub-=170*dt;moved=true}
+    if(S.dragTurn){c.hub+=clamp(S.dragTurn,-40,40);S.dragTurn=0;moved=true}
     // torque reaches the tip through the shaft: it drags on the aortic wall (most round the arch), winds up, then lets go
     {const c0=cst(c),region=c.s<S_ARCH0?0.3:c.s<=S_ROOT?1.2:1;
      const th0=c.th;S.twist=stepTorque(c,dt,{...D.torque,fric:D.torque.fric*region,moving:axial,engaged:!!c0.eng});
@@ -704,7 +738,7 @@ function tick(dt){
      if(Math.abs(c.w)>260&&!S.whipT){S.whipT=1.2;toast(`Whip! The tip jumped as the stored twist let go. Turn in small steps and nudge the catheter in or out as you torque.`,true)}
      S.whipT=Math.max(0,(S.whipT||0)-dt);void th0}
     // near the ostium a preshaped Judkins tends to drop in on its own (more help on easier settings): the whole catheter turns
-    if(D.seek>0){const C=CATH[c.type],c0=cst(c);if(!c0.eng&&c0.u>=0.55&&!down('ArrowLeft','KeyA','ArrowRight','KeyD')){const diff=((OSTANG[C.sys]-c.th+540)%360)-180;if(Math.abs(diff)<D.tol[C.sys]+D.seek){const d=Math.sign(diff)*Math.min(Math.abs(diff),D.seekSpeed*dt);c.th+=d;c.hub+=d}}}
+    if(D.seek>0){const C=CATH[c.type],c0=cst(c);if(!c0.eng&&c0.u>=0.55&&!down('ArrowLeft','KeyA','ArrowRight','KeyD')&&!S.dragTurn){const diff=((OSTANG[C.sys]-c.th+540)%360)-180;if(Math.abs(diff)<D.tol[C.sys]+D.seek){const d=Math.sign(diff)*Math.min(Math.abs(diff),D.seekSpeed*dt);c.th+=d;c.hub+=d}}}
     if(c.th>180)c.th-=360;if(c.th<-180)c.th+=360;
     const imaging=down('Space','KeyF')||!!S.cine;
     if(moved&&!imaging&&c.s>120){S.blind+=dt;if(S.blind>0.6&&Math.floor((S.blind-dt)/2)!==Math.floor(S.blind/2))toast('Moving the catheter without fluoro. Step on the pedal.',true)}
@@ -851,7 +885,7 @@ function updateUI(){
   hudTL.textContent=`${caseName(S).toUpperCase()} · ${S.c.pt}\n${R?angLabel(R.run.a,R.run.b):angLabel(S.a,S.b)}`;
   const d2bTxt=S.d2b?`\n<span class="${!S.reperfAt&&d2bNow()>=80?'act':''}">D2B ${S.reperfAt||d2bNow()} min${S.reperfAt?' ✓':''}</span>`:'';
   hudTR.innerHTML=(R?`<span class="act">REVIEW · RUN ${R.run.id}</span>\nfr ${R.idx+1}/${R.run.frames.length}`:cine?`<span class="act">● CINE 15 f/s</span>\n${(S.cine.frames.length/15).toFixed(1)} s`:fl?'<span class="act">FLUORO 15 p/s</span>':(S.frame?'LIH':'NO IMAGE'))+d2bTxt;
-  hudBL.textContent=R?'Click a narrowing to mark it':(S.frame?'':TOUCH?'Hold Fluoro for X-ray':'Hold Space for fluoro');
+  hudBL.textContent=R?'Click a narrowing to mark it':(S.frame?'':TOUCH?'Hold Fluoro for X-ray':'Hold '+shortKey('Space')+' for fluoro');
   hudBR.textContent=`AK ${Math.round(S.ak)} mGy\n${Math.round(S.contrast)} mL`;
   uiAcc++;if(uiAcc%6)return;
   $('rdFT').querySelector('b').textContent=fmtT(S.ftime);
@@ -874,7 +908,7 @@ function updateUI(){
   st.className='status '+cls;st.textContent=msg;
   document.querySelectorAll('#presets button').forEach(b=>b.disabled=!!S.cine);
   $('sA').disabled=$('sB').disabled=!!S.cine;
-  renderPCI();
+  renderPCI();txUpdate();
 }
 
 /* ---------- scoring and coffee tokens ---------- */
