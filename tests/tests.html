@@ -26,6 +26,7 @@ canvas{display:none}
 <script src="../cases/rca-inferior-nstemi.js"></script>
 <script src="../cases/lcx-breathless-diabetic.js"></script>
 <script src="../js/sim.js"></script>
+<script src="../js/gen.js"></script>
 <script>
 "use strict";
 const results=[];
@@ -123,6 +124,33 @@ test('Contrast darkens the image where the coronaries are',()=>{
   renderImage({...base,conc:()=>1});const full=lum();
   ok(full<empty*0.99,'no visible contrast');return `${((1-full/empty)*100).toFixed(1)}% darker`;
 });
+/* random patients (run last; they rebuild the anatomy, and the final test restores the default) */
+test('Case codes round-trip, and a code always gives the same patient',()=>{
+  for(const n of [0,1,12345,CODE_SPACE-1])ok(codeToSeed(seedToCode(n))===n,'round trip '+n);
+  ok(codeToSeed('clr-7kq2m')===codeToSeed('CLR-7KQ2M'),'case-insensitive');ok(codeToSeed('CLR-0000O')===null&&codeToSeed('hello')===null,'rejects junk');
+  const a=JSON.stringify(generatePatient('CLR-7KQ2M')),b=JSON.stringify(generatePatient('CLR-7KQ2M'));ok(a===b,'not deterministic');
+  ok(JSON.stringify(generatePatient('CLR-7KQ2N'))!==a,'neighbouring codes should differ');
+});
+test('400 random patients: valid anatomy, stentable culprit, engageable ostia',()=>{
+  const dom={R:0,L:0,C:0};let ramus=0,lesions=0;
+  for(let i=0;i<400;i++){
+    const code=seedToCode((i*7919+13)%CODE_SPACE),c=generatePatient(code);buildAnatomy(c.anatomy);dom[c.anatomy.dom]++;if(c.anatomy.ramus)ramus++;
+    for(const v of VESSELS){ok(LEADS.includes(TERRITORY[v.id]),code+': '+v.id+' has no ECG lead');
+      if(v.parent){const P=VBY[v.parent];ok(Math.min(...P.p.map(q=>dist3(q,v.p[0])))<0.8,code+': '+v.id+' detached')}}
+    if(c.anatomy.dom==='L')ok(!VBY.PDA&&VBY.LPDA,code+': left dominance should move the PDA to the circumflex');
+    ok(c.lesions.length>=1&&c.lesions.some(L=>L.sev>=0.7),code+': no significant lesion');
+    for(const L of prepLesions(c.lesions)){lesions++;const v=VBY[L.vid];ok(v&&L.at>0&&L.at<v.len,code+': lesion off its vessel');if(L.sev>=0.7)ok(refDiam(L.vid,L.at)>=2.3,code+': significant lesion in a vessel too small to stent')}
+    ok(c.hx&&c.title&&c.task&&c.budget>0,code+': missing text');
+    for(const d of ['easy','hard'])ok(cathState({type:'JR',th:OSTANG.R,s:S_ROOT+22},DIFFICULTY[d]).eng==='R'&&cathState({type:'JL',th:OSTANG.L,s:S_ROOT+22},DIFFICULTY[d]).eng==='L',code+': ostium not engageable on '+d);
+  }
+  ok(dom.L>10&&dom.C>10&&dom.R>200,'dominance mix '+JSON.stringify(dom));ok(ramus>30,'ramus '+ramus);
+  return `right ${dom.R} · left ${dom.L} · co-dominant ${dom.C} · ramus ${ramus} · ${lesions} lesions`;
+});
+test('A posteriorly placed RCA origin needs more clockwise torque than usual',()=>{
+  buildAnatomy();const base=OSTANG.R;buildAnatomy({rca:'posterior'});const post=OSTANG.R;buildAnatomy();
+  ok(post-base>8,`${base.toFixed(0)}° → ${post.toFixed(0)}°`);return `${base.toFixed(0)}° → ${post.toFixed(0)}°`;
+});
+test('The default anatomy is restored for the teaching cases',()=>{buildAnatomy();ok(VBY.PLV&&VBY.PDA&&!VBY.RI&&!VBY.LPDA);ok(prepLesions(CASES[1].lesions)[0].label==='mid RCA')});
 
 const bad=results.filter(r=>!r.ok).length,sum=document.getElementById('sum');
 sum.textContent=bad?`${bad} of ${results.length} failed`:`All ${results.length} passed`;sum.className=bad?'bad':'ok';

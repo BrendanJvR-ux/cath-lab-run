@@ -20,10 +20,11 @@ Then open http://localhost:8767/ (the game) or http://localhost:8767/tests/tests
 |---|---|
 | `cases/*.js` | **Editable case files**: patient, history, task, contrast budget, baseline ECG, and each lesion's vessel, position, length, severity and eccentricity. |
 | `config/config.js` | Anatomy (coronary tree, aorta), coronary flow speed, Judkins catheters, C-arm presets, grading buckets, stent and balloon sizes, difficulty settings, ECG territories and avatars. |
-| `js/sim.js` | Geometry, catheter position and engagement, lesion appearance per projection, stent and balloon outcome rules, coverage segments, coronary tortuosity, ribs and spine, and the X-ray image renderer (including wire, balloon and stent struts). No game state. |
+| `js/gen.js` | Random patients: case codes, anatomy variants, lesions and a matching history. |
+| `js/sim.js` | Geometry, anatomy builder (variants), catheter position and engagement, lesion appearance per projection, stent and balloon outcome rules, coverage segments, coronary tortuosity, ribs and spine, and the X-ray image renderer (including wire, balloon and stent struts). No game state. |
 | `js/game.js` | Menu, operator profile and coffee tokens, game state, controls, cine runs and review, the PCI tools, the three-lead ECG and pressure strip, the main loop and scoring. |
 | `css/style.css` | Layout and look. |
-| `tests/tests.html` | Automated checks: cases load, catheter engagement, a smooth aorta-to-root path and deep-seating, eccentric lesions per view, contrast rendering, stent and balloon rules, difficulty windows, shop items, ECG territories, coronary tortuosity and coverage segments. |
+| `tests/tests.html` | Automated checks: cases load, catheter engagement, a smooth aorta-to-root path and deep-seating, eccentric lesions per view, contrast rendering, stent and balloon rules, difficulty windows, shop items, ECG territories, coronary tortuosity, coverage segments, and 400 random patients (valid anatomy, stentable culprit, engageable ostia, same code gives the same patient). |
 
 To add a case, copy a file in `cases/`, edit it, and add a `<script>` line for it in `index.html` and `tests/tests.html`.
 
@@ -65,7 +66,24 @@ Items are defined in `SHOP` in `config/config.js`.
 | Stent | Pick a diameter and length (the 6F guide is 2 mm wide for scale), nudge the markers around the narrowing, then hold Inflate to deploy at 12–14 atm. Take a final shot, remove the wire, finish. |
 | ECG | Three leads follow the coronary territories: V3 anterior (LAD), V5 lateral (circumflex), II inferior (RCA). An inflated balloon raises ST in that territory's lead with reciprocal depression elsewhere. Case 2 starts with inferior T-wave inversion in II, case 3 with lateral inversion in V5. |
 
-## Cases
+## Random patients
+
+**New random patient** on the case menu builds a fresh patient from a seed, shown as a case code such as `CLR-BNF2J`. The same code always gives the same patient, so you can replay it or send it to a friend (type it into the box next to the button).
+
+Each patient gets:
+
+| Part | What varies |
+|---|---|
+| Dominance | Right (about 78%), left (11%: the circumflex wraps round to the crux and gives the PDA, the RCA is small) or co-dominant (11%: the circumflex gives a posterolateral branch, the RCA keeps the PDA) |
+| Branches | Ramus intermedius (20%), short left main (12%), large or small first diagonal, one or two obtuse marginals |
+| RCA origin | Usual, anterior, or posterior (needs more clockwise torque) |
+| Tortuosity | Its own pattern and strength of natural vessel bends |
+| Disease | One or two significant lesions (70–96%) in a vessel big enough to stent, plus up to two mild or intermediate decoys you should report but not stent |
+| Story | Age, sex, risk factors, stable angina or NSTEMI with a stress test or ECG that matches the culprit's territory, and sometimes impaired kidneys with a tighter contrast budget |
+
+The report names the anatomy at the end. Random patients keep their own best score per difficulty. The generator is `js/gen.js`; the variants are `VARIANT_PARTS` in `config/config.js`.
+
+## Teaching cases
 
 1. **Exertional chest pain** (M, 64): proximal LAD stenosis.
 2. **Inferior NSTEMI** (F, 58): tight mid RCA lesion with sluggish distal flow.

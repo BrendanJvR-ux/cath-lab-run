@@ -5,30 +5,75 @@ function crPt(p0,p1,p2,p3,t){const t2=t*t,t3=t2*t;const f=i=>0.5*(2*p1[i]+(-p0[i
 function sample(ctrl,step){const out=[];for(let i=0;i<ctrl.length-1;i++){const p0=ctrl[Math.max(0,i-1)],p1=ctrl[i],p2=ctrl[i+1],p3=ctrl[Math.min(ctrl.length-1,i+2)];const n=Math.max(2,Math.ceil(dist3(p1,p2)/step));for(let k=0;k<n;k++)out.push(crPt(p0,p1,p2,p3,k/n))}out.push(ctrl[ctrl.length-1].slice());const ld=[0];for(let i=1;i<out.length;i++)ld.push(ld[i-1]+dist3(out[i-1],out[i]));return {p:out,ld}}
 function pointAt(S,s){const ld=S.ld;if(s<=0)return S.p[0].slice();if(s>=ld[ld.length-1])return S.p[S.p.length-1].slice();let lo=0,hi=ld.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(ld[m]<=s)lo=m;else hi=m}const f=(s-ld[lo])/(ld[hi]-ld[lo]||1);return add(S.p[lo],mul(sub(S.p[hi],S.p[lo]),f))}
 
+/* ---------- anatomy ----------
+   buildAnatomy(spec) rebuilds the live coronary tree in place: VESSELS, VBY, MAXD, the ostia and the coverage
+   segments. The default spec is the usual right-dominant pattern. Random patients pass a variant:
+   dom 'R' | 'L' | 'C' (right, left or co-dominant), ramus (a ramus intermedius), shortLM (a stubby left main),
+   rca 'normal' | 'anterior' | 'posterior' (where the RCA leaves the right sinus), d1 'normal' | 'large' | 'small',
+   om2 (second obtuse marginal present), tort {seed, amp} (the pattern and strength of natural tortuosity). */
+const VESSELS=[],VBY={},MAXD={L:0,R:0},OST={},OSTDIR={},OSTANG={},MAP_SEGS=[];
+const ANATOMY_DEFAULT={dom:'R',ramus:false,shortLM:false,rca:'normal',d1:'normal',om2:true,tort:{seed:0,amp:1}};
+let ANATOMY=ANATOMY_DEFAULT;
 /* Natural tortuosity: a smooth 3D wave field nudges every vessel point by up to ~2 mm. Because it depends only
    on position, a branch moves exactly with its parent at the join. It fades to nothing near the two ostia
    (engagement is unchanged) and grows towards the periphery, where real coronaries are curliest. */
-const TORT_OST=[VESSELS[0].ctrl[0],VESSELS.find(v=>v.id==='RCA').ctrl[0]];
-const TORT_W=[[0.41,0.13,0.29,0.3],[0.17,0.37,-0.22,1.7],[-0.26,0.21,0.35,4.1],[0.33,-0.28,0.12,2.6],[0.09,0.44,0.19,5.3],[-0.38,-0.1,0.27,0.9]];
-function tortuous(p){
-  const d=Math.min(...TORT_OST.map(o=>dist3(p,o))),amp=clamp((d-6)/14,0,1)*(1.1+0.9*clamp((d-20)/60,0,1));
-  const w=i=>{const a=TORT_W[i],b=TORT_W[i+3];return 0.6*Math.sin(a[0]*p[0]+a[1]*p[1]+a[2]*p[2]+a[3])+0.4*Math.sin(b[0]*p[0]+b[1]*p[1]+b[2]*p[2]+b[3])};
-  return [p[0]+amp*w(0),p[1]+amp*w(1),p[2]+amp*w(2)];
+const TORT_W0=[[0.41,0.13,0.29,0.3],[0.17,0.37,-0.22,1.7],[-0.26,0.21,0.35,4.1],[0.33,-0.28,0.12,2.6],[0.09,0.44,0.19,5.3],[-0.38,-0.1,0.27,0.9]];
+function tortField(osts,seed,ampK){
+  const W=TORT_W0.map((w,i)=>[w[0],w[1],w[2],w[3]+seed*(1.3+0.7*i)]);
+  return p=>{
+    const d=Math.min(...osts.map(o=>dist3(p,o))),amp=ampK*clamp((d-6)/14,0,1)*(1.1+0.9*clamp((d-20)/60,0,1));
+    const w=i=>{const a=W[i],b=W[i+3];return 0.6*Math.sin(a[0]*p[0]+a[1]*p[1]+a[2]*p[2]+a[3])+0.4*Math.sin(b[0]*p[0]+b[1]*p[1]+b[2]*p[2]+b[3])};
+    return [p[0]+amp*w(0),p[1]+amp*w(1),p[2]+amp*w(2)];
+  };
 }
-const VBY={};
-const MAXD={L:0,R:0};
-for(const v of VESSELS){
-  const s=sample(v.ctrl,1.1);s.p=s.p.map(tortuous);for(let i=1;i<s.p.length;i++)s.ld[i]=s.ld[i-1]+dist3(s.p[i-1],s.p[i]);
-  v.p=s.p;v.ld=s.ld;v.len=s.ld[s.ld.length-1];v.n=v.p.length;
-  v.anc=new Set();
-  if(v.parent){const P=VBY[v.parent];let bi=0,bd=1e9;P.p.forEach((q,i)=>{const d=dist3(q,v.p[0]);if(d<bd){bd=d;bi=i}});v.base=P.base+P.ld[bi];v.joinIdx=bi;P.anc.forEach(a=>v.anc.add(a));v.anc.add(P.id)}else v.base=0;
-  v.r=v.ld.map(d=>v.r0+(v.r1-v.r0)*d/v.len);
-  MAXD[v.sys]=Math.max(MAXD[v.sys],v.base+v.len);
-  VBY[v.id]=v;
+function anatomyDefs(sp){
+  const cp=o=>JSON.parse(JSON.stringify(o)),V=VARIANT_PARTS;
+  let defs=cp(VESSEL_DEFS);const by=id=>defs.find(v=>v.id===id),drop=(...ids)=>{defs=defs.filter(v=>!ids.includes(v.id))};
+  if(sp.dom==='L'){
+    const r=by('RCA');r.ctrl=r.ctrl.slice(0,5);r.r0=1.6;r.r1=0.9;drop('PDA','PLV');
+    const c=by('LCx');c.ctrl=c.ctrl.concat(cp(V.LCX_LONG).slice(1));c.r0=2.0;c.r1=1.1;
+    const om=by('OM1');om.r0=1.3;defs.push(cp(V.LPDA));
+  }else if(sp.dom==='C'){
+    drop('PLV');const c=by('LCx');c.ctrl=c.ctrl.concat(cp(V.LCX_MID).slice(1));c.r0=1.85;c.r1=0.95;defs.push(cp(V.LPL));
+    const r=by('RCA');r.r0=1.8;r.r1=1.0;
+  }
+  if(sp.ramus)defs.splice(defs.findIndex(v=>v.id==='LCx'),0,cp(V.RI));
+  if(sp.d1==='large'){const d=by('D1');d.r0=1.45;d.r1=0.65}
+  else if(sp.d1==='small'){const d=by('D1');d.r0=0.8;d.r1=0.35;d.ctrl=d.ctrl.slice(0,3)}
+  if(!sp.om2)drop('OM2');
+  if(sp.rca!=='normal'&&V.RCA_ORIGIN[sp.rca]){const r=by('RCA'),o=V.RCA_ORIGIN[sp.rca];r.ctrl[0]=o[0];r.ctrl[1]=o[1]}
+  if(sp.shortLM){ // shift the whole left tree back towards the ostium
+    const lm=by('LM'),end=lm.ctrl[2],dl=[-4.5,0.5,-1],sh=q=>[q[0]+dl[0],q[1]+dl[1],q[2]+dl[2]];
+    for(const v of defs)if(v.sys==='L'&&v.id!=='LM')v.ctrl=v.ctrl.map(sh);
+    lm.ctrl=[lm.ctrl[0],[14.5,40.2,-3.8],sh(end)];
+  }
+  return defs;
 }
-const OST={L:VBY.LM.p[0],R:VBY.RCA.p[0]};
-const OSTDIR={L:norm(sub(VBY.LM.p[3],VBY.LM.p[0])),R:norm(sub(VBY.RCA.p[3],VBY.RCA.p[0]))};
-const OSTANG={L:Math.atan2(OST.L[2]-ROOT[2],OST.L[0]-ROOT[0])/D2R,R:Math.atan2(OST.R[2]-ROOT[2],OST.R[0]-ROOT[0])/D2R};
+function buildAnatomy(spec){
+  const sp=ANATOMY={...ANATOMY_DEFAULT,...(spec||{}),tort:{...ANATOMY_DEFAULT.tort,...((spec&&spec.tort)||{})}};
+  const defs=anatomyDefs(sp);
+  const o={L:defs.find(v=>v.id==='LM').ctrl[0].slice(),R:defs.find(v=>v.id==='RCA').ctrl[0].slice()};
+  for(const v of defs){const c=o[v.sys];v.ctrl=v.ctrl.map(q=>q.map((x,i)=>c[i]+(x-c[i])*TREE_SCALE));v.r0*=TREE_RSCALE;v.r1*=TREE_RSCALE}
+  const tortuous=tortField([o.L,o.R],sp.tort.seed,sp.tort.amp);
+  VESSELS.length=0;for(const k in VBY)delete VBY[k];MAXD.L=MAXD.R=0;
+  for(const v of defs){
+    const s=sample(v.ctrl,1.1);s.p=s.p.map(tortuous);
+    if(v.parent){const P=VBY[v.parent];let bq=P.p[0],bd=1e9;for(const q of P.p){const d=dist3(q,s.p[0]);if(d<bd){bd=d;bq=q}}s.p[0]=bq.slice()} // a branch starts exactly on its parent
+    for(let i=1;i<s.p.length;i++)s.ld[i]=s.ld[i-1]+dist3(s.p[i-1],s.p[i]);
+    v.p=s.p;v.ld=s.ld;v.len=s.ld[s.ld.length-1];v.n=v.p.length;
+    v.anc=new Set();
+    if(v.parent){const P=VBY[v.parent];let bi=0,bd=1e9;P.p.forEach((q,i)=>{const d=dist3(q,v.p[0]);if(d<bd){bd=d;bi=i}});v.base=P.base+P.ld[bi];v.joinIdx=bi;P.anc.forEach(a=>v.anc.add(a));v.anc.add(P.id)}else v.base=0;
+    v.r=v.ld.map(d=>v.r0+(v.r1-v.r0)*d/v.len);
+    MAXD[v.sys]=Math.max(MAXD[v.sys],v.base+v.len);
+    VBY[v.id]=v;VESSELS.push(v);
+  }
+  OST.L=VBY.LM.p[0];OST.R=VBY.RCA.p[0];
+  OSTDIR.L=norm(sub(VBY.LM.p[Math.min(3,VBY.LM.n-1)],VBY.LM.p[0]));OSTDIR.R=norm(sub(VBY.RCA.p[3],VBY.RCA.p[0]));
+  OSTANG.L=Math.atan2(OST.L[2]-ROOT[2],OST.L[0]-ROOT[0])/D2R;OSTANG.R=Math.atan2(OST.R[2]-ROOT[2],OST.R[0]-ROOT[0])/D2R;
+  MAP_SEGS.length=0;for(const v of VESSELS){const parts=v.id==='LM'||v.len<30?1:3;for(let j=0;j<parts;j++)MAP_SEGS.push({key:v.id+':'+j,v,j,parts})}
+  return sp;
+}
+buildAnatomy();
 const AO=sample(AO_CTRL,2);
 AO.len=AO.ld[AO.ld.length-1];
 const S_ROOT=AO.len-18;
@@ -274,8 +319,7 @@ function drawPCI(pci,projV){
   if(w){const q=chain(w.vid);const n=Math.max(2,Math.round(q.length*w.frac));dctx.beginPath();for(let i=0;i<n;i++)i?dctx.lineTo(q[i][0],q[i][1]):dctx.moveTo(q[i][0],q[i][1]);dctx.lineWidth=1.5;dctx.strokeStyle=grey(0.3);dctx.stroke()}
 }
 
-/* ---------- coverage segments: the tree split into short segments, used to score how much was opacified ---------- */
-const MAP_SEGS=[];for(const v of VESSELS){const parts=v.id==='LM'||v.len<30?1:3;for(let j=0;j<parts;j++)MAP_SEGS.push({key:v.id+':'+j,v,j,parts})}
+/* ---------- coverage segments (MAP_SEGS, built with the anatomy): used to score how much of the tree was opacified ---------- */
 const mapKey=(v,ld)=>{const parts=v.id==='LM'||v.len<30?1:3;return v.id+':'+Math.min(parts-1,Math.floor(ld/v.len*parts))};
 
 const angLabel=(a,b)=>(a===0?'AP':(a>0?'LAO ':'RAO ')+Math.abs(a)+'°')+(b===0?'':(b>0?' CRA ':' CAU ')+Math.abs(b)+'°');

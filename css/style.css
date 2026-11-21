@@ -38,6 +38,10 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-
 .overlay{position:absolute;inset:0;background:rgba(9,11,12,.80);overflow:auto;padding:clamp(14px,4%,30px);display:flex;flex-direction:column;gap:14px}
 .overlay h1{font-family:var(--f-display);font-weight:700;font-size:clamp(28px,5.4vw,44px);letter-spacing:.03em;text-transform:uppercase;line-height:.95;margin:0;text-wrap:balance}
 .overlay p{margin:0;color:#c3ccd0;max-width:60ch}
+.randrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:14px}
+.randrow input{font-family:var(--f-mono);font-size:14px;letter-spacing:.06em;text-transform:uppercase;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:8px 10px;width:13ch;min-width:0}
+.randrow input:focus{outline:none;border-color:var(--amber)}
+.randinfo{font-family:var(--f-mono);font-size:11px;color:var(--muted);letter-spacing:.04em}
 .cases{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .case{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:6px}
 .case:hover{border-color:var(--amber)}

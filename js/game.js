@@ -24,6 +24,7 @@ function avatarSVG(i,size){
   const cap=a.cap?`<path d="M20 24Q20 12 32 12Q44 12 44 24Q32 19 20 24Z" fill="${a.cap}"/><path d="M43 22L48 25" stroke="${a.cap}" stroke-width="2" stroke-linecap="round"/>`:'';
   return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="#222c31"/><path d="M10 64Q12 46 32 44Q52 46 54 64Z" fill="${a.scrub}"/><path d="M26 45L32 53L38 45" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="2"/><rect x="28" y="35" width="8" height="10" fill="${a.skin}"/><ellipse cx="32" cy="28" rx="11" ry="12" fill="${a.skin}"/>${hair}${cap}<circle cx="28" cy="29" r="1.3" fill="#2a1a12"/><circle cx="36" cy="29" r="1.3" fill="#2a1a12"/><path d="M29 34Q32 36.5 35 34" fill="none" stroke="#5a3424" stroke-width="1.4" stroke-linecap="round"/></svg>`;
 }
+const DICE='<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="vertical-align:-3px"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5" cy="5" r="1.3" fill="currentColor"/><circle cx="11" cy="11" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/></svg>';
 const CUP='<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h9v5a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3Z" fill="currentColor"/><path d="M11 6h1.5a2 2 0 0 1 0 4H11" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 1.5q1 1 0 2M8 1.5q1 1 0 2" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>';
 function renderWho(){const w=$('who');if(!profile){w.hidden=true;return}w.hidden=false;w.innerHTML=`${avatarSVG(profile.avatar,26)}<span>${esc(profile.name)}</span><b>${CUP}${profile.tokens}</b>`}
 
@@ -72,6 +73,11 @@ function renderMenu(){
     ov.innerHTML=`<h1>Choose a case</h1>
       <div class="grouplabel">Difficulty</div>
       <div class="diffs">${Object.entries(DIFFICULTY).map(([k,v])=>`<button class="diff${k===d?' sel':''}" data-diff="${k}"><b>${LEVEL_BARS(v.level)}${v.label}</b><span>${v.blurb}</span></button>`).join('')}</div>
+      <div class="grouplabel">Random patient</div>
+      <div class="randrow"><button class="btn primary" data-act="rand">${DICE} New random patient</button>
+        <input id="codeIn" maxlength="10" autocomplete="off" spellcheck="false" placeholder="CLR-XXXXX" aria-label="Case code"><button class="btn" data-act="code">Play code</button>
+        <span class="randinfo">${profile.randomDone?`${profile.randomDone} played`:'Different anatomy and disease every time'}${profile.best[d+'-R']!=null?` · best ${profile.best[d+'-R']}`:''}</span></div>
+      <div class="grouplabel">Teaching cases</div>
       <div class="cases">${CASES.map((c,i)=>{const b=profile.best[d+'-'+i];return `<button class="case" data-ci="${i}"><span>CASE ${i+1} · ${c.pt}${b!=null?` · BEST ${b}`:''}</span><b>${c.title}</b>${miniECG(c)}<em>${caseTask(c,DIFFICULTY[d])}</em></button>`}).join('')}</div>
       <div class="row"><button class="btn" data-act="home">Back</button></div>`;
     return;
@@ -109,6 +115,8 @@ $('startOv').addEventListener('click',e=>{
   if(d.act==='saveop'){const n=($('opName').value||'').trim().slice(0,24);if(!n)return;profile=profile?{...profile,name:n,avatar:draft.avatar}:{name:n,avatar:draft.avatar,tokens:0,best:{},diff:'easy',owned:[],lut:null};draft=null;saveProfile();renderWho();menuView='home';renderMenu()}
   else if(d.act==='editop'){draft=null;menuView='profile';renderMenu()}
   else if(d.act==='play'){menuView='play';renderMenu()}
+  else if(d.act==='rand'){startCase(randomCode())}
+  else if(d.act==='code'){const v=($('codeIn').value||'').trim(),n=codeToSeed(v);if(n==null){toast('That is not a case code. Codes look like CLR-7KQ2M.',true);return}startCase(seedToCode(n))}
   else if(d.act==='shop'){menuView='shop';renderMenu()}
   else if(d.act==='home'){draft=null;menuView='home';renderMenu()}
 });
@@ -118,8 +126,12 @@ $('who').addEventListener('click',()=>{if(!S||S.done)showMenu('home')});
 /* ---------- state ---------- */
 let S=null;
 const keys={};
+/* ci is a case index (0, 1, 2…) or a random patient's case code ('CLR-XXXXX'). */
+function caseFor(ci){return typeof ci==='string'?generatePatient(ci):CASES[ci]}
+const caseName=S=>S.c.code?'patient '+S.c.code:'case '+(S.ci+1);
 function newState(ci){
-  const base=DIFFICULTY[profile.diff]||DIFFICULTY.easy,c=CASES[ci];
+  const base=DIFFICULTY[profile.diff]||DIFFICULTY.easy,c=caseFor(ci);
+  buildAnatomy(c.anatomy); // fixed cases use the default anatomy
   // shop perks adjust a copy of the difficulty settings
   const D={...base,tol:{...base.tol}};if(owns('torque')){D.tol.L+=6;D.tol.R+=6}
   return {ci,c,D,diff:profile.diff,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,type:'JL'},exch:0,
@@ -145,7 +157,7 @@ $('sB').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.b=+e.targ
 function startCase(ci){
   S=newState(ci);
   $('startOv').hidden=true;$('resultOv').hidden=true;closeReview();
-  const c=S.c;$('caseHead').innerHTML=`<h2>Patient · case ${ci+1} · ${S.D.label}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
+  const c=S.c;$('caseHead').innerHTML=`<h2>${S.c.code?'Random patient · '+S.c.code:'Patient · '+caseName(S)} · ${S.D.label}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
   ictx.fillStyle='#000';ictx.fillRect(0,0,W,W);applyLut();
   syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   toast('Sheath in the right femoral artery. Hold Space for fluoro and advance.');
@@ -458,7 +470,7 @@ function updateUI(){
   ['ArrowLeft','ArrowUp','ArrowDown','ArrowRight'].forEach(k=>document.querySelector(`[data-k="${k}"]`).classList.toggle('on',!!down(k)));
   if(!S){hudTL.textContent='CATH LAB RUN\nRAO 30° CAU 25°';hudTR.innerHTML='<span>SAMPLE IMAGE</span>';hudBL.textContent='';hudBR.textContent='';return}
   const R=S.review;
-  hudTL.textContent=`CASE ${S.ci+1} · ${S.c.pt}\n${R?angLabel(R.run.a,R.run.b):angLabel(S.a,S.b)}`;
+  hudTL.textContent=`${caseName(S).toUpperCase()} · ${S.c.pt}\n${R?angLabel(R.run.a,R.run.b):angLabel(S.a,S.b)}`;
   hudTR.innerHTML=R?`<span class="act">REVIEW · RUN ${R.run.id}</span>\nfr ${R.idx+1}/${R.run.frames.length}`:cine?`<span class="act">● CINE 15 f/s</span>\n${(S.cine.frames.length/15).toFixed(1)} s`:fl?'<span class="act">FLUORO 15 p/s</span>':(S.frame?'LIH':'NO IMAGE');
   hudBL.textContent=R?'Click a narrowing to mark it':(S.frame?'':'Hold Space for fluoro');
   hudBR.textContent=`AK ${Math.round(S.ak)} mGy\n${Math.round(S.contrast)} mL`;
@@ -538,20 +550,23 @@ function finish(){
   const saf=10-Math.min(10,Math.round(S.blind*2));rows.push(['Safety (catheter moved under fluoro)',saf,10]);
   let total=lesPts+tx+comp+cm+rad+saf;
   if(S.complication){total=Math.min(total,35);notes.unshift({c:'bad',t:S.complication+' A damped or ventricularised pressure trace means the tip is against the vessel wall. Withdraw before injecting.'})}
+  if(S.c.random){notes.push({c:'',t:`Anatomy: ${S.c.anatomyNote.join('; ')}.`});notes.push({c:'',t:`Case code <b>${S.c.code}</b>: enter it under Random patient to replay this exact patient, or share it.`})}
   total=Math.round(total);
   const grade=S.complication?'Complication':total>=85?'Attending standard':total>=70?'Senior fellow':total>=50?'Junior fellow':'Keep practising';
   // coffee tokens: one per 10 points, scaled by difficulty; none after a complication
   const earned=S.complication?0:Math.round(total/10*S.D.tokenX);
-  profile.tokens+=earned;const key=S.diff+'-'+S.ci,prev=profile.best[key];if(prev==null||total>prev)profile.best[key]=total;saveProfile();renderWho();
+  profile.tokens+=earned;if(S.c.random)profile.randomDone=(profile.randomDone||0)+1;
+  const key=S.diff+'-'+(S.c.random?'R':S.ci),prev=profile.best[key];if(prev==null||total>prev)profile.best[key]=total;saveProfile();renderWho();
   const ov=$('resultOv');
-  ov.innerHTML=`<div class="rephead">${avatarSVG(profile.avatar,48)}<div><h1>Report · case ${S.ci+1}</h1><span class="fine">${esc(profile.name)} · ${S.D.label}</span></div></div>
+  ov.innerHTML=`<div class="rephead">${avatarSVG(profile.avatar,48)}<div><h1>Report · ${caseName(S)}</h1><span class="fine">${esc(profile.name)} · ${S.D.label}</span></div></div>
   <div class="score"><b>${total}</b><span>${grade}</span></div>
   <div class="tokens">${CUP} +${earned} coffee token${earned===1?'':'s'}${S.D.tokenX>1?` (×${S.D.tokenX} for ${S.D.label})`:''} · ${profile.tokens} banked${prev!=null&&total>prev?' · new best':''}</div>
   <div class="rows">${rows.map(r=>`<span>${r[0]}</span><span class="v">${Math.round(r[1])} / ${r[2]}</span>`).join('')}</div>
   <div class="notes">${notes.map(n=>`<div class="${n.c}">${n.t}</div>`).join('')}</div>
-  <div class="row"><button class="btn primary" id="rAgain">Repeat case</button><button class="btn" id="rCases">Choose another case</button><button class="btn" id="rMenu">Main menu</button></div>`;
+  <div class="row">${S.c.random?'<button class="btn primary" id="rNew">New random patient</button><button class="btn" id="rAgain">Repeat this patient</button>':'<button class="btn primary" id="rAgain">Repeat case</button>'}<button class="btn" id="rCases">Choose another case</button><button class="btn" id="rMenu">Main menu</button></div>`;
   ov.hidden=false;
   $('rAgain').onclick=()=>startCase(S.ci);
+  if($('rNew'))$('rNew').onclick=()=>startCase(randomCode());
   $('rCases').onclick=()=>showMenu('play');
   $('rMenu').onclick=()=>showMenu('home');
   renderMarks();renderPCI(true);

@@ -11,9 +11,10 @@ const mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const norm=a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return [a[0]/l,a[1]/l,a[2]/l]};
 
-/* Coronary tree. ctrl = control points from the ostium outward; r0/r1 = lumen radius (mm) at start/end.
-   A branch starts at one of its parent's control points. */
-const VESSELS=[
+/* Coronary tree (the usual right-dominant pattern). ctrl = control points from the ostium outward;
+   r0/r1 = lumen radius (mm) at start/end. A branch starts at one of its parent's control points.
+   js/sim.js builds the live tree (VESSELS) from these, with any anatomical variant applied (see VARIANT_PARTS). */
+const VESSEL_DEFS=[
  {id:'LM',sys:'L',name:'left main',r0:2.3,r1:2.1,ctrl:[[12,40,-4],[17,40,-4],[22,39,-2]]},
  {id:'LAD',sys:'L',name:'LAD',parent:'LM',r0:1.9,r1:0.7,ctrl:[[22,39,-2],[27,37,9],[31,31,20],[35,19,28],[39,5,31],[43,-11,29],[47,-27,23],[50,-40,15]]},
  {id:'S1',sys:'L',name:'first septal',parent:'LAD',r0:0.6,r1:0.3,ctrl:[[28,35,13],[27,29,7],[26,21,2]]},
@@ -33,8 +34,20 @@ const VESSELS=[
 /* The tree is drawn a little larger than the raw control points: every vessel is stretched away from its
    own ostium by TREE_SCALE (lumen radii by TREE_RSCALE). Lesion positions in the case files are scaled to match. */
 const TREE_SCALE=1.12, TREE_RSCALE=1.06;
-{const o={L:VESSELS[0].ctrl[0].slice(),R:VESSELS.find(v=>v.id==='RCA').ctrl[0].slice()};
- for(const v of VESSELS){const c=o[v.sys];v.ctrl=v.ctrl.map(q=>q.map((x,i)=>c[i]+(x-c[i])*TREE_SCALE));v.r0*=TREE_RSCALE;v.r1*=TREE_RSCALE}}
+
+/* Extra vessels used by anatomical variants (random patients). */
+const VARIANT_PARTS={
+  // ramus intermedius: a third branch from the end of the left main, between the LAD and the circumflex
+  RI:{id:'RI',sys:'L',name:'ramus intermedius',parent:'LM',r0:1.3,r1:0.55,ctrl:[[22,39,-2],[32,36,3],[43,28,5],[52,16,3],[57,3,0]]},
+  // left dominance: the circumflex runs on round the back of the heart to the crux and gives the posterior descending
+  LCX_LONG:[[50,7,-41],[46,-6,-44],[34,-16,-43],[18,-22,-37],[2,-25,-30]],
+  LPDA:{id:'LPDA',sys:'L',name:'posterior descending',parent:'LCx',r0:1.1,r1:0.5,ctrl:[[2,-25,-30],[10,-32,-23],[19,-38,-15],[28,-43,-7]]},
+  // co-dominance: the circumflex reaches part-way and gives a posterolateral branch; the RCA keeps the PDA
+  LCX_MID:[[50,7,-41],[46,-6,-44],[36,-15,-43]],
+  LPL:{id:'LPL',sys:'L',name:'posterolateral',parent:'LCx',r0:0.95,r1:0.45,ctrl:[[36,-15,-43],[30,-24,-38],[22,-30,-31]]},
+  // where the RCA arises from the right sinus (default is between these)
+  RCA_ORIGIN:{anterior:[[-4,44,15],[-15,38,21]],posterior:[[-13,39,5],[-22,35,13]]},
+};
 
 /* Coronary flow speed (mm/s) for contrast travel. */
 const FLOW={L:150,R:125};
@@ -69,7 +82,7 @@ const DIFFICULTY={
 };
 
 /* ECG lead that shows ischaemia in each vessel's territory: V3 anterior (LAD), V5 lateral (circumflex), II inferior (RCA). */
-const TERRITORY={LM:'V3',LAD:'V3',D1:'V3',D2:'V3',S1:'V3',S2:'V3',LCx:'V5',OM1:'V5',OM2:'V5',RCA:'II',CON:'II',AM:'II',PDA:'II',PLV:'II'};
+const TERRITORY={LM:'V3',LAD:'V3',D1:'V3',D2:'V3',S1:'V3',S2:'V3',LCx:'V5',OM1:'V5',OM2:'V5',RCA:'II',CON:'II',AM:'II',PDA:'II',PLV:'II',RI:'V5',LPDA:'II',LPL:'II'};
 const LEADS=['II','V3','V5'];
 
 /* Operator avatars (drawn as SVG in js/game.js). */
