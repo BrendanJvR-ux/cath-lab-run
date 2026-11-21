@@ -82,6 +82,14 @@ const S_ROOT=AO.len-18;
 let S_EXCH=0;for(let i=0;i<AO.p.length;i++){if(AO.p[i][1]>40){S_EXCH=AO.ld[i];break}}
 let S_ARCH0=0,S_ARCH1=0;{let f=false;for(let i=0;i<AO.p.length;i++){if(AO.p[i][1]>95){if(!f){S_ARCH0=AO.ld[i];f=true}S_ARCH1=AO.ld[i]}}}
 const AO_ASC=AO.p.filter((q,i)=>AO.ld[i]>AO.len-80);
+/* The catheter does not run down the middle of the aorta: round the arch it is pushed against the outer wall (the
+   greater curvature), by up to 7 mm where the aorta bends most. Off at the descending aorta's straight run and in
+   the root, so the path still meets the root smoothly. */
+const AO_CATH=(()=>{const n=AO.p.length,out=[];
+  for(let i=0;i<n;i++){const a=AO.p[Math.max(0,i-6)],b=AO.p[Math.min(n-1,i+6)],mid=mul(add(a,b),0.5),o=sub(AO.p[i],mid),l=Math.hypot(o[0],o[1],o[2]);
+    const ld=AO.ld[i],w=clamp((ld-(S_ARCH0-60))/40,0,1)*clamp((S_ROOT-12-ld)/30,0,1);
+    out.push(l>1e-6?add(AO.p[i],mul(o,Math.min(7,l*15)*w/l)):AO.p[i].slice())}
+  return {p:out,ld:AO.ld}})();
 
 function basis(aDeg,bDeg){const a=aDeg*D2R,b=bDeg*D2R;const d=[Math.sin(a)*Math.cos(b),Math.sin(b),Math.cos(a)*Math.cos(b)];const r=[Math.cos(a),0,-Math.sin(a)];const u=[d[1]*r[2]-d[2]*r[1],d[2]*r[0]-d[0]*r[2],d[0]*r[1]-d[1]*r[0]];return {d,r,u}}
 function motion(p,k){
@@ -96,11 +104,25 @@ function contraction(ph){return ph>0.13&&ph<0.5?Math.pow(Math.sin(Math.PI*(ph-0.
 
 /* ---------- catheter ---------- */
 function angDiff(a,b){let d=(a-b)%360;if(d>180)d-=360;if(d<-180)d+=360;return Math.abs(d)}
+/* Torque: the operator turns the hub; the tip follows through a springy shaft that drags on the aortic wall.
+   Small turns wind the shaft up without moving the tip (static friction); once the stored twist beats the friction the
+   tip breaks free, and a big stored twist overshoots ("whip"). Moving the catheter in or out frees it, so torque goes
+   through smoothly, as in the lab. cat = {th (tip, deg), hub (deg), w (tip spin, deg/s)}; fric = static friction (deg
+   of twist the wall can hold). Returns the twist still stored in the shaft. */
+function stepTorque(cat,dt,o){
+  const wrap=a=>{a=(a+540)%360-180;return a},K=60,Cd=8;
+  const F=o.fric*(o.moving?0.25:1)*(o.engaged?1.8:1);
+  for(let t=0;t<dt-1e-9;t+=1/120){const h=Math.min(1/120,dt-t),tw=wrap(cat.hub-cat.th);
+    if(Math.abs(tw)<=F&&Math.abs(cat.w)<5){cat.w=0;continue}
+    const acc=K*(tw-Math.sign(tw)*F*0.5)-Cd*cat.w;cat.w+=acc*h;cat.th+=cat.w*h}
+  cat.th=wrap(cat.th);cat.hub=wrap(cat.hub);
+  return wrap(cat.hub-cat.th);
+}
 function cathState(c,D){
   const out={u:0,eng:null,deep:false,pts:null,tip:null,region:''};
   const sBody=Math.min(c.s,S_ROOT);
-  const pts=[];for(let i=0;i<AO.p.length&&AO.ld[i]<sBody;i++)pts.push(AO.p[i]);
-  const base=pointAt(AO,sBody);pts.push(base);
+  const pts=[];for(let i=0;i<AO_CATH.p.length&&AO.ld[i]<sBody;i++)pts.push(AO_CATH.p[i]);
+  const base=pointAt(AO_CATH,sBody);pts.push(base);
   if(c.s<=S_ROOT){
     out.pts=pts;out.tip=base;
     out.region=c.s<S_ARCH0?'Descending aorta':c.s<=S_ARCH1?'Aortic arch':'Ascending aorta';
@@ -120,10 +142,14 @@ function cathState(c,D){
     if(u>=0.55){out.eng=C.sys;out.deep=u>deepU}
   }
   const full=add(ROOT,add(mul(dir,c.type==='JL'?-13:-6),[0,c.type==='JL'?22:12,0]));
-  const ctrl=add(mul(mul(add(base,tip),0.5),1-open),mul(full,open));
+  let ctrl=add(mul(mul(add(base,tip),0.5),1-open),mul(full,open));
+  // pushing on without an ostium to go into: the tip meets the aortic valve, the curve folds and the body loops up
+  // (prolapse). The tip is driven down onto the valve and the shaft bows upwards.
+  if(!out.eng&&u>1){const b=sm((u-1)/0.5);out.buckle=b;
+    tip=add(mul(tip,1-0.75*b),mul(add(ROOT,add(mul(dir,6),[0,-16,0])),0.75*b));ctrl=add(ctrl,[0,18*b,0])}
   for(let i=1;i<=20;i++){const t=i/20,a=(1-t)*(1-t),b=2*(1-t)*t,cc=t*t;pts.push([a*base[0]+b*ctrl[0]+cc*tip[0],a*base[1]+b*ctrl[1]+cc*tip[1],a*base[2]+b*ctrl[2]+cc*tip[2]])}
   out.pts=pts;out.tip=tip;
-  out.region=out.eng?(out.deep?'Deep-seated':'Engaged '+(out.eng==='L'?'LMCA':'RCA')):'Aortic root';
+  out.region=out.eng?(out.deep?'Deep-seated':'Engaged '+(out.eng==='L'?'LMCA':'RCA')):out.buckle>0.3?'Prolapsing onto the aortic valve':'Aortic root';
   return out;
 }
 
@@ -229,6 +255,10 @@ function segLabel(v,ld){if(v.id==='LM')return 'left main';const f=ld/v.len;retur
 /* ---------- static image layers ---------- */
 const noise=[];for(let n=0;n<4;n++){const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');const id=g.createImageData(256,256);for(let i=0;i<id.data.length;i+=4){const v=128+(Math.random()+Math.random()-1)*46;id.data[i]=id.data[i+1]=id.data[i+2]=v;id.data[i+3]=255}g.putImageData(id,0,0);noise.push(c)}
 const vign=document.createElement('canvas');vign.width=vign.height=W;{const g=vign.getContext('2d');const rg=g.createRadialGradient(W/2,W/2,W*0.32,W/2,W/2,W*0.74);rg.addColorStop(0,'rgba(120,90,50,0)');rg.addColorStop(1,'rgba(120,90,50,0.32)');g.fillStyle=rg;g.fillRect(0,0,W,W)}
+/* The image is drawn at RES× the 512-unit drawing space, so it stays sharp on high-density screens.
+   hiCanvas() gives a RES× canvas whose context already draws in 512-unit coordinates. */
+const RES=2;
+const hiCanvas=()=>{const c=document.createElement('canvas');c.width=c.height=W*RES;const g=c.getContext('2d');g.setTransform(RES,0,0,RES,0,0);return c};
 const bgCache=new Map();
 const PAPER='#f3ead4';
 /* hand-drawn helpers: a stable pseudo-random number per (i, j), and pencil hatching over the whole canvas (clip it first) */
@@ -299,7 +329,7 @@ const m3=pts=>{const m=[0,0,0];for(const p of pts)for(let i=0;i<3;i++)m[i]+=p[i]
    tree's own outline so every vessel stays inside), the atria and appendages, the aorta, pulmonary trunk and cavae */
 function heartMask(B,geo){
   const P=q=>proj(q,B),{V,pts}=geo||heartGeometry(),parts=HEART_PARTS,hullOf=e=>hull2(ellPts(e).map(P));
-  const c=document.createElement('canvas');c.width=c.height=W;const m=c.getContext('2d');m.fillStyle='#000';m.strokeStyle='#000';m.lineCap='round';m.lineJoin='round';
+  const c=hiCanvas(),m=c.getContext('2d');m.fillStyle='#000';m.strokeStyle='#000';m.lineCap='round';m.lineJoin='round';
   for(const e of [V,parts.RA,parts.LA,parts.LAA,parts.RAA]){smoothClosed(m,hullOf(e),0,0);m.fill()}
   smoothClosed(m,hull2(pts.map(P)),0,0);m.fill();
   for(const [pts3,r] of heartTubes()){if(pts3===PA_L||pts3===PA_R)continue; // the pulmonary branches are hilar, not part of the cardiac outline
@@ -314,13 +344,13 @@ function drawHeartSketch(g,B){
   const tubes=heartTubes();
   const pathOf=pts=>{const q=pts.map(P);g.beginPath();q.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]))};
   // the silhouette: fill every part into a mask, then keep a thin ring just outside it
-  const mk=()=>{const c=document.createElement('canvas');c.width=c.height=W;return c};
+  const mk=hiCanvas;
   const mask=heartMask(B,geo);
-  const ringOf=(w,ox,oy)=>{const r=mk(),x=r.getContext('2d');for(let k=0;k<12;k++){const a=k/12*Math.PI*2;x.drawImage(mask,ox+Math.cos(a)*w,oy+Math.sin(a)*w)}
-    x.globalCompositeOperation='destination-out';x.drawImage(mask,ox,oy);x.globalCompositeOperation='source-in';x.fillStyle='rgb(62,54,46)';x.fillRect(0,0,W,W);return r};
+  const ringOf=(w,ox,oy)=>{const r=mk(),x=r.getContext('2d');for(let k=0;k<12;k++){const a=k/12*Math.PI*2;x.drawImage(mask,ox+Math.cos(a)*w,oy+Math.sin(a)*w,W,W)}
+    x.globalCompositeOperation='destination-out';x.drawImage(mask,ox,oy,W,W);x.globalCompositeOperation='source-in';x.fillStyle='rgb(62,54,46)';x.fillRect(0,0,W,W);return r};
   g.save();
-  if(HEART_MODE==='chambers'){const h=mk(),x=h.getContext('2d');hatch(x,-32,8,0.9,ink(0.1),3);x.globalCompositeOperation='destination-in';x.drawImage(mask,0,0);g.drawImage(h,0,0)}
-  g.globalAlpha=HEART_MODE==='chambers'?0.42:0.34;g.drawImage(ringOf(1.6,0,0),0,0);g.globalAlpha*=0.5;g.drawImage(ringOf(1.1,1.3,-0.9),0,0);g.globalAlpha=1;
+  if(HEART_MODE==='chambers'){const h=mk(),x=h.getContext('2d');hatch(x,-32,8,0.9,ink(0.1),3);x.globalCompositeOperation='destination-in';x.drawImage(mask,0,0,W,W);g.drawImage(h,0,0,W,W)}
+  g.globalAlpha=HEART_MODE==='chambers'?0.42:0.34;g.drawImage(ringOf(1.6,0,0),0,0,W,W);g.globalAlpha*=0.5;g.drawImage(ringOf(1.1,1.3,-0.9),0,0,W,W);g.globalAlpha=1;
   if(HEART_MODE==='chambers'){
     g.lineCap='round';g.lineJoin='round';
     // each chamber's own outline, faint, where it overlaps the others
@@ -350,9 +380,9 @@ function drawHeartSketch(g,B){
 }
 function getBg(a,b){
   const key=Math.round(a)+'|'+Math.round(b)+'|'+ANAT_VER+'|'+HEART_MODE;if(bgCache.has(key))return bgCache.get(key);
-  const c=document.createElement('canvas');c.width=c.height=W;const B=basis(a,b);
+  const c=hiCanvas(),B=basis(a,b);
   // the anatomy is drawn in black on a transparent layer, then laid on paper as graphite (see the end)
-  const lay=document.createElement('canvas');lay.width=lay.height=W;const g=lay.getContext('2d');
+  const lay=hiCanvas(),g=lay.getContext('2d');
   // ribs: twelve pairs, each articulating with its thoracic vertebra (T1 at the top of the spine below). A rib runs
   // back and out from the spine to its angle, sweeps round the side of the chest, then slopes down and forwards
   // to the costochondral junction, three or four levels below where it started. The posterior part is dense with
@@ -424,23 +454,27 @@ function getBg(a,b){
   // compose: paper, cross-hatched heart shadow, then the anatomy as graphite drawn twice slightly offset (a sketchy pencil line)
   const gc=c.getContext('2d');gc.fillStyle=PAPER;gc.fillRect(0,0,W,W);
   drawHeartSketch(gc,B);
-  const tint=document.createElement('canvas');tint.width=tint.height=W;{const t=tint.getContext('2d');t.drawImage(lay,0,0);t.globalCompositeOperation='source-in';t.fillStyle='rgb(62,54,46)';t.fillRect(0,0,W,W)}
-  gc.globalAlpha=1;gc.drawImage(tint,0,0);gc.globalAlpha=0.55;gc.drawImage(tint,1.4,-1);gc.globalAlpha=0.3;gc.drawImage(tint,-1,1.3);gc.globalAlpha=1;
-  if(bgCache.size>40)bgCache.delete(bgCache.keys().next().value);
+  const tint=hiCanvas();{const t=tint.getContext('2d');t.drawImage(lay,0,0,W,W);t.globalCompositeOperation='source-in';t.fillStyle='rgb(62,54,46)';t.fillRect(0,0,W,W)}
+  gc.globalAlpha=1;gc.drawImage(tint,0,0,W,W);gc.globalAlpha=0.55;gc.drawImage(tint,1.4,-1,W,W);gc.globalAlpha=0.3;gc.drawImage(tint,-1,1.3,W,W);gc.globalAlpha=1;
+  if(bgCache.size>16)bgCache.delete(bgCache.keys().next().value);
   bgCache.set(key,c);return c;
 }
 
 /* ---------- rendering ---------- */
 let ictx=null; // set by js/game.js (or a test) to the 2D context the image is drawn into
-const dcan=document.createElement('canvas');dcan.width=dcan.height=W;const dctx=dcan.getContext('2d');
+const dcan=hiCanvas(),dctx=dcan.getContext('2d');
+/* Each vessel is drawn on its own layer (the lumen never darkens itself where its strokes overlap), then MULTIPLIED
+   into the image: transmissions multiply, so attenuation adds, exactly as X-rays do (Beer–Lambert). Where two
+   vessels cross, or a branch runs over its parent, the image is darker. */
+const vcan=hiCanvas(),vctx=vcan.getContext('2d');
 /* ink: v = 1 is bare paper (white in the multiply layer), v = 0 is full blue-black ink */
 const INK=[34,33,56];
 const grey=v=>{v=clamp(v,0,1);return 'rgb('+Math.round(INK[0]+(255-INK[0])*v)+','+Math.round(INK[1]+(255-INK[1])*v)+','+Math.round(INK[2]+(255-INK[2])*v)+')'};
 let lastProj=null;
 function renderImage(st){
   const B=basis(st.a,st.b),k=contraction(st.phase);
-  const ctx=ictx;ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
-  ctx.drawImage(getBg(st.a,st.b),0,0);
+  const ctx=ictx,sc=ctx.canvas.width/W;ctx.setTransform(sc,0,0,sc,0,0);ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+  ctx.drawImage(getBg(st.a,st.b),0,0,W,W);
   dctx.globalCompositeOperation='source-over';dctx.fillStyle='#fff';dctx.fillRect(0,0,W,W);
   dctx.globalCompositeOperation='darken';dctx.lineCap='round';dctx.lineJoin='round';
   if(st.root>0.02){
@@ -460,21 +494,34 @@ function renderImage(st){
       const d=v.base+v.ld[i];let delay=d/FLOW[v.sys],att=1-0.35*d/MAXD[v.sys];
       for(const L of slow){if(d>L.gd){delay+=(d-L.gd)/FLOW[v.sys]*2.4;att*=0.72}}
       if(st.events){const m=flowMod(v,i,st.events);delay+=m.delay;att*=m.att}
-      cs[i]=st.conc(v.sys,st.t-delay)*att;
+      // the bolus front spreads as it travels (dispersion): average the concentration over a window that widens with transit time
+      const sp=0.06+0.14*delay,t0=st.t-delay;
+      cs[i]=(st.conc(v.sys,t0-sp)+2*st.conc(v.sys,t0)+st.conc(v.sys,t0+sp))/4*att;
     }
     projV.push({v,xs,ys,cs});const rws=new Float32Array(v.n);
-    for(let i=0;i<v.n-1;i++){
-      const c=(cs[i]+cs[i+1])/2;if(c<0.02)continue;
+    let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,any=false;
+    for(let i=0;i<v.n;i++){if(cs[i]<0.02)continue;any=true;x0=Math.min(x0,xs[i]);x1=Math.max(x1,xs[i]);y0=Math.min(y0,ys[i]);y1=Math.max(y1,ys[i])}
+    const pad=v.r0*SCALE*1.5+6;x0=Math.max(0,Math.floor(x0-pad));y0=Math.max(0,Math.floor(y0-pad));x1=Math.min(W,Math.ceil(x1+pad));y1=Math.min(W,Math.ceil(y1+pad));
+    if(any){vctx.globalCompositeOperation='source-over';vctx.fillStyle='#fff';vctx.fillRect(x0,y0,x1-x0,y1-y0);vctx.globalCompositeOperation='darken';vctx.lineCap='round';vctx.lineJoin='round'}
+    // a branch's first millimetres lie inside its parent's lumen: leave them to the parent, or the junction would
+    // count twice and show a dark bead at every branch point
+    const skip=v.parent?VBY[v.parent].r[v.joinIdx]*1.7:0;
+    for(let i=0;any&&i<v.n-1;i++){
+      const c=(cs[i]+cs[i+1])/2;if(c<0.02||v.ld[i+1]<skip)continue;
       let rf=1;for(const [L,ap] of les){const dd=Math.abs(v.ld[i]-L.at),h=L.len/2;if(dd<h)rf*=1-ap*0.5*(1+Math.cos(Math.PI*dd/h))}
       if(st.events)for(const ev of st.events){if(ev.vid!==v.id)continue;const dd=Math.abs(v.ld[i]-ev.ld),h=ev.len/2;if(dd>=h)continue;
         if(ev.kind==='dissection'&&!ev.treated)rf*=1-(ev.closed?0.85:0.25+0.55*ev.progress)*0.5*(1+Math.cos(Math.PI*dd/h));
         else if(ev.kind==='spasm'&&ev.sev>0.02)rf*=1-ev.sev*0.5*(1+Math.cos(Math.PI*dd/h))}
+      // a round lumen: X-rays crossing its middle travel through more contrast than at its edge (chord length), so
+      // three nested strokes give the darker centre and softer walls of a real opacified artery
       const r=v.r[i]*rf,w=Math.max(1.1,2*r*SCALE),dens=0.5+0.5*Math.min(1,r/1.5);
-      dctx.beginPath();dctx.moveTo(xs[i],ys[i]);dctx.lineTo(xs[i+1],ys[i+1]);
-      dctx.lineWidth=w;dctx.strokeStyle=grey(1-0.6*c*dens);dctx.stroke();
-      dctx.lineWidth=w*0.5;dctx.strokeStyle=grey(1-0.86*c*dens);dctx.stroke();
+      vctx.beginPath();vctx.moveTo(xs[i],ys[i]);vctx.lineTo(xs[i+1],ys[i+1]);
+      vctx.lineWidth=w;vctx.strokeStyle=grey(1-0.42*c*dens);vctx.stroke();
+      vctx.lineWidth=w*0.72;vctx.strokeStyle=grey(1-0.66*c*dens);vctx.stroke();
+      vctx.lineWidth=w*0.4;vctx.strokeStyle=grey(1-0.86*c*dens);vctx.stroke();
       rws[i]=r;
     }
+    if(any){dctx.globalCompositeOperation='multiply';dctx.drawImage(vcan,x0*RES,y0*RES,(x1-x0)*RES,(y1-y0)*RES,x0,y0,x1-x0,y1-y0);dctx.globalCompositeOperation='darken'}
     // pen outline along both walls of the filled lumen, re-inked every few frames so the line "boils" like hand-drawn animation
     const boil=Math.floor((st.frame||0)/4);
     for(const side of [-1,1]){dctx.beginPath();let pen=false;
@@ -494,9 +541,9 @@ function renderImage(st){
     const tq=pp[pp.length-1];dctx.beginPath();dctx.arc(tq[0],tq[1],2.8,0,7);dctx.fillStyle=grey(0.36);dctx.fill();
     if(st.wire){const p2=proj(motion(add(cs.tip,[0,14,0]),k),B);dctx.beginPath();dctx.moveTo(tq[0],tq[1]);dctx.lineTo(p2[0],p2[1]);dctx.lineWidth=1.6;dctx.strokeStyle=grey(0.35);dctx.stroke()}
   }
-  ctx.globalCompositeOperation='multiply';ctx.drawImage(dcan,0,0);
+  ctx.globalCompositeOperation='multiply';ctx.drawImage(dcan,0,0,W,W);
   ctx.globalCompositeOperation='overlay';ctx.globalAlpha=st.mode==='cine'?0.07:0.16;ctx.imageSmoothingEnabled=true;ctx.drawImage(noise[st.frame%4],0,0,W,W);
-  ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.drawImage(vign,0,0);
+  ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.drawImage(vign,0,0,W,W);
   lastProj={B,k,projV};
   if(st.marks&&st.marks.length){
     ctx.lineWidth=2.2;ctx.font='700 18px "Kalam", "Patrick Hand", cursive';

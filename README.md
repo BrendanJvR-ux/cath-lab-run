@@ -54,8 +54,10 @@ Upgrades are `UPGRADES` and other items `SHOP` in `config/config.js`. Old single
 | Step | What you do |
 |---|---|
 | Access | Start with a 6F JL4 catheter in the femoral sheath. Hold fluoro and advance up the descending aorta, over the arch, into the aortic root. |
+| Catheter feel | The arrow keys turn the hub; the tip follows through a springy shaft that drags on the aortic wall (most round the arch, more on harder difficulties). Small turns wind the shaft up without moving the tip, and the status line tells you how much twist is stored; a big stored twist can make the tip whip past. Advancing or withdrawing a little frees it so the torque goes through. Round the arch the catheter rides the outer wall. Pushing on in the root without engaging folds the tip onto the aortic valve (prolapse): pull back and torque towards the ostium. |
 | Engage | Torque the tip into the ostium: JL4 for the left main, JR4 (a clockwise turn) for the RCA. Near an ostium the tip drops in on its own. Switch between JL4 and JR4 with the catheter toggle (or X) from anywhere outside an ostium; it backs out of an engaged ostium first. |
 | Watch the pressure | Advance too far and the aortic trace damps. Injecting through a damped catheter causes an ostial dissection and ends the case. |
+| X-ray image | Drawn at 1024 px for sharp screens. Each vessel is its own attenuation layer, multiplied in as X-rays add up, so a vessel crossing another (or the spine, or the catheter) looks darker; each vessel is darker down its middle than at its walls, as a round contrast-filled tube is; and the bolus front blurs as it travels down the tree. |
 | Record | Start a cine run, then inject. Contrast flows down the tree and washes out; flow beyond a severe stenosis is slow. RCA injections can cause brief bradycardia. |
 | Choose views | The C-arm rotates in 3D (LAO/RAO, cranial/caudal). Some lesions are eccentric, so they look tight in one projection and mild in another. |
 | Report | Replay a run, click the narrowing and grade it (<50%, 50–69%, 70–89%, ≥90%). |

@@ -187,8 +187,8 @@ test('Heart sketch: chambers in their anatomical places around the coronary tree
   ok(H.RA.c[0]<V.c[0]&&H.RA.c[0]<H.LA.c[0],'the right atrium should form the right border');
   ok(H.LAA.c[0]>H.LA.c[0]&&H.LAA.c[2]>H.LA.c[2],'the left atrial appendage reaches forward and left');
   // every coronary (beyond the ostia) lies inside the drawn cardiac outline, in every standard projection
-  for(const pr of [['AP',0,0],['RAO 30 CAU 25',-30,-25],['LAO 45 CRA 25',45,25],['LAO 40',40,0]]){const B=basis(pr[1],pr[2]),d=heartMask(B).getContext('2d').getImageData(0,0,W,W).data;
-    for(const v of VESSELS)for(let i=Math.floor(v.n*0.15);i<v.n;i+=4){const q=proj(v.p[i],B),x=Math.round(q[0]),y=Math.round(q[1]);if(x<0||y<0||x>=W||y>=W)continue;ok(d[(y*W+x)*4+3]>0,`${v.id} pokes out of the heart in ${pr[0]}`)}}
+  for(const pr of [['AP',0,0],['RAO 30 CAU 25',-30,-25],['LAO 45 CRA 25',45,25],['LAO 40',40,0]]){const B=basis(pr[1],pr[2]),d=heartMask(B).getContext('2d').getImageData(0,0,W*RES,W*RES).data;
+    for(const v of VESSELS)for(let i=Math.floor(v.n*0.15);i<v.n;i+=4){const q=proj(v.p[i],B),x=Math.round(q[0]),y=Math.round(q[1]);if(x<0||y<0||x>=W||y>=W)continue;ok(d[(y*RES*W*RES+x*RES)*4+3]>0,`${v.id} pokes out of the heart in ${pr[0]}`)}}
   return V.ax.map(a=>Math.round(a.r*2)).join(' × ')+' mm ventricles';
 });
 
@@ -214,6 +214,23 @@ test('Daily case: one code per day, the same for everyone; medals by difficulty'
   for(const d of Object.keys(DIFFICULTY))ok(MEDALS[d].gold>MEDALS[d].silver&&MEDALS[d].silver>MEDALS[d].bronze,d);
   ok(MEDALS.easy.gold>MEDALS.hard.gold,'Easy should ask more for gold');
   return `today ${dailyCode()} · gold needs ${MEDALS.easy.gold}/${MEDALS.medium.gold}/${MEDALS.hard.gold}`;
+});
+
+test('Torque: small turns wind the shaft up, big stored twist whips the tip, moving the catheter frees it',()=>{
+  const c={th:0,hub:8,w:0};stepTorque(c,1,{fric:10});ok(Math.abs(c.th)<1e-6,'an 8° turn should not move the tip against 10° of wall friction');
+  const d={th:0,hub:50,w:0};let peak=0;for(let i=0;i<120;i++){stepTorque(d,1/60,{fric:10});peak=Math.max(peak,d.th)}
+  ok(peak>50,'a 50° wind-up should overshoot (whip), peak '+peak.toFixed(0)+'°');ok(Math.abs(d.hub-d.th)<=10,'it should settle within the friction band');
+  const e={th:0,hub:8,w:0};stepTorque(e,1,{fric:10,moving:true});ok(e.th>4,'advancing or withdrawing should let the torque through');
+  return `50° wind-up whips to ${peak.toFixed(0)}°`;
+});
+test('Pushing on without engaging folds the catheter onto the aortic valve',()=>{
+  const off=OSTANG.L+120,c=cathState({type:'JL',th:off,s:S_ROOT+22*1.55},DIFFICULTY.easy);
+  ok(!c.eng&&c.buckle>0.8,'should prolapse');ok(c.tip[1]<ROOT[1]-5,'tip should drop towards the valve');
+  ok(!cathState({type:'JL',th:OSTANG.L,s:S_ROOT+22*1.3},DIFFICULTY.easy).buckle,'an engaged catheter deep-seats instead');
+});
+test('Round the arch the catheter rides the outer wall; it rejoins the centre line in the root',()=>{
+  let mx=0;for(let i=0;i<AO.p.length;i++)mx=Math.max(mx,dist3(AO.p[i],AO_CATH.p[i]));ok(mx>3&&mx<=7.01,'max offset '+mx.toFixed(1));
+  ok(dist3(pointAt(AO,S_ROOT),pointAt(AO_CATH,S_ROOT))<0.5,'offset should be gone at the root');return `up to ${mx.toFixed(1)} mm off the centre line`;
 });
 
 /* random patients (run last; they rebuild the anatomy, and the final test restores the default) */

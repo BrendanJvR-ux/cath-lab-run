@@ -1,6 +1,6 @@
 /* Cath Lab Run: menu and operator profile, game state, input, UI, PCI tools, hemodynamic strip, main loop and scoring. */
 "use strict";
-const img=document.getElementById('img');ictx=img.getContext('2d');
+const img=document.getElementById('img');img.width=img.height=W*RES;ictx=img.getContext('2d');ictx.setTransform(RES,0,0,RES,0,0);
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -165,7 +165,7 @@ function newState(ci){
   HEART_MODE=['chambers','outline','none'][base.level-1]||'outline'; // the heart sketch: labelled chambers on Easy, outline on Medium, none on Hard
   // shop perks adjust a copy of the difficulty settings
   const D={...base,tol:{...base.tol}},tq=upgradeVal('torque');D.tol.L+=tq;D.tol.R+=tq;
-  return {ci,c,D,ch,forced:ch.forced,diff:profile.diff,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,type:'JL'},exch:0,
+  return {ci,c,D,ch,forced:ch.forced,diff:profile.diff,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,hub:CATH.JL.home,w:0,type:'JL'},twist:0,exch:0,
     cL:0,cR:0,cRoot:0,hist:{L:[],R:[],root:[]},histN:0,contrast:0,ak:0,ftime:0,ctime:0,blind:0,wasted:0,
     cine:null,runs:[],marks:[],pending:null,review:null,imgAcc:0,frame:0,deepInj:0,rcaInj:0,complication:null,done:false,
     sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),events:[],drugs:[],hrDip:0,bpDip:0,isch:0,effusion:0,tamponade:false,pcT:0,pcCount:0,protamine:false,seals:[],prevEng:null,prevDeep:false,
@@ -526,20 +526,25 @@ function tick(dt){
   const ph0=S.phase;S.hr+=(S.hrT-S.hr)*Math.min(1,dt/1.2);S.phase=(S.phase+dt*S.hr/60)%1;
   // catheter handling
   let cs=cst(c);
-  if(S.exch>0){S.exch-=dt;if(S.exch<=0){c.type=c.type==='JL'?'JR':'JL';c.th=CATH[c.type].home;c.s=Math.min(c.s,S_ROOT);toast(`${CATH[c.type].label} is in. Same position, ready to torque.`)}}
+  if(S.exch>0){S.exch-=dt;if(S.exch<=0){c.type=c.type==='JL'?'JR':'JL';c.th=c.hub=CATH[c.type].home;c.w=0;c.s=Math.min(c.s,S_ROOT);toast(`${CATH[c.type].label} is in. Same position, ready to torque.`)}}
   else if(S.pci){if(down('ArrowUp','KeyW','ArrowDown','KeyS','ArrowLeft','KeyA','ArrowRight','KeyD')&&toastT<=0)toast('The guide is holding position over the wire. Remove the wire first.')}
   else if(!S.complication){
     let moved=false;const spd=26+84*clamp((S_ROOT-10-c.s)/90,0,1); // slows smoothly approaching the root
     if(down('ArrowUp','KeyW')){c.s=Math.min(S_ROOT+22*1.6,c.s+spd*dt);moved=true}
     if(down('ArrowDown','KeyS')){c.s=Math.max(0,c.s-spd*dt);moved=true}
-    if(down('ArrowRight','KeyD')){c.th+=170*dt;moved=true}
-    if(down('ArrowLeft','KeyA')){c.th-=170*dt;moved=true}
-    // near the ostium a preshaped Judkins tends to drop in on its own (more help on easier settings)
-    if(D.seek>0){const C=CATH[c.type],c0=cst(c);if(!c0.eng&&c0.u>=0.55&&!down('ArrowLeft','KeyA','ArrowRight','KeyD')){const diff=((OSTANG[C.sys]-c.th+540)%360)-180;if(Math.abs(diff)<D.tol[C.sys]+D.seek)c.th+=Math.sign(diff)*Math.min(Math.abs(diff),D.seekSpeed*dt)}}
+    const axial=down('ArrowUp','KeyW','ArrowDown','KeyS');
+    if(down('ArrowRight','KeyD')){c.hub+=170*dt;moved=true}
+    if(down('ArrowLeft','KeyA')){c.hub-=170*dt;moved=true}
+    // torque reaches the tip through the shaft: it drags on the aortic wall (most round the arch), winds up, then lets go
+    {const c0=cst(c),region=c.s<S_ARCH0?0.3:c.s<=S_ROOT?1.2:1;
+     S.twist=stepTorque(c,dt,{fric:[0,5,10,16][D.level]*region,moving:axial,engaged:!!c0.eng})}
+    // near the ostium a preshaped Judkins tends to drop in on its own (more help on easier settings): the whole catheter turns
+    if(D.seek>0){const C=CATH[c.type],c0=cst(c);if(!c0.eng&&c0.u>=0.55&&!down('ArrowLeft','KeyA','ArrowRight','KeyD')){const diff=((OSTANG[C.sys]-c.th+540)%360)-180;if(Math.abs(diff)<D.tol[C.sys]+D.seek){const d=Math.sign(diff)*Math.min(Math.abs(diff),D.seekSpeed*dt);c.th+=d;c.hub+=d}}}
     if(c.th>180)c.th-=360;if(c.th<-180)c.th+=360;
     const imaging=down('Space','KeyF')||!!S.cine;
     if(moved&&!imaging&&c.s>120){S.blind+=dt;if(S.blind>0.6&&Math.floor((S.blind-dt)/2)!==Math.floor(S.blind/2))toast('Moving the catheter without fluoro. Step on the pedal.',true)}
     cs=cst(c);
+    if(cs.buckle>0.35&&toastT<=0)toast('The catheter is folding onto the aortic valve. Pull back a little and torque towards the ostium.');
   }
   S.cs=cs;
   // catheter-induced spasm: on engaging an ostium, more so the RCA, and very likely if the catheter deep-seats
@@ -684,7 +689,8 @@ function updateUI(){
   else if(S.pci){cls='ok';msg={wire:'Crossing the lesion with a 0.014" wire. Keep fluoro on.',tools:'Wire across. Choose a balloon or a stent.',size:'Pick the diameter and length.',positioned:'Device in place. Check its position on fluoro, then hold Inflate.'}[S.pci.stage]}
   else if(cs.deep){cls='danger';msg='Pressure damped: catheter deep-seated. Withdraw slightly before you inject.'}
   else if(cs.eng){cls='ok';msg=`Engaged ${cs.eng==='L'?'left main':'right coronary'} ostium. Pressure normal. Start cine, then inject.`}
-  else if(cs.u>0){cls='warn';const need=CATH[S.cath.type].sys;msg=`In the aortic root, ${CATH[S.cath.type].label} tip at ${Math.round(S.cath.th)}°. Torque to find the ${need==='L'?'left main':'right coronary'} ostium; a short test puff shows where you are.`}
+  else if(cs.buckle>0.3){cls='danger';msg='Prolapsing: the tip is folding onto the aortic valve. Withdraw a little, then torque towards the ostium.'}
+  else if(cs.u>0){cls='warn';const need=CATH[S.cath.type].sys,tw=Math.round(S.twist||0);msg=`In the aortic root, ${CATH[S.cath.type].label} tip at ${Math.round(S.cath.th)}°. Torque to find the ${need==='L'?'left main':'right coronary'} ostium; a short test puff shows where you are.`+(Math.abs(tw)>6?` ${Math.abs(tw)}° of twist stored in the shaft: nudge the catheter in or out to let it reach the tip, or it may whip.`:'')}
   else{msg=`${cs.region||'Femoral sheath'} · ${Math.round(S.cath.s)} mm inserted.`}
   st.className='status '+cls;st.textContent=msg;
   document.querySelectorAll('#presets button').forEach(b=>b.disabled=!!S.cine);
