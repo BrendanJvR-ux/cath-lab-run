@@ -175,7 +175,7 @@ kbd{font-family:var(--f-mono);font-size:14px;border:1.5px solid var(--line);bord
 /* menu visuals */
 .overlay[data-view="home"]{background:rgba(239,230,210,.96)}
 .hero{position:relative;min-height:clamp(170px,34vw,250px);border-radius:var(--wob);overflow:hidden;background:#fbf3e4;border:2.5px solid var(--line);box-shadow:var(--shadow)}
-.heroimg{position:absolute;right:clamp(4px,5%,48px);top:4%;height:92%;width:auto;max-width:none;filter:url(#rough)}
+.heroimg{position:absolute;right:clamp(0px,2%,24px);bottom:2%;width:46%;height:auto;max-height:96%;object-fit:contain;object-position:right bottom}
 @media (max-width:560px){.heroimg{height:100%;right:-30px;opacity:.45}}
 .herotxt{position:relative;max-width:min(52%,340px);padding:clamp(14px,3vw,22px);display:flex;flex-direction:column;gap:8px}
 .herotxt h1{font-size:clamp(36px,7vw,60px);transform:rotate(-2deg);transform-origin:left}
