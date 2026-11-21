@@ -24,6 +24,7 @@ canvas{display:none}
 <script src="../config/config.js"></script>
 <script src="../js/sim.js"></script>
 <script src="../js/gen.js"></script>
+<script src="../js/career.js"></script>
 <script>
 "use strict";
 const results=[];
@@ -249,6 +250,18 @@ test('Pressure wire: FFR falls with the narrowing, counts only what is upstream 
   const L=mk(0.85);ok(ffrAt('LAD',L[0].at-12,L,false)===1,'a sensor before the narrowing should read 1');
   L[0].cur=0.05;ok(ffrAt('LAD',L[0].at+20,L,true)>0.95,'after stenting the FFR should recover');
   return `FFR: 55% → ${f55.toFixed(2)} (leave), 66% → ${f66.toFixed(2)} (treat), 85% → ${f85.toFixed(2)}`;
+});
+
+test('STEMI: about one patient in six, culprit fully blocked, ST elevation in its territory',()=>{
+  let n=0,st=0;for(let i=0;i<300;i++){const p=generatePatient(seedToCode((i*48271+5)%CODE_SPACE));n++;if(p.ecg&&p.ecg.stemi){st++;
+    const L=p.lesions.find(l=>l.sev>=0.98);ok(L,'STEMI without an occluded culprit');ok(p.ecg.stemi[0]===TERRITORY[L.vid],'ST elevation should face the culprit');ok(/STEMI/.test(p.title))}}
+  ok(st>n*0.1&&st<n*0.25,'STEMI share '+st+'/'+n);buildAnatomy();return `${st} of ${n} patients are STEMIs`;
+});
+test('Career ladder: seven goals, each on a sensible difficulty, harder as you climb',()=>{
+  ok(CAREER.length===7&&CAREER.every(g=>g.need>0&&DIFFICULTY[g.diff]&&typeof g.test==='function'));
+  const lv=CAREER.map(g=>DIFFICULTY[g.diff].level);for(let i=1;i<lv.length;i++)ok(lv[i]>=lv[i-1],'difficulty should not go down at '+CAREER[i].rank);
+  ok(CAREER[3].test({diff:'medium',score:70,stemi:true,d2b:84})&&!CAREER[3].test({diff:'medium',score:70,stemi:true,d2b:95}),'STEMI goal needs D2B ≤ 90');
+  return CAREER.map(g=>g.rank).join(' → ')+' → '+TOP_RANK;
 });
 
 /* random patients (run last; they rebuild the anatomy, and the final test restores the default) */

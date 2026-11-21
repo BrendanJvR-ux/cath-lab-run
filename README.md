@@ -22,6 +22,7 @@ Then open http://localhost:8767/ (the game) or http://localhost:8767/tests/tests
 | `js/gen.js` | Random patients: case codes, anatomy variants, lesions, a matching history, and each case's complications for the chosen difficulty (`caseChallenge`). |
 | `js/sim.js` | Geometry, anatomy builder (variants), catheter position and engagement, lesion appearance per projection, stent and balloon outcome rules, coverage segments, coronary tortuosity, ribs and spine, and the X-ray image renderer (including wire, balloon and stent struts). No game state. |
 | `js/glossary.js` | The glossary (about 57 terms) and the links from the tutorial coach. |
+| `js/career.js` | Career mode: the ranks, their goals and promotions. |
 | `js/tutorial.js` | The play-through tutorial: experience levels, the tutorial patient and the coach's steps. |
 | `js/heart3d.js` | The 3D heart view (three.js r128 from a CDN, loaded the first time you open it). |
 | `js/game.js` | Menu, operator profile and coffee tokens, game state, controls, cine runs and review, the PCI tools, the three-lead ECG and pressure strip, the main loop and scoring. |
@@ -75,6 +76,18 @@ Upgrades are `UPGRADES` and other items `SHOP` in `config/config.js`. Old single
 ## Tutorial
 
 Before your first case the game asks how much angiography you have done: **new to angiography**, **some experience** or **experienced**. Then it offers a short play-through on one complication-free patient (a proximal LAD stenosis, on Easy). A coach card under the monitor gives one step at a time, highlights the control you need, and moves on when you have actually done it: switch on fluoro, advance, engage the left main, record a cine run, take a second view, mark and grade the narrowing, wire it, stent it, check the result, finish. New players get every step with the anatomy explained; some experience gets shorter notes; experienced players get a seven-step run through this game's controls only. Afterwards the difficulty is set to suit (Easy, Easy, Medium). Replay it any time from **Tutorial** on the main menu. Returning players (anyone who has played a case, finished or skipped the tutorial) go straight to the cases, and both tutorial screens have a skip button.
+
+## Career
+
+**Career** on the main menu is a ladder of ranks: Medical student → Junior fellow → Fellow → Senior fellow → Interventional fellow → Consultant cardiologist → Interventional consultant → Head of the cath lab. Each rank has one goal (for example two Easy cases scoring 60+, a STEMI opened within 90 minutes on Medium, a complication managed on Medium or Hard, two Hard cases scoring 60+). Every finished case counts; **Next career case** picks a patient that fits the goal (a STEMI, or one with a complication waiting). Promotions pay coffee tokens, and your rank shows on your operator card and in the report.
+
+## STEMI and the door-to-balloon clock
+
+About one random patient in six arrives with a STEMI: the culprit artery is completely blocked (no contrast gets past it, TIMI 0) and the ECG shows ST elevation in its territory with reciprocal depression. On **Medium and Hard** a door-to-balloon clock runs (top right, D2B): it starts with the 35–50 minutes already spent getting the patient to the lab and runs at a minute every 4 seconds (3 on Hard). The clock stops at the first balloon or stent that opens the culprit; within 90 minutes scores in full, every 4 minutes over costs a point (up to 6), and never opening it costs 6. On Easy there is no clock.
+
+## Teaching mode (Easy)
+
+Reviewing a cine run on Easy adds frame-by-frame buttons (◀ ▶), names on each vessel holding contrast (switch them with **Labels on/off**), and a note on what that projection shows best (for example, the "spider" view for the left main splitting into the LAD and circumflex).
 
 ## Random patients
 

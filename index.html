@@ -28,9 +28,13 @@
       <div class="hud bl" id="hudBL"></div>
       <div class="hud br" id="hudBR"></div>
       <div class="toast" id="toast" hidden></div>
+      <div class="teachnote" id="teachNote" hidden></div>
       <div class="reviewbar" id="reviewbar" hidden>
+        <button class="btn" id="rvPrev" title="Previous frame" aria-label="Previous frame">◀</button>
         <button class="btn" id="rvPlay">Pause</button>
+        <button class="btn" id="rvNext" title="Next frame" aria-label="Next frame">▶</button>
         <input type="range" id="rvSlider" min="0" max="10" value="0" aria-label="Cine frame">
+        <button class="btn" id="rvLabels" hidden title="Teaching mode: vessel names on the image">Labels on</button>
         <button class="btn" id="rvClose">Back to live</button>
       </div>
       <div class="overlay" id="startOv"></div>
@@ -108,6 +112,7 @@
 <script src="js/gen.js"></script>
 <script src="js/game.js"></script>
 <script src="js/heart3d.js"></script>
+<script src="js/career.js"></script>
 <script src="js/tutorial.js"></script>
 <script src="js/glossary.js"></script>
 </body>

@@ -510,7 +510,7 @@ function renderImage(st){
     for(let i=0;i<v.n;i++){
       const q=proj(motion(v.p[i],k),B);xs[i]=q[0];ys[i]=q[1];
       const d=v.base+v.ld[i];let delay=d/FLOW[v.sys],att=1-0.35*d/MAXD[v.sys];
-      for(const L of slow){if(d>L.gd){delay+=(d-L.gd)/FLOW[v.sys]*2.4;att*=0.72}}
+      for(const L of slow){if(d>L.gd){delay+=(d-L.gd)/FLOW[v.sys]*2.4;att*=sevNow(L)>=0.98?0.04:0.72}} // a total occlusion lets almost nothing past (TIMI 0)
       if(st.events){const m=flowMod(v,i,st.events);delay+=m.delay;att*=m.att}
       // the bolus front spreads as it travels (dispersion): average the concentration over a window that widens with transit time
       const sp=0.06+0.14*delay,t0=st.t-delay;
@@ -563,6 +563,7 @@ function renderImage(st){
   ctx.globalCompositeOperation='overlay';ctx.globalAlpha=st.mode==='cine'?0.07:0.16;ctx.imageSmoothingEnabled=true;ctx.drawImage(noise[st.frame%4],0,0,W,W);
   ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.drawImage(vign,0,0,W,W);
   lastProj={B,k,projV};
+  if(st.labels)drawVesselLabels(ctx,projV);
   if(st.marks&&st.marks.length){
     ctx.lineWidth=2.2;ctx.font='700 18px "Kalam", "Patrick Hand", cursive';
     st.marks.forEach((m,i)=>{const q=proj(motion(m.p3,k),B);ctx.strokeStyle='#c2452d';ctx.beginPath();ctx.ellipse(q[0],q[1],15,12,-0.3,0.3,6.75);ctx.stroke();ctx.fillStyle='#c2452d';ctx.fillText(String(i+1),q[0]+16,q[1]-10)});
@@ -573,6 +574,22 @@ function renderImage(st){
 /* Wire, balloon and stents, drawn along the already-projected vessels. */
 /* A dissection shows as a thin second channel of contrast running beside the lumen (the false lumen behind the
    flap) and a haze of contrast staining the wall that lingers after the injection washes out. */
+/* Teaching mode (Easy): name each vessel that is holding contrast, in handwriting beside it. */
+const VESSEL_SHORT={LAD:'LAD',D1:'D1',D2:'D2',LCx:'Cx',OM1:'OM1',OM2:'OM2',RI:'Ramus',RCA:'RCA',AM:'AM',PDA:'PDA',PLV:'PL',LPDA:'PDA',LPL:'PL'}; // small septals, conus and the short left main would crowd the bifurcation
+function drawVesselLabels(ctx,projV){
+  ctx.save();ctx.font='700 15px "Kalam", "Patrick Hand", cursive';ctx.textBaseline='middle';ctx.lineJoin='round';
+  for(const P of projV){
+    const v=P.v,name=VESSEL_SHORT[v.id];if(!name)continue;
+    const i=Math.min(v.n-2,Math.floor(v.n*(v.id==='LM'?0.5:v.id==='LAD'||v.id==='RCA'||v.id==='LCx'?0.42:0.6)));
+    if(P.cs[i]<0.25)continue;
+    let nx=P.ys[i-1]-P.ys[i+1],ny=P.xs[i+1]-P.xs[i-1];const l=Math.hypot(nx,ny)||1;nx/=l;ny/=l;
+    const x=P.xs[i]+nx*14,y=P.ys[i]+ny*14,w=ctx.measureText(name).width;
+    ctx.fillStyle='rgba(251,246,234,0.82)';ctx.strokeStyle='#2f5d8a';ctx.lineWidth=1.3;
+    ctx.beginPath();ctx.roundRect?ctx.roundRect(x-w/2-5,y-10,w+10,20,6):ctx.rect(x-w/2-5,y-10,w+10,20);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#2f5d8a';ctx.fillText(name,x-w/2,y+1);
+  }
+  ctx.restore();
+}
 function drawDissections(events,projV){
   for(const ev of events){
     if(ev.kind!=='dissection'||ev.treated)continue;const P=projV.find(x=>x.v.id===ev.vid);if(!P)continue;const v=P.v;

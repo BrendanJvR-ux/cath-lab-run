@@ -72,9 +72,20 @@ function generatePatient(code){
     hx=`${riskTxt}${pick(['Three','Four','Six'])} months of ${pick(['chest tightness walking uphill','breathlessness and chest pressure on exertion','jaw and arm ache on exertion'])}, relieved by rest. ${test}`;
     if(chance(0.25))ecg={twi:[lead]};
   }
+  // STEMI: about one patient in six has the culprit fully blocked. Decided on its own random stream so that other
+  // patients' codes are unchanged. (The door-to-balloon clock runs on Medium and Hard: see newState in game.js.)
+  const RS=mulberry32((seed^0x5bd1e995)>>>0);RS();
+  const stemi=RS()<0.17;
+  if(stemi){
+    culprit.sev=0.99;
+    const st={II:'II, III and aVF',V3:'V1–V4',V5:'I, aVL, V5 and V6'}[lead];
+    title=region[0].toUpperCase()+region.slice(1)+' STEMI';
+    hx=`${riskTxt}${['Forty minutes','An hour','Ninety minutes'][Math.floor(RS()*3)]} of crushing central chest pain, sweaty and grey. ECG: ST elevation in ${st}. Aspirin and heparin given; the emergency team has activated the cath lab.`;
+    ecg={stemi:[lead]};
+  }
   if(renal)hx+=` eGFR ${Math.round(rnd(34,52))}, so keep contrast to a minimum.`;
   const extra=lesions.length>nSig;
-  const task=acs?(extra?'Find the culprit lesion and treat it. Report any other disease you see.':'Find the culprit lesion and treat it.')
+  const task=stemi?'Find the blocked artery and open it fast: wire, balloon, stent.':acs?(extra?'Find the culprit lesion and treat it. Report any other disease you see.':'Find the culprit lesion and treat it.')
     :(extra?'Map all disease, significant or not, and treat only what is significant.':'Find the significant stenosis and treat it.');
   const budget=renal?50:70+10*(nSig-1)+5*(lesions.length-nSig);
   return {code:seedToCode(seed),random:true,title,pt:(male?'M':'F')+', '+age,hx,task,budget,budgetInTask:renal,ecg,lesions,anatomy,anatomyNote:describeAnatomy(buildAnatomy(anatomy))};

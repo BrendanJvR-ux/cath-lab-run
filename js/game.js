@@ -149,6 +149,7 @@ function renderMenu(){
     const inp=$('opName');inp.addEventListener('input',()=>{draft.name=inp.value;ov.querySelector('[data-act="saveop"]').disabled=!inp.value.trim()});
     return;
   }
+  if(menuView==='career'){ov.innerHTML=careerView();return}
   if(menuView==='exp'){
     ov.innerHTML=`<h1>How much angiography have you done?</h1>
       <p>The tutorial is a short play-through of one patient. Your answer sets how much it explains and where you start afterwards.</p>
@@ -195,9 +196,9 @@ function renderMenu(){
     return;
   }
   ov.innerHTML=`<div class="hero"><img class="heroimg" src="assets/cardiologists.png" alt="Cartoon of two cardiologists, a woman with a stethoscope and a man holding a guide catheter, in scrubs and lead aprons"><div class="herotxt"><span class="kicker"><img class="steth" src="assets/stethoscope.svg" alt="" aria-hidden="true">Coronary angiography · PCI</span><h1>Cath Lab Run</h1><p>Drive the catheter to the aortic root, engage each coronary, record cine runs in the right projections, then find, grade and treat the stenosis.</p></div></div>
-    <div class="opcard">${avatarSVG(profile.avatar,64)}<div><b>${esc(profile.name)}</b><span>${CUP} ${profile.tokens} coffee tokens · ${DIFFICULTY[profile.diff].label}</span></div><button class="btn" data-act="editop">Change operator</button></div>
+    <div class="opcard">${avatarSVG(profile.avatar,64)}<div><b>${esc(profile.name)}</b><span>${typeof rankName==='function'?rankName()+' · ':''}${CUP} ${profile.tokens} coffee tokens · ${DIFFICULTY[profile.diff].label}</span></div><button class="btn" data-act="editop">Change operator</button></div>
     ${resumeCard()}${dailyCard()}
-    <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button><button class="btn big" data-act="exp">Tutorial</button><button class="btn big" data-gl="">Glossary</button></div>
+    <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button><button class="btn big" data-act="career">Career</button><button class="btn big" data-act="exp">Tutorial</button><button class="btn big" data-gl="">Glossary</button></div>
     <p class="fine">Teaching game with simplified anatomy and physics. Not a clinical training device.</p>`;
 }
 $('startOv').addEventListener('click',e=>{
@@ -211,6 +212,8 @@ $('startOv').addEventListener('click',e=>{
   else if(d.act==='editop'){draft=null;menuView='profile';renderMenu()}
   else if(d.act==='play'){menuView=profile.exp==null&&!returning()?'exp':'play';renderMenu()}
   else if(d.act==='exp'){menuView='exp';renderMenu()}
+  else if(d.act==='career'){menuView='career';renderMenu()}
+  else if(d.act==='careercase'){startCareerCase()}
   else if(d.act==='tutorial'){startTutorial()}
   else if(d.act==='skiptut'||d.act==='notut'){profile.tutSkipped=true;saveProfile();menuView='play';renderMenu()}
   else if(d.act==='rand'){startCase(randomCode())}
@@ -228,16 +231,24 @@ $('who').addEventListener('click',()=>{if(!S||S.done)showMenu('home')});
 let S=null;
 const keys={};
 /* ci is a random patient's case code ('CLR-XXXXX'). */
+const d2bNow=()=>S&&S.d2b?Math.round(S.d2b.start+S.clock*S.d2b.rate):0;
+const stemiCulprit=()=>S&&S.stemi?S.lesions.find(L=>L.sev>=0.98):null;
 const caseName=S=>S.c.tutorial?'the tutorial patient':'patient '+S.c.code;
 function newState(ci){
   const tut=ci==='TUTORIAL',dk=tut?'easy':profile.diff,base=DIFFICULTY[dk]||DIFFICULTY.easy,ch=caseChallenge(ci,dk),c=tut?tutorialCase():{...generatePatient(ci)};
   // a severe contrast restriction halves the budget and joins the story
   if(ch.contrastX<1&&base.budgetX!=null){c.budget=Math.round(c.budget*ch.contrastX);c.budgetInTask=true;c.hx+=` Severe chronic kidney disease (eGFR ${12+(codeToSeed(ci)%14)}): every millilitre of contrast counts.`}
+  // STEMI: the door-to-balloon clock runs on Medium and Hard. It starts with the minutes already spent getting to the
+  // lab and runs at minutes per real second; the target is the first balloon or stent in the culprit within 90 min.
+  const stemi=!!(c.ecg&&c.ecg.stemi),cseed=codeToSeed(ci)||0;
+  const d2b=stemi&&base.level>=2?{start:34+cseed%12+(base.level===3?6:0),rate:base.level===3?1/3:1/4,target:90}:null;
+  if(stemi&&!d2b)c.task='Find the blocked artery and open it: wire, balloon, stent.';
+  if(d2b)c.task+=` Door-to-balloon target 90 minutes: ${d2b.start} minutes have already gone.`;
   buildAnatomy(c.anatomy);
   HEART_MODE=['chambers','outline','none'][base.level-1]||'outline'; // the heart sketch: labelled chambers on Easy, outline on Medium, none on Hard
   // shop perks adjust a copy of the difficulty settings
   const D={...base,tol:{...base.tol}},tq=upgradeVal('torque');D.tol.L+=tq;D.tol.R+=tq;
-  return {ci,c,D,ch,forced:ch.forced,diff:dk,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,hub:CATH.JL.home,w:0,type:'JL'},twist:0,exch:0,
+  return {ci,c,D,ch,forced:ch.forced,diff:dk,stemi,d2b,reperfAt:null,d2bWarned:0,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,hub:CATH.JL.home,w:0,type:'JL'},twist:0,exch:0,
     cL:0,cR:0,cRoot:0,hist:{L:[],R:[],root:[]},histN:0,contrast:0,ak:0,ftime:0,ctime:0,blind:0,wasted:0,
     cine:null,runs:[],marks:[],pending:null,review:null,imgAcc:0,frame:0,deepInj:0,rcaInj:0,complication:null,done:false,
     sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),events:[],drugs:[],ffr:[],pdRatio:null,hrDip:0,bpDip:0,isch:0,effusion:0,tamponade:false,pcT:0,pcCount:0,protamine:false,seals:[],prevEng:null,prevDeep:false,
@@ -321,10 +332,19 @@ function openReview(id){
   if(!S)return;const run=S.runs.find(r=>r.id===id);if(!run)return;
   if(S.cine)stopCine();
   S.review={run,idx:0,playing:true,acc:0};
-  $('reviewbar').hidden=false;$('rvSlider').max=run.frames.length-1;$('rvPlay').textContent='Pause';renderRuns();
+  $('reviewbar').hidden=false;$('rvLabels').hidden=!teaching();if(S.teachLabels==null)S.teachLabels=true;$('rvLabels').textContent=S.teachLabels?'Labels on':'Labels off';$('rvSlider').max=run.frames.length-1;$('rvPlay').textContent='Pause';renderRuns();
 }
-function closeReview(){if(S)S.review=null;$('reviewbar').hidden=true;renderRuns()}
+function closeReview(){if(S)S.review=null;$('teachNote').hidden=true;$('reviewbar').hidden=true;renderRuns()}
 $('rvClose').addEventListener('click',closeReview);
+/* teaching mode (Easy): step frame by frame, vessel names on the image, and what each projection shows best */
+const stepFrame=d=>{if(!S||!S.review)return;const R=S.review;R.playing=false;$('rvPlay').textContent='Play';R.idx=clamp(R.idx+d,0,R.run.frames.length-1);drawReview()};
+$('rvPrev').addEventListener('click',()=>stepFrame(-1));$('rvNext').addEventListener('click',()=>stepFrame(1));
+$('rvLabels').addEventListener('click',()=>{if(!S)return;S.teachLabels=!S.teachLabels;$('rvLabels').textContent=S.teachLabels?'Labels on':'Labels off';if(S.review)drawReview()});
+const VIEW_TIPS=[[-30,-25,'Caudal RAO: the left main splitting, the proximal LAD and the circumflex with its marginals.'],[-30,30,'Cranial RAO: the mid and distal LAD, pulled apart from its diagonals.'],[0,35,'AP cranial: the LAD and its diagonals; the septal branches run downwards.'],
+  [45,25,'LAO cranial: diagonals open off the LAD. For the right coronary: the PDA and posterolateral branches.'],[45,-30,'The "spider" view: the left main splitting into the LAD and circumflex.'],[40,0,'Straight LAO: the right coronary as a "C", its proximal and mid segments.'],[-30,0,'Straight RAO: the mid right coronary and the PDA along the bottom of the heart.']];
+function viewTip(a,b){const t=VIEW_TIPS.find(v=>Math.abs(v[0]-a)<=15&&Math.abs(v[1]-b)<=15);
+  return t?t[2]:`${angLabel(a,b)}: the camera is on the patient's ${a>3?'left':a<-3?'right':'front'}${b>3?', tilted towards the head':b<-3?', tilted towards the feet':''}. Try the presets: each is chosen to open up particular segments.`}
+const teaching=()=>!!(S&&S.D.level===1);
 $('rvPlay').addEventListener('click',()=>{if(!S||!S.review)return;S.review.playing=!S.review.playing;$('rvPlay').textContent=S.review.playing?'Pause':'Play'});
 $('rvSlider').addEventListener('input',e=>{if(!S||!S.review)return;S.review.idx=+e.target.value;S.review.playing=false;$('rvPlay').textContent='Play';drawReview()});
 $('runs').addEventListener('click',e=>{const b=e.target.closest('.run');if(b)openReview(+b.dataset.id)});
@@ -332,7 +352,8 @@ function frameState(run,f){
   return {t:f.t,phase:f.phase,a:run.a,b:run.b,mode:'cine',frame:f.frame,lesions:run.lesState||S.lesions,pci:f.pci,events:f.ev,cath:true,cathState:cst(f.cath),
     conc:(sys,t)=>histAt(S.hist[sys],t),root:histAt(S.hist.root,f.t),marks:S.marks};
 }
-function drawReview(){const R=S.review;const f=R.run.frames[R.idx];renderImage(frameState(R.run,f));$('rvSlider').value=R.idx}
+function drawReview(){const R=S.review;const f=R.run.frames[R.idx];renderImage({...frameState(R.run,f),labels:teaching()&&S.teachLabels!==false});$('rvSlider').value=R.idx;
+  const tn=$('teachNote');if(teaching()){tn.hidden=false;tn.textContent=viewTip(R.run.a,R.run.b)}else tn.hidden=true}
 img.addEventListener('click',e=>{
   if(!S||!S.review||S.done||!lastProj)return;
   const rect=img.getBoundingClientRect();const x=(e.clientX-rect.left)/rect.width*W,y=(e.clientY-rect.top)/rect.height*W;
@@ -726,9 +747,14 @@ function tick(dt){
     else if(P.atm>0){if(sealing){S.seals.push({how:'balloon',label:P.label,t:S.clock,atm:Math.round(P.maxAtm)});P.stage='tools';P.kind=null;P.atm=P.maxAtm=0;P.pain=false;toast('Balloon deflated.');renderPCI(true)}
       else if(P.maxAtm>=4)applyDevice();else{P.atm=Math.max(0,P.atm-20*dt);if(P.atm===0)P.maxAtm=0}}
   }
+  // STEMI: reperfusion when the culprit is first ballooned or stented open; warnings as the clock runs
+  if(S.stemi){const L=stemiCulprit();
+    if(L&&!S.reperfAt&&L.cur!=null&&L.cur<0.8){S.reperfAt=S.d2b?d2bNow():Math.round(S.clock);toast(S.d2b?`Artery open. Door-to-balloon ${S.reperfAt} minutes${S.reperfAt<=90?': within the 90-minute target.':`: ${S.reperfAt-90} over the target.`}`:'Artery open: flow restored and the ST elevation is settling.')}
+    if(S.d2b&&!S.reperfAt){const m=d2bNow();if(m>=75&&S.d2bWarned<1){S.d2bWarned=1;toast(`Door-to-balloon ${m} minutes. Get a wire across and a balloon up.`,true)}if(m>=90&&S.d2bWarned<2){S.d2bWarned=2;toast('90 minutes: past the door-to-balloon target. Open the artery.',true)}}}
   // ECG territories: an inflated balloon raises ST in the lead facing that vessel, with reciprocal change elsewhere
   const tgt={II:0,V3:0,V5:0};
   if(P&&P.atm>4){const l=TERRITORY[P.vid];if(P.vid==='LM'){tgt.V3=0.8;tgt.V5=0.8;tgt.II=-0.4}else{tgt[l]=1;if(l==='V3')tgt.II=-0.35;if(l==='V5')tgt.V3=-0.5;if(l==='II')tgt.V5=-0.3}}
+  if(S.stemi&&!S.reperfAt){const L=stemiCulprit();if(L){const l=TERRITORY[L.vid];tgt[l]=Math.max(tgt[l],1.4);if(l==='V3')tgt.II=Math.min(tgt.II,-0.45);if(l==='II')tgt.V3=Math.min(tgt.V3,-0.5);if(l==='V5')tgt.II=Math.min(tgt.II,-0.35)}}
   for(const ev of S.events){const x=1-evFlow(ev);if(x<0.05)continue;const l=TERRITORY[ev.vid];tgt[l]=Math.max(tgt[l],1.1*x);if(l==='V3')tgt.II=Math.min(tgt.II,-0.35*x);if(l==='V5')tgt.V3=Math.min(tgt.V3,-0.5*x);if(l==='II')tgt.V5=Math.min(tgt.V5,-0.3*x)}
   for(const l of LEADS)S.st[l]+=(tgt[l]-S.st[l])*Math.min(1,dt*1.4);
   // hemodynamics
@@ -766,7 +792,8 @@ function updateUI(){
   if(!S){hudTL.textContent='CATH LAB RUN\nRAO 30° CAU 25°';hudTR.innerHTML='<span>SAMPLE IMAGE</span>';hudBL.textContent='';hudBR.textContent='';return}
   const R=S.review;
   hudTL.textContent=`${caseName(S).toUpperCase()} · ${S.c.pt}\n${R?angLabel(R.run.a,R.run.b):angLabel(S.a,S.b)}`;
-  hudTR.innerHTML=R?`<span class="act">REVIEW · RUN ${R.run.id}</span>\nfr ${R.idx+1}/${R.run.frames.length}`:cine?`<span class="act">● CINE 15 f/s</span>\n${(S.cine.frames.length/15).toFixed(1)} s`:fl?'<span class="act">FLUORO 15 p/s</span>':(S.frame?'LIH':'NO IMAGE');
+  const d2bTxt=S.d2b?`\n<span class="${!S.reperfAt&&d2bNow()>=80?'act':''}">D2B ${S.reperfAt||d2bNow()} min${S.reperfAt?' ✓':''}</span>`:'';
+  hudTR.innerHTML=(R?`<span class="act">REVIEW · RUN ${R.run.id}</span>\nfr ${R.idx+1}/${R.run.frames.length}`:cine?`<span class="act">● CINE 15 f/s</span>\n${(S.cine.frames.length/15).toFixed(1)} s`:fl?'<span class="act">FLUORO 15 p/s</span>':(S.frame?'LIH':'NO IMAGE'))+d2bTxt;
   hudBL.textContent=R?'Click a narrowing to mark it':(S.frame?'':TOUCH?'Hold Fluoro for X-ray':'Hold Space for fluoro');
   hudBR.textContent=`AK ${Math.round(S.ak)} mGy\n${Math.round(S.contrast)} mL`;
   uiAcc++;if(uiAcc%6)return;
@@ -870,6 +897,10 @@ function finish(){
     for(const d of ded)txb.push({label:`−${(perT*d[0]).toFixed(1)} ${d[1]}`,pts:null,cls:'sub'});
     notes.push({c:ded.length?'':'good',t:`Stented ${L.label}: ${s.diam.toFixed(1)} × ${s.len} mm at ${s.atm} atm${post?', post-dilated':''}, residual ${Math.round(L.cur*100)}%.`+(ded.length?' But '+ded.map(d=>d[1]).join('; ')+'.':` Well sized for a ~${o.refD.toFixed(1)} mm vessel.`)});
   }
+  if(S.d2b){const m=S.reperfAt;
+    if(m==null){T('STEMI artery never opened: door-to-balloon missed',-6,'minus');notes.push({c:'bad',t:'The blocked artery was never opened. In a STEMI every minute costs heart muscle: wire, balloon and stent the culprit first, then look at the rest.'})}
+    else if(m<=90){T(`Door-to-balloon ${m} min (target 90)`,0,'plus');notes.push({c:'good',t:`Door-to-balloon ${m} minutes: within the 90-minute target.`})}
+    else{const pen=Math.round(clamp((m-90)/4,1,6)*10)/10;T(`Door-to-balloon ${m} min: ${m-90} over the 90-minute target`,-pen,'minus');notes.push({c:'bad',t:`Door-to-balloon ${m} minutes, ${m-90} over target. Go straight for the culprit: one view to find it, then wire and balloon; finish the study afterwards.`})}}
   for(const s of S.stents){if(s.sealed&&!s.hits.length)continue;if(!s.hits.some(h=>needs(h.L))){const L=s.hits[0]&&s.hits[0].L,fx=L&&L.sev>=0.5?` (FFR ${ffrOf(L).toFixed(2)})`:'';T(`Unnecessary stent in the ${s.label}${fx}`,-8,'minus');notes.push({c:'bad',t:`Unnecessary stent in the ${s.label}: ${L?(L.sev>=0.5?`a ${Math.round(L.sev*100)}% narrowing with an FFR of about ${ffrOf(L).toFixed(2)} does not limit flow. Measure intermediate narrowings before stenting them.`:'that lesion was not flow-limiting.'):'there was no lesion there.'}`})}else if(s.hits.some(h=>h.o.over))T(`Oversized stent in the ${s.label} (edge dissection risk)`,-4,'minus')}
   for(const b of S.balloons){if(b.hits.some(h=>h.o.over)){T(`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm)`,-4,'minus');notes.push({c:'bad',t:`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm)${S.ch.errX?' caused an edge dissection.':': on Medium or Hard that tears the vessel.'}`})}if(!b.hits.some(h=>needs(h.L))&&!b.hits.some(h=>h.o.post)){T(`Unnecessary balloon inflation in the ${b.label}`,-4,'minus');notes.push({c:'bad',t:`Unnecessary balloon inflation in the ${b.label}.`})}}
   for(const sy of new Set(S.stents.map(s=>VBY[s.vid].sys))){const t=Math.max(...S.stents.filter(s=>VBY[s.vid].sys===sy).map(s=>s.t));if(!S.runs.some(r=>r.sys===sy&&r.t0>t))notes.push({c:'',t:`Record a final cine run of the ${sy==='L'?'left':'right'} system after stenting to confirm the result.`})}
@@ -927,6 +958,8 @@ function finish(){
   const earned=S.complication?0:Math.round(total/10*S.D.tokenX);
   profile.tokens+=earned;if(S.c.random)profile.randomDone=(profile.randomDone||0)+1;
   const daily=S.daily?recordDaily(S.complication?0:total):null;
+  if(!S.c.tutorial&&typeof careerRecord==='function'){const ev=S.events.filter(e=>e.kind!=='spasm'||e.sev>0.8);
+    for(const n of careerRecord({diff:S.diff,score:S.complication?0:total,stemi:S.stemi,d2b:S.d2b?S.reperfAt:null,hadComp:ev.length>0,managed:ev.length>0&&ev.every(e=>e.treated||e.sealed),ffrUsed:S.ffr.length>0}))notes.unshift(n)}
   const key=S.diff+'-'+(S.c.random?'R':S.ci),prev=profile.best[key];if(prev==null||total>prev)profile.best[key]=total;saveProfile();renderWho();
   const ov=$('resultOv');
   ov.innerHTML=`<div class="rephead">${avatarSVG(profile.avatar,48)}<div><h1>Report · ${caseName(S)}</h1><span class="fine">${esc(profile.name)} · ${S.D.label}</span></div></div>

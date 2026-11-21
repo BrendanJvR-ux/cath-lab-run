@@ -317,3 +317,14 @@ body.inmenu #startOv,body.inreport #resultOv{position:relative;inset:auto;min-he
 /* stethoscope beside the menu kicker */
 .kicker{display:flex;align-items:center;gap:10px}
 .steth{width:clamp(66px,11vw,100px);height:auto;transform:rotate(-8deg);filter:url(#rough);flex:none}
+
+/* teaching note on the review image (Easy) */
+.teachnote{position:absolute;left:12px;right:12px;bottom:56px;z-index:4;background:rgba(251,246,234,.9);border:1.5px solid #2f5d8a;border-radius:var(--wob-s);padding:4px 10px;font-size:15px;color:#2f5d8a;pointer-events:none}
+.reviewbar .btn{padding:5px 9px}
+
+/* career ladder */
+.career{display:flex;flex-direction:column;gap:6px;max-width:560px}
+.crow{display:flex;gap:10px;align-items:center;background:var(--panel);border:2px solid var(--line);border-radius:var(--wob-s);padding:6px 10px;opacity:.6}
+.crow.done{opacity:1;background:#eef4e4}.crow.now{opacity:1;background:#fff3b8;transform:rotate(-.4deg)}
+.crow b{font-family:var(--f-display);font-size:18px;display:block}.crow span{font-size:14.5px}
+.cmark{width:22px;text-align:center;font-weight:700;font-size:18px;flex:none}
