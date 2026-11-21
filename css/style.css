@@ -282,3 +282,22 @@ body.inmenu .lab{grid-template-columns:minmax(0,1fr);max-width:820px}
 .coach-hl{outline:3px dashed var(--danger)!important;outline-offset:3px;animation:coachpulse 1.2s ease-in-out infinite}
 @keyframes coachpulse{50%{outline-color:transparent}}
 @media (prefers-reduced-motion:reduce){.coach-hl{animation:none}}
+
+/* FFR reading */
+.ffrread{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:2px solid var(--line);border-radius:var(--wob-s);padding:6px 10px;background:var(--panel)}
+.ffrread b{font-family:var(--f-display);font-size:24px}
+.ffrread.sig b{color:var(--danger)}.ffrread.ok b{color:var(--ok)}
+.mark .row{gap:5px;flex-wrap:nowrap}
+
+/* glossary */
+.glbtn{font-size:14px;padding:4px 10px}
+.glossary{position:fixed;inset:0;z-index:50;background:rgba(43,42,51,.35);display:grid;place-items:center;padding:16px}
+.glbox{background:var(--panel);border:2.5px solid var(--line);border-radius:var(--wob);box-shadow:var(--shadow);width:min(640px,100%);max-height:min(80vh,720px);display:flex;flex-direction:column}
+.glhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:2px dashed var(--faint)}
+.glhead b{font-family:var(--f-display);font-size:24px}
+.glhead input{flex:1;min-width:140px;font:inherit;font-size:16px;border:2px solid var(--line);border-radius:var(--wob-s);padding:5px 10px;background:var(--panel2);color:var(--fg)}
+#gllist{margin:0;padding:8px 14px 14px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+#gllist dt{font-family:var(--f-display);font-weight:700;font-size:18px}
+#gllist dd{margin:0;font-size:15.5px}
+#gllist .hit{background:var(--hi);border-radius:var(--wob-s);padding:4px 8px}
+.glterm{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline dotted var(--blue) 2px;text-underline-offset:3px;cursor:help}

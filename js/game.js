@@ -52,12 +52,55 @@ const ICONS={
 function shopIcon(it){if(it.kind==='avatar')return avatarSVG(it.avatar,44);return `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[it.id]}</svg>`}
 function showMenu(view){
   if(typeof close3D==='function')close3D();
+  if(S&&!S.done)saveCase();
   menuView=view||(profile?'home':'profile');S=null;if(typeof renderCoach==='function')renderCoach();document.body.classList.add('inmenu');
   $('resultOv').hidden=true;$('startOv').hidden=false;$('reviewbar').hidden=true;
   demoFrame();syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   $('caseHead').innerHTML='<h2>Patient</h2><b>No case loaded</b><p>Pick a case on the monitor to begin.</p>';$('status').textContent='Catheter in the femoral sheath.';$('status').className='status';
   renderMenu();
 }
+/* ---------- save and resume ----------
+   An unfinished case is saved every couple of seconds (and when the tab is hidden or closed). The patient is
+   rebuilt from its case code, so only what happened is stored: the contrast history, runs, marks, devices,
+   complications and where the catheter is. A cine run being recorded at that moment is not kept. */
+const SAVE_KEY='cathlabrun.save.v1';
+const SAVE_FIELDS=['clock','phase','hr','hrT','a','b','cath','exch','cL','cR','cRoot','histN','contrast','ak','ftime','ctime','blind','wasted','runs','marks','imgAcc','frame','deepInj','rcaInj','complication','sysP','diaP','pci','events','drugs','hrDip','bpDip','isch','effusion','tamponade','pcT','pcCount','protamine','seals','prevEng','prevDeep','st','forced','twist','ffr','tut','daily'];
+const r3=a=>a.map(x=>Math.round(x*1000)/1000);
+function saveCase(){
+  if(!S||S.done)return;
+  try{
+    const sv={v:1,ci:S.ci,diff:S.diff,saved:Date.now(),hist:{L:r3(S.hist.L),R:r3(S.hist.R),root:r3(S.hist.root)},mapped:[...S.mapped],twi:[...S.twi],
+      lesions:S.lesions.map(L=>({cur:L.cur??null,predil:!!L.predil,stented:!!L.stented})),
+      stents:S.stents.map(d=>({...d,hits:d.hits.map(h=>({li:S.lesions.indexOf(h.L),o:h.o}))})),
+      balloons:S.balloons.map(d=>({...d,hits:d.hits.map(h=>({li:S.lesions.indexOf(h.L),o:h.o}))}))};
+    for(const k of SAVE_FIELDS)sv[k]=S[k];
+    localStorage.setItem(SAVE_KEY,JSON.stringify(sv));
+  }catch(e){}
+}
+function loadSave(){try{const sv=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');return sv&&sv.v===1&&sv.ci?sv:null}catch(e){return null}}
+function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
+function resumeCase(){
+  const sv=loadSave();if(!sv)return;
+  if(sv.ci!=='TUTORIAL'){profile.diff=sv.diff;saveProfile()}
+  startCase(sv.ci,{daily:sv.daily});
+  for(const k of SAVE_FIELDS)if(sv[k]!==undefined)S[k]=sv[k];
+  S.hist={L:sv.hist.L,R:sv.hist.R,root:sv.hist.root};S.mapped=new Set(sv.mapped);S.twi=new Set(sv.twi);
+  sv.lesions.forEach((x,i)=>{const L=S.lesions[i];if(!L)return;if(x.cur!=null)L.cur=x.cur;L.predil=x.predil;L.stented=x.stented});
+  const relink=d=>({...d,hits:d.hits.map(h=>({L:S.lesions[h.li],o:h.o})).filter(h=>h.L)});
+  S.stents=sv.stents.map(relink);S.balloons=sv.balloons.map(relink);
+  S.daily=!!sv.daily&&sv.ci===dailyCode();S.cine=null;S.review=null;
+  syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);if(typeof renderCoach==='function')renderCoach();
+  toast(`Resumed ${caseName(S)} at ${fmtT(S.clock)}. Hold Space for fluoro to pick up where you left off.`);
+}
+function resumeCard(){
+  const sv=loadSave();if(!sv)return '';
+  const name=sv.ci==='TUTORIAL'?'the tutorial':'patient '+sv.ci,ago=Math.round((Date.now()-sv.saved)/60000);
+  return `<div class="daily resume"><span class="medal none" aria-hidden="true">▶</span><div><b>Unfinished case</b><span>${name} on ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:sv.diff}, ${fmtT(sv.clock)} in${sv.stents&&sv.stents.length?`, ${sv.stents.length} stent${sv.stents.length>1?'s':''} placed`:''} · saved ${ago<1?'just now':ago<60?ago+' min ago':Math.round(ago/60)+' h ago'}.</span></div>
+    <div class="row"><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="discard">Discard</button></div></div>`;
+}
+window.addEventListener('pagehide',saveCase);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)saveCase()});
+
 /* ---------- daily case ---------- */
 const MEDAL_NAME={gold:'Gold',silver:'Silver',bronze:'Bronze',none:'No medal'};
 const medalBadge=m=>`<span class="medal ${m}" aria-label="${MEDAL_NAME[m]}">${m==='none'?'–':MEDAL_NAME[m][0]}</span>`;
@@ -146,8 +189,8 @@ function renderMenu(){
   }
   ov.innerHTML=`<div class="hero"><img class="heroimg" src="assets/cardiologists.png" alt="Cartoon of two cardiologists, a woman with a stethoscope and a man holding a guide catheter, in scrubs and lead aprons"><div class="herotxt"><span class="kicker">Coronary angiography · PCI</span><h1>Cath Lab Run</h1><p>Drive the catheter to the aortic root, engage each coronary, record cine runs in the right projections, then find, grade and treat the stenosis.</p></div></div>
     <div class="opcard">${avatarSVG(profile.avatar,64)}<div><b>${esc(profile.name)}</b><span>${CUP} ${profile.tokens} coffee tokens · ${DIFFICULTY[profile.diff].label}</span></div><button class="btn" data-act="editop">Change operator</button></div>
-    ${dailyCard()}
-    <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button><button class="btn big" data-act="exp">Tutorial</button></div>
+    ${resumeCard()}${dailyCard()}
+    <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button><button class="btn big" data-act="exp">Tutorial</button><button class="btn big" data-gl="">Glossary</button></div>
     <p class="fine">Teaching game with simplified anatomy and physics. Not a clinical training device.</p>`;
 }
 $('startOv').addEventListener('click',e=>{
@@ -164,6 +207,8 @@ $('startOv').addEventListener('click',e=>{
   else if(d.act==='tutorial'){startTutorial()}
   else if(d.act==='skiptut'||d.act==='notut'){profile.tutSkipped=true;saveProfile();menuView='play';renderMenu()}
   else if(d.act==='rand'){startCase(randomCode())}
+  else if(d.act==='resume'){resumeCase()}
+  else if(d.act==='discard'){clearSave();renderMenu();toast('Unfinished case discarded.')}
   else if(d.act==='daily'){startCase(dailyCode(),{daily:true})}
   else if(d.act==='code'){const v=($('codeIn').value||'').trim(),n=codeToSeed(v);if(n==null){toast('That is not a case code. Codes look like CLR-7KQ2M.',true);return}startCase(seedToCode(n))}
   else if(d.act==='shop'){menuView='shop';renderMenu()}
@@ -188,7 +233,7 @@ function newState(ci){
   return {ci,c,D,ch,forced:ch.forced,diff:dk,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,hub:CATH.JL.home,w:0,type:'JL'},twist:0,exch:0,
     cL:0,cR:0,cRoot:0,hist:{L:[],R:[],root:[]},histN:0,contrast:0,ak:0,ftime:0,ctime:0,blind:0,wasted:0,
     cine:null,runs:[],marks:[],pending:null,review:null,imgAcc:0,frame:0,deepInj:0,rcaInj:0,complication:null,done:false,
-    sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),events:[],drugs:[],hrDip:0,bpDip:0,isch:0,effusion:0,tamponade:false,pcT:0,pcCount:0,protamine:false,seals:[],prevEng:null,prevDeep:false,
+    sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),events:[],drugs:[],ffr:[],pdRatio:null,hrDip:0,bpDip:0,isch:0,effusion:0,tamponade:false,pcT:0,pcCount:0,protamine:false,seals:[],prevEng:null,prevDeep:false,
     st:{II:0,V3:0,V5:0},twi:new Set((c.ecg&&c.ecg.twi)||[])};
 }
 const histAt=(arr,t)=>{if(t<0||!arr.length)return 0;const i=Math.floor(t*50);return i<arr.length?arr[i]:arr[arr.length-1]};
@@ -317,7 +362,7 @@ function renderRuns(){
 /* ---------- hemodynamics: three ECG leads + aortic pressure ---------- */
 const hemo=$('hemo'),hctx=hemo.getContext('2d');let HB=null,hx=0,dpr=1;
 const HEMO_H=168;
-function sizeHemo(){dpr=Math.min(2,window.devicePixelRatio||1);const w=Math.max(200,Math.round(hemo.clientWidth*dpr)),h=Math.round(HEMO_H*dpr);hemo.width=w;hemo.height=h;HB={p:new Float32Array(w).fill(NaN)};for(const l of LEADS)HB[l]=new Float32Array(w).fill(NaN);hx=0}
+function sizeHemo(){dpr=Math.min(2,window.devicePixelRatio||1);const w=Math.max(200,Math.round(hemo.clientWidth*dpr)),h=Math.round(HEMO_H*dpr);hemo.width=w;hemo.height=h;HB={p:new Float32Array(w).fill(NaN),pd:new Float32Array(w).fill(NaN)};for(const l of LEADS)HB[l]=new Float32Array(w).fill(NaN);hx=0}
 window.addEventListener('resize',sizeHemo);
 const gs=(x,m,s)=>Math.exp(-((x-m)*(x-m))/(2*s*s));
 /* One beat of an ECG lead: st = ST shift (+ elevation, − depression), twi = inverted T wave, amp = QRS size. */
@@ -336,8 +381,8 @@ function hemoStep(dt,ph0,ph1,damped){
   if(!HB)return;const speed=105*dpr;const n=Math.max(0,Math.round(dt*speed));const len=HB.p.length;
   for(let j=1;j<=n;j++){let ph=ph0+(((ph1-ph0+1)%1))*j/n;ph%=1;
     for(const l of LEADS)HB[l][hx]=ecgAt(ph,S?S.st[l]:0,S?S.twi.has(l):false,LEAD_AMP[l]);
-    HB.p[hx]=pressAt(ph,damped,S?S.bpDrop||0:0);hx=(hx+1)%len;
-    for(let g=0;g<14*dpr;g++){const k=(hx+g)%len;HB.p[k]=NaN;for(const l of LEADS)HB[l][k]=NaN}}
+    HB.p[hx]=pressAt(ph,damped,S?S.bpDrop||0:0);HB.pd[hx]=S&&S.pdRatio!=null?HB.p[hx]*S.pdRatio:NaN;hx=(hx+1)%len;
+    for(let g=0;g<14*dpr;g++){const k=(hx+g)%len;HB.p[k]=NaN;HB.pd[k]=NaN;for(const l of LEADS)HB[l][k]=NaN}}
 }
 function drawHemo(){
   if(!HB)return;const w=hemo.width,h=hemo.height;hctx.clearRect(0,0,w,h);
@@ -351,7 +396,8 @@ function drawHemo(){
   hctx.font=`${14*dpr}px "Patrick Hand", "Kalam", cursive`;
   LEADS.forEach((l,i)=>{const base=rowH*(i+0.72);trace(HB[l],v=>base-v*rowH*0.62,'#2b2a33');hctx.fillStyle='#2b2a33';hctx.fillText(l,6*dpr,rowH*i+12*dpr);
     const stv=S?S.st[l]:0;if(Math.abs(stv)>0.25){hctx.fillStyle=stv>0?'#c2452d':'#2f5d8a';hctx.fillText(`ST ${stv>0?'↑':'↓'} ${(Math.abs(stv)*2).toFixed(1)} mm`,26*dpr,rowH*i+12*dpr)}});
-  trace(HB.p,pm,'#c2452d');
+  trace(HB.p,pm,'#c2452d');trace(HB.pd,pm,'#2f5d8a');
+  if(S&&S.pdRatio!=null){hctx.fillStyle='#2f5d8a';hctx.fillText(`Pd/Pa ${S.pdRatio.toFixed(2)}`,6*dpr,pTop+24*dpr)}
   hctx.fillStyle='#c2452d';hctx.fillText('AO 0–160',6*dpr,pTop+8*dpr);
   const hr=S?Math.round(S.hr):72,sp=S?Math.round(S.sysP):128,dp=S?Math.round(S.diaP):74;
   hctx.textAlign='right';hctx.font=`700 ${18*dpr}px "Kalam", "Patrick Hand", cursive`;hctx.fillStyle='#2b2a33';hctx.fillText('HR '+hr,w-8*dpr,16*dpr);
@@ -367,11 +413,11 @@ function pciRender(){
     balloon:P&&P.stage==='positioned'?{vid:P.vid,ld:P.ld,len:P.len,diam:P.diam,inflate:P.atm/14}:null};
 }
 function canTreat(m){const sys=VBY[m.vid].sys;return !!(S&&S.cs&&S.cs.eng===sys&&!S.cs.deep&&!S.complication&&!S.done)}
-function startPCI(mi){startPCIAt(S.marks[mi])}
-function startPCIAt(m){
+function startPCI(mi,opt){startPCIAt(S.marks[mi],opt)}
+function startPCIAt(m,opt={}){
   if(!canTreat(m)){toast(`Engage the ${VBY[m.vid].sys==='L'?'left':'right'} coronary first.`);return}
   const closed=S.events.some(e=>e.kind==='dissection'&&e.closed&&!e.treated&&e.vid===m.vid);
-  S.pci={vid:m.vid,ld:m.ld,mark:m.ld,label:m.label,stage:'wire',wire:0,kind:null,diam:3.0,len:18,atm:0,maxAtm:0,slow:closed};
+  S.pci={vid:m.vid,ld:m.ld,mark:m.ld,label:m.label,stage:'wire',wire:0,kind:null,diam:3.0,len:18,atm:0,maxAtm:0,slow:closed,ffr:!!opt.ffr,hyperT:0,reading:null};
   toast(closed?'Recrossing an occluded, dissected vessel: the wire will be slow. Hold fluoro.':'Hold fluoro while the wire crosses the lesion.');renderPCI(true);
 }
 /* ---------- complications: dissection, no-reflow, perforation, spasm ---------- */
@@ -487,10 +533,16 @@ function renderPCI(force){
   const log=[...S.balloons.map(b=>`Balloon ${b.diam.toFixed(1)} × ${b.len} mm · ${b.label} · ${b.atm} atm`),...S.stents.map(s=>`Stent ${s.diam.toFixed(1)} × ${s.len} mm · ${s.label} · ${s.atm} atm`)].map(t=>`<div class="mark"><span>${t}</span></div>`).join('');
   if(!P){
     if(!S.marks.length)h='<div class="empty">Mark a lesion on a cine run, then treat it here with the guide engaged.</div>';
-    else{h=S.marks.map((m,i)=>`<div class="mark"><span>${i+1}. ${m.label} · ${BUCKETS[m.bucket].k}</span><button class="btn" data-treat="${i}" ${canTreat(m)?'':'disabled'}>Wire it</button></div>`).join('');
+    else{h=S.marks.map((m,i)=>`<div class="mark"><span>${i+1}. ${m.label} · ${BUCKETS[m.bucket].k}</span><span class="row"><button class="btn" data-ffr="${i}" ${canTreat(m)?'':'disabled'} title="Measure the pressure drop across it (FFR)">FFR</button><button class="btn" data-treat="${i}" ${canTreat(m)?'':'disabled'}>Wire it</button></span></div>`).join('');
       if(!S.marks.some(canTreat))h+='<div class="empty">Engage the matching coronary to treat a marked lesion.</div>'}
   }else if(P.stage==='wire'){
-    h=`<div class="pending"><div>Crossing the ${P.label} with a 0.014" wire. Hold fluoro. <b id="pciWire" class="pci-read">0%</b></div><div class="row"><button class="btn" data-cancel="1">Cancel</button></div></div>`;
+    h=`<div class="pending"><div>Crossing the ${P.label} with a 0.014" ${P.ffr?'pressure ':''}wire. Hold fluoro. <b id="pciWire" class="pci-read">0%</b></div><div class="row"><button class="btn" data-cancel="1">Cancel</button></div></div>`;
+  }else if(P.stage==='ffr'){
+    const r=P.reading;
+    h=`<div class="pending"><div>Pressure wire beyond the ${P.label}. At rest the distal pressure (blue) sits just under the aortic pressure (red). Adenosine opens up the small vessels so maximal flow runs through the narrowing; the ratio of the two pressures then is the <b>FFR</b>.</div>
+      ${r==null?`<div class="row"><button class="btn primary" data-hyper="1" ${P.hyperT>0?'disabled':''}>${P.hyperT>0?'Hyperaemia building…':'Give IV adenosine'}</button><button class="btn" data-finish="1">Remove wire</button></div>`
+      :`<div class="ffrread ${r<=0.8?'sig':'ok'}"><b>FFR ${r.toFixed(2)}</b><span>${r<=0.8?'0.80 or less: this narrowing limits flow. Treat it.':'Above 0.80: not flow-limiting. Leave it and treat with tablets.'}</span></div>
+        <div class="row">${r<=0.8?'<button class="btn primary" data-ffruse="1">Treat it with this wire</button>':''}<button class="btn${r>0.8?' primary':''}" data-finish="1">Remove wire</button></div>`}</div>`;
   }else if(P.stage==='tools'){
     h=`<div class="pending"><div>Wire across the ${P.label}. Choose a device:</div>
       <div class="tools"><button class="btn" data-tool="balloon"><b>Balloon</b><span>Angioplasty, pre- or post-dilation</span></button><button class="btn" data-tool="stent"><b>Stent</b><span>Drug-eluting stent</span></button>${S.events.some(e=>e.kind==='perforation'&&!e.sealed&&e.vid===P.vid)?'<button class="btn" data-tool="covered"><b>Covered stent</b><span>Seals a perforation</span></button>':''}${S.events.some(e=>e.kind==='perforation'&&!e.sealed&&e.grade==='distal'&&e.vid===P.vid)?'<button class="btn" data-tool="coil"><b>Coil</b><span>Plugs a distal wire perforation</span></button>':''}</div>
@@ -512,6 +564,9 @@ function renderPCI(force){
 $('pci').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b||!S||S.done)return;const P=S.pci,d=b.dataset;
   if(d.treat!=null)startPCI(+d.treat);
+  else if(d.ffr!=null)startPCI(+d.ffr,{ffr:true});
+  else if(d.hyper){if(!P.hyperT&&P.reading==null){P.hyperT=3.2;S.hrDip=1.2;toast('IV adenosine: maximal flow (hyperaemia) building… watch the blue distal pressure fall.')}}
+  else if(d.ffruse){P.ffr=false;P.stage='tools';toast('The pressure wire doubles as your working wire. Choose a device.')}
   else if(d.rewire!=null){const e=S.events[+d.rewire];startPCIAt({vid:e.vid,ld:e.ld,label:e.label})}
   else if(d.drug){giveDrug(d.drug);return}
   else if(d.aim!=null){const e=S.events[+d.aim];P.mark=P.ld=e.ld;P.label=e.label;P.seal=e.kind==='perforation';toast(`Devices will be positioned at the ${e.label}.`+(P.seal?' A balloon here inflates at low pressure to seal the hole.':''))}
@@ -530,7 +585,7 @@ $('pci').addEventListener('pointerdown',e=>{if(e.target.closest('[data-hold]')){
 const holdUp=()=>{keys.btn_KeyB=false};window.addEventListener('pointerup',holdUp);window.addEventListener('pointercancel',holdUp);
 
 /* ---------- main loop ---------- */
-let demoPhase=0.25,last=performance.now();
+let demoPhase=0.25,last=performance.now(),saveAcc=0;
 function demoFrame(){
   const cs=cathState({s:S_ROOT+22*1.02,th:OSTANG.L,type:'JL'});
   renderImage({t:10,phase:demoPhase,a:-30,b:-25,mode:'cine',frame:0,lesions:[],cath:true,cathState:cs,conc:()=>1,root:0.05});
@@ -540,6 +595,7 @@ function loop(now){
   if(S&&!S.done)tick(dt);else{const p0=demoPhase;demoPhase=(demoPhase+dt*72/60)%1;hemoStep(dt,p0,demoPhase,false)}
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true}
   drawHemo();updateUI();if(typeof tutorialTick==='function')tutorialTick();
+  if(S&&!S.done){saveAcc+=dt;if(saveAcc>2){saveAcc=0;saveCase()}}
   requestAnimationFrame(loop);
 }
 function tick(dt){
@@ -643,12 +699,20 @@ function tick(dt){
   if(Math.floor(S.clock/4)!==Math.floor((S.clock-dt)/4)&&S.effusion>0.3)renderPCI(true);
   // PCI: wire crossing (under X-ray) and balloon inflation
   const P=S.pci,xray=down('Space','KeyF')||!!S.cine;
-  if(P&&P.stage==='wire'&&xray){P.wire+=dt*(owns('wire')?1:0.5)*(P.slow?0.4:1);if(P.wire>=1){P.wire=1;P.stage='tools';toast('Wire is across. Choose a device.');
+  if(P&&P.stage==='wire'&&xray){P.wire+=dt*(owns('wire')?1:0.5)*(P.slow?0.4:1);if(P.wire>=1){P.wire=1;P.stage=P.ffr?'ffr':'tools';toast(P.ffr?'Pressure wire across: its sensor sits beyond the narrowing. Give adenosine to read the FFR.':'Wire is across. Choose a device.');
     const v=VBY[P.vid];
     if(S.forced==='perforation'&&addEvent('perforation',P.vid,v.len-3,'the wire tip',{grade:'distal'}))S.forced=null;
     else if(Math.random()<perfRisk({kind:'wire',hydrophilic:owns('wire')})*S.ch.randomX)addEvent('perforation',P.vid,v.len-3,'the wire tip',{grade:'distal'});
     else if(Math.random()<spasmRisk({cause:'wire'})*S.ch.randomX)addEvent('spasm',P.vid,Math.min(v.len-6,P.ld+16+Math.random()*10),'the wire',{sev:0.5+Math.random()*0.35});
     renderPCI(true)}}
+  if(P&&P.stage==='ffr'){
+    const L=S.lesions.filter(l=>l.vid===P.vid&&Math.abs(l.at-P.mark)<=l.len/2+7)[0],sensor=L?L.at+L.len/2+6:P.mark+8;
+    const truth=ffrAt(P.vid,sensor,S.lesions,true),rest=1-(1-truth)*0.3;
+    if(P.hyperT>0){P.hyperT-=dt;if(P.hyperT<=0){P.hyperT=0;P.reading=Math.round(clamp(truth+(Math.random()-0.5)*0.03,0.3,1)*100)/100;
+      S.ffr.push({vid:P.vid,ld:sensor,label:P.label,value:P.reading,t:S.clock});toast(`FFR ${P.reading.toFixed(2)} across the ${P.label}.`);renderPCI(true)}}
+    const target=P.reading!=null?P.reading:P.hyperT>0?rest+(P.reading??truth-rest)*clamp(1-P.hyperT/3.2,0,1):rest;
+    S.pdRatio=S.pdRatio==null?target:S.pdRatio+(target-S.pdRatio)*Math.min(1,dt*2);
+  }else S.pdRatio=null;
   if(P&&P.stage==='positioned'){
     const sealing=P.seal&&P.kind==='balloon';
     if(down('KeyB')){P.atm=Math.min(sealing?6:18,P.atm+INFLATE_RATE*dt);P.maxAtm=Math.max(P.maxAtm,P.atm);if(P.atm>=16.5&&!P.warned){P.warned=true;toast('Above the 16 atm rated burst pressure.',true)}if(P.atm>4&&!P.pain){P.pain=true;toast(`Balloon up. Chest pain, ST rising in ${P.vid==='LM'?'V3 and V5':TERRITORY[P.vid]}.`)}}
@@ -746,7 +810,7 @@ function flowReport(){
     <div class="fine">Maximal flow as a share of a normal vessel, estimated from the remaining narrowing (about what an FFR wire would read; ischaemic below 0.80), with any complication left at the end. Pale bar: before, ink bar: after. Teaching model.</div></div>`;
 }
 function finish(){
-  if(!S||S.done)return;if(S.cine)stopCine();closeReview();S.done=true;S.pci=null;
+  if(!S||S.done)return;clearSave();if(S.cine)stopCine();closeReview();S.done=true;S.pci=null;
   const notes=[],rows=[];
   // lesion detection
   const sig=S.lesions.filter(L=>L.sev>=0.5),minor=S.lesions.filter(L=>L.sev<0.5);
@@ -769,7 +833,14 @@ function finish(){
   if(fp){lesPts-=6*fp;notes.push({c:'bad',t:`${fp} mark${fp>1?'s':''} on normal vessel.`})}
   lesPts=clamp(lesPts,0,35);rows.push(['Lesion detection and grading',lesPts,35]);
   // treatment, itemised: each significant lesion is worth an equal share of 15; device and complication penalties follow
-  const targets=S.lesions.filter(L=>L.sev>=0.7);let tx=0;const perT=15/Math.max(1,targets.length),txb=[];
+  // what needs treating: anything 70% or more, and intermediate (50–69%) narrowings only if they limit flow (FFR ≤ 0.80)
+  // a lesion you measured is judged on your reading (that is what you acted on); otherwise on its true FFR
+  const pre=S.lesions.map(L=>({...L,cur:null})),measured=L=>S.ffr.filter(f=>f.vid===L.vid&&Math.abs(f.ld-(L.at+L.len/2+6))<14).pop();
+  const ffrOf=L=>{const m=measured(L);return m?m.value:lesionFFR(L,pre)},needs=L=>L.sev>=0.7||(L.sev>=0.5&&ffrOf(L)<=0.8);
+  for(const L of S.lesions)if(L.sev>=0.5&&L.sev<0.7){const f=ffrOf(L),m=measured(L),st=S.stents.some(s=>s.hits.some(h=>h.L===L));
+    if(f>0.8&&!st)notes.push({c:m?'good':'',t:m?`Intermediate ${Math.round(L.sev*100)}% ${L.label}: FFR ${m.value.toFixed(2)}, correctly left alone.`:`Intermediate ${Math.round(L.sev*100)}% ${L.label}: left alone, rightly. A pressure wire would have read about ${f.toFixed(2)} and proved it.`});
+    else if(f<=0.8)notes.push({c:m?'good':'',t:`Intermediate ${Math.round(L.sev*100)}% ${L.label} limits flow (FFR about ${f.toFixed(2)}${m?`, you measured ${m.value.toFixed(2)}`:''}), so it needed treating.${m?'':' Measure intermediate narrowings with the pressure wire (FFR button) instead of judging them by eye.'}`})}
+  const targets=S.lesions.filter(needs);let tx=0;const perT=15/Math.max(1,targets.length),txb=[];
   const T=(label,pts,cls)=>{txb.push({label,pts,cls});tx+=pts};
   const near=(list,x)=>list.reduce((a,b)=>Math.abs(b-x)<Math.abs(a-x)?b:a);
   if(!targets.length)T('No lesion needed treatment',15,'plus');
@@ -792,8 +863,8 @@ function finish(){
     for(const d of ded)txb.push({label:`−${(perT*d[0]).toFixed(1)} ${d[1]}`,pts:null,cls:'sub'});
     notes.push({c:ded.length?'':'good',t:`Stented ${L.label}: ${s.diam.toFixed(1)} × ${s.len} mm at ${s.atm} atm${post?', post-dilated':''}, residual ${Math.round(L.cur*100)}%.`+(ded.length?' But '+ded.map(d=>d[1]).join('; ')+'.':` Well sized for a ~${o.refD.toFixed(1)} mm vessel.`)});
   }
-  for(const s of S.stents){if(s.sealed&&!s.hits.length)continue;if(!s.hits.some(h=>h.L.sev>=0.5)){T(`Unnecessary stent in the ${s.label}`,-8,'minus');notes.push({c:'bad',t:`Unnecessary stent in the ${s.label}: ${s.hits.length?'that lesion was not flow-limiting.':'there was no lesion there.'}`})}else if(s.hits.some(h=>h.o.over))T(`Oversized stent in the ${s.label} (edge dissection risk)`,-4,'minus')}
-  for(const b of S.balloons){if(b.hits.some(h=>h.o.over)){T(`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm)`,-4,'minus');notes.push({c:'bad',t:`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm)${S.ch.errX?' caused an edge dissection.':': on Medium or Hard that tears the vessel.'}`})}if(!b.hits.some(h=>h.L.sev>=0.5)){T(`Unnecessary balloon inflation in the ${b.label}`,-4,'minus');notes.push({c:'bad',t:`Unnecessary balloon inflation in the ${b.label}.`})}}
+  for(const s of S.stents){if(s.sealed&&!s.hits.length)continue;if(!s.hits.some(h=>needs(h.L))){const L=s.hits[0]&&s.hits[0].L,fx=L&&L.sev>=0.5?` (FFR ${ffrOf(L).toFixed(2)})`:'';T(`Unnecessary stent in the ${s.label}${fx}`,-8,'minus');notes.push({c:'bad',t:`Unnecessary stent in the ${s.label}: ${L?(L.sev>=0.5?`a ${Math.round(L.sev*100)}% narrowing with an FFR of about ${ffrOf(L).toFixed(2)} does not limit flow. Measure intermediate narrowings before stenting them.`:'that lesion was not flow-limiting.'):'there was no lesion there.'}`})}else if(s.hits.some(h=>h.o.over))T(`Oversized stent in the ${s.label} (edge dissection risk)`,-4,'minus')}
+  for(const b of S.balloons){if(b.hits.some(h=>h.o.over)){T(`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm)`,-4,'minus');notes.push({c:'bad',t:`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm)${S.ch.errX?' caused an edge dissection.':': on Medium or Hard that tears the vessel.'}`})}if(!b.hits.some(h=>needs(h.L))&&!b.hits.some(h=>h.o.post)){T(`Unnecessary balloon inflation in the ${b.label}`,-4,'minus');notes.push({c:'bad',t:`Unnecessary balloon inflation in the ${b.label}.`})}}
   for(const sy of new Set(S.stents.map(s=>VBY[s.vid].sys))){const t=Math.max(...S.stents.filter(s=>VBY[s.vid].sys===sy).map(s=>s.t));if(!S.runs.some(r=>r.sys===sy&&r.t0>t))notes.push({c:'',t:`Record a final cine run of the ${sy==='L'?'left':'right'} system after stenting to confirm the result.`})}
   // complications during the case
   let capEv=100;

@@ -235,6 +235,20 @@ function dissectRisk(x){if(x.over)return 1;if(x.atm>16)return 0.5;return x.kind=
    Maximal (hyperaemic) flow through a stenosis as a share of a normal vessel, from the diameter stenosis: about
    0.9 at 50%, 0.7 at 70%, 0.5 at 80%, 0.2 at 90%. This is roughly what the FFR measures. Lesions in series multiply. */
 function stenFlow(ds){ds=clamp(ds,0,0.995);const r=ds/(1-ds);return 1/(1+0.1*Math.pow(r,1.6))}
+/* FFR measured by a pressure wire whose sensor sits at ld (mm) along vid: every narrowing between the ostium and the
+   sensor counts (its own vessel up to the sensor, and its parents up to where this vessel branches off).
+   useCur = after treatment (treated severities). Below 0.80 the narrowing limits flow enough to treat. */
+function ffrAt(vid,ld,lesions,useCur){
+  const v=VBY[vid];if(!v)return 1;let f=1;
+  for(const L of lesions){
+    let up=L.vid===vid&&L.at-L.len/2<ld;
+    if(!up&&v.anc.has(L.vid)){let cur=v;while(cur.parent!==L.vid)cur=VBY[cur.parent];up=VBY[L.vid].ld[cur.joinIdx]>L.at}
+    if(up)f*=stenFlow(useCur&&L.cur!=null?L.cur:L.sev);
+  }
+  return f;
+}
+/* the FFR a lesion would read with the sensor just beyond it, before any treatment */
+const lesionFFR=(L,lesions)=>ffrAt(L.vid,L.at+L.len/2+6,lesions,false);
 /* Flow at the far end of a vessel: its own lesions, lesions upstream of where it branches off, and (after
    treatment) any complication still present upstream. after = use treated severities and the events. */
 function vesselFlow(vid,lesions,events,after){

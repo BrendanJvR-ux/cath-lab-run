@@ -78,7 +78,7 @@ function renderCoach(){
   if(!st){el.hidden=true;return}
   const txt=st.text[Math.min(S.tut.exp,st.text.length-1)];
   el.hidden=false;
-  el.innerHTML=`<div class="coachhead"><b>Step ${S.tut.i+1} of ${steps.length} · ${st.title}</b><button class="btn" data-coach="skip">Skip tutorial</button></div><p>${txt}</p>
+  el.innerHTML=`<div class="coachhead"><b>Step ${S.tut.i+1} of ${steps.length} · ${st.title}</b><button class="btn" data-coach="skip">Skip tutorial</button></div><p>${typeof glossLink==='function'?glossLink(txt):txt}</p>
     <div class="coachdots">${steps.map((_,i)=>`<i class="${i<S.tut.i?'done':i===S.tut.i?'now':''}"></i>`).join('')}</div>`;
   const hl=document.querySelector(st.hl);if(hl)hl.classList.add('coach-hl');
 }

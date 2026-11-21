@@ -242,6 +242,15 @@ test('The whip is noticeable on Hard, gentle on Medium, absent on Easy',()=>{
   return `overshoot past the hub: Easy ${e.toFixed(0)}°, Medium ${m.toFixed(0)}°, Hard ${h.toFixed(0)}°`;
 });
 
+test('Pressure wire: FFR falls with the narrowing, counts only what is upstream of the sensor, and recovers after a stent',()=>{
+  const mk=sev=>prepLesions([{vid:'LAD',at:30,len:10,sev,e:[1,0,0]}]);
+  const f55=lesionFFR(mk(0.55)[0],mk(0.55)),f66=lesionFFR(mk(0.66)[0],mk(0.66)),f85=lesionFFR(mk(0.85)[0],mk(0.85));
+  ok(f55>0.8&&f66<=0.8&&f85<0.6,`55% ${f55.toFixed(2)}, 66% ${f66.toFixed(2)}, 85% ${f85.toFixed(2)}`);
+  const L=mk(0.85);ok(ffrAt('LAD',L[0].at-12,L,false)===1,'a sensor before the narrowing should read 1');
+  L[0].cur=0.05;ok(ffrAt('LAD',L[0].at+20,L,true)>0.95,'after stenting the FFR should recover');
+  return `FFR: 55% → ${f55.toFixed(2)} (leave), 66% → ${f66.toFixed(2)} (treat), 85% → ${f85.toFixed(2)}`;
+});
+
 /* random patients (run last; they rebuild the anatomy, and the final test restores the default) */
 test('Case codes round-trip, and a code always gives the same patient',()=>{
   for(const n of [0,1,12345,CODE_SPACE-1])ok(codeToSeed(seedToCode(n))===n,'round trip '+n);
