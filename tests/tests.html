@@ -185,6 +185,17 @@ test('Flow estimates: calibrated to the stenosis, multiplied in series, and only
 });
 test('The shop no longer sells monitor filters, and old purchases are refundable',()=>{ok(!SHOP.some(x=>x.kind==='lut'),'filters still on sale');ok(RETIRED_SHOP.warm>0&&RETIRED_SHOP.cool>0)});
 
+test('Heart sketch: chambers in their anatomical places around the coronary tree',()=>{
+  const {V}=heartGeometry(),H=HEART_PARTS;
+  ok(H.LA.c[2]<Math.min(H.RA.c[2],V.c[2]),'the left atrium should be the most posterior chamber');
+  ok(H.RA.c[0]<V.c[0]&&H.RA.c[0]<H.LA.c[0],'the right atrium should form the right border');
+  ok(H.LAA.c[0]>H.LA.c[0]&&H.LAA.c[2]>H.LA.c[2],'the left atrial appendage reaches forward and left');
+  // every coronary (beyond the ostia) lies inside the drawn cardiac outline, in every standard projection
+  for(const pr of [['AP',0,0],['RAO 30 CAU 25',-30,-25],['LAO 45 CRA 25',45,25],['LAO 40',40,0]]){const B=basis(pr[1],pr[2]),d=heartMask(B).getContext('2d').getImageData(0,0,W,W).data;
+    for(const v of VESSELS)for(let i=Math.floor(v.n*0.15);i<v.n;i+=4){const q=proj(v.p[i],B),x=Math.round(q[0]),y=Math.round(q[1]);if(x<0||y<0||x>=W||y>=W)continue;ok(d[(y*W+x)*4+3]>0,`${v.id} pokes out of the heart in ${pr[0]}`)}}
+  return V.ax.map(a=>Math.round(a.r*2)).join(' × ')+' mm ventricles';
+});
+
 /* random patients (run last; they rebuild the anatomy, and the final test restores the default) */
 test('Case codes round-trip, and a code always gives the same patient',()=>{
   for(const n of [0,1,12345,CODE_SPACE-1])ok(codeToSeed(seedToCode(n))===n,'round trip '+n);

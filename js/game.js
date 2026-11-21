@@ -96,7 +96,7 @@ function renderMenu(){
       <div class="row"><button class="btn" data-act="home">Back</button></div>`;
     return;
   }
-  ov.innerHTML=`<div class="hero"><img class="heroimg" src="assets/heart.svg" alt="Illustration of the heart from the front, with the right coronary artery, left anterior descending and circumflex arteries"><div class="herotxt"><span class="kicker">Coronary angiography · PCI</span><h1>Cath Lab Run</h1><p>Drive the catheter to the aortic root, engage each coronary, record cine runs in the right projections, then find, grade and treat the stenosis.</p></div></div>
+  ov.innerHTML=`<div class="hero"><img class="heroimg" src="assets/cardiologists.svg" alt="Sketch of two cardiologists, a woman and a man, in scrubs and lead aprons"><div class="herotxt"><span class="kicker">Coronary angiography · PCI</span><h1>Cath Lab Run</h1><p>Drive the catheter to the aortic root, engage each coronary, record cine runs in the right projections, then find, grade and treat the stenosis.</p></div></div>
     <div class="opcard">${avatarSVG(profile.avatar,64)}<div><b>${esc(profile.name)}</b><span>${CUP} ${profile.tokens} coffee tokens · ${DIFFICULTY[profile.diff].label}</span></div><button class="btn" data-act="editop">Change operator</button></div>
     <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button></div>
     <div class="keys">
@@ -133,6 +133,7 @@ const caseName=S=>S.c.code?'patient '+S.c.code:'case '+(S.ci+1);
 function newState(ci){
   const base=DIFFICULTY[profile.diff]||DIFFICULTY.easy,c=caseFor(ci);
   buildAnatomy(c.anatomy); // fixed cases use the default anatomy
+  HEART_MODE=['chambers','outline','none'][base.level-1]||'outline'; // the heart sketch: labelled chambers on Easy, outline on Medium, none on Hard
   // shop perks adjust a copy of the difficulty settings
   const D={...base,tol:{...base.tol}};if(owns('torque')){D.tol.L+=6;D.tol.R+=6}
   return {ci,c,D,diff:profile.diff,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,type:'JL'},exch:0,

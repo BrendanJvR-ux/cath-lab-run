@@ -238,48 +238,108 @@ function hatch(g,deg,gap,lw,col,seed){
   for(let k=-R,n=0;k<=R;k+=gap,n++){const j=(hsh(seed,n)-0.5)*gap*0.5,cx=W/2+nx*(k+j),cy=W/2+ny*(k+j),l=R*(0.8+0.4*hsh(seed+1,n));
     g.lineWidth=lw*(0.7+0.6*hsh(seed+2,n));g.beginPath();g.moveTo(cx-dx*l,cy-dy*l);g.lineTo(cx+dx*l,cy+dy*l);g.stroke()}
 }
-/* A very light pencil sketch of the heart where it really lies, built from the live coronary tree (which runs on the
-   heart's surface), so it fits every projection and every patient's anatomy: the cardiac outline round the
-   ventricles and atria, the atrioventricular and interventricular grooves, the aortic root and arch, the pulmonary
-   trunk and the superior vena cava, with small handwritten chamber labels. */
-const FIBO=(()=>{const out=[],n=48,g=Math.PI*(3-Math.sqrt(5));for(let i=0;i<n;i++){const y=1-2*(i+0.5)/n,r=Math.sqrt(1-y*y);out.push([Math.cos(g*i)*r,y,Math.sin(g*i)*r])}return out})();
-const sphere=(c,r)=>FIBO.map(u=>add(c,mul(u,r)));
+/* ---------- heart sketch over the fluoroscopy ----------
+   A very light pencil drawing of the heart where it really lies, in every projection, following standard
+   radiographic cardiac anatomy. In the frontal view the right heart border is the superior vena cava above and the
+   right atrium below; the left border runs from the aortic knob over the main pulmonary artery and the left atrial
+   appendage to the left ventricle, whose apex points left, forwards and down onto the diaphragm. The right ventricle
+   lies in front (retrosternal), the left atrium is the most posterior chamber, just in front of the spine, and the
+   atrioventricular and interventricular grooves (where the coronaries run) mark the borders between the chambers.
+   The ventricular mass is fitted to the patient's own coronary tree (which lies on its surface), so the sketch fits
+   every anatomy. HEART_MODE: 'chambers' (Easy: outline, chambers, grooves and labels), 'outline' (Medium: the
+   cardiac silhouette only) or 'none' (Hard). js/game.js sets it for each case. */
+let HEART_MODE='outline';
+const FIBO=(()=>{const out=[],n=90,g=Math.PI*(3-Math.sqrt(5));for(let i=0;i<n;i++){const y=1-2*(i+0.5)/n,r=Math.sqrt(1-y*y);out.push([Math.cos(g*i)*r,y,Math.sin(g*i)*r])}return out})();
 function hull2(P){P=P.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);const lo=[],up=[];
   for(const p of P){while(lo.length>1&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p)}
   for(let i=P.length-1;i>=0;i--){const p=P[i];while(up.length>1&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p)}
   return lo.slice(0,-1).concat(up.slice(0,-1))}
 function smoothClosed(g,pts,jit,seed){const n=pts.length;g.beginPath();
   for(let i=0;i<=n;i++){const a=pts[i%n],b=pts[(i+1)%n],m=[(a[0]+b[0])/2+(hsh(seed,i)-0.5)*jit,(a[1]+b[1])/2+(hsh(seed+9,i)-0.5)*jit];i?g.quadraticCurveTo(a[0],a[1],m[0],m[1]):g.moveTo(m[0],m[1])}}
-const HEART_RA=[-36,14,-12],HEART_LA=[20,30,-42];
+/* eigenvectors of a symmetric 3×3 matrix (Jacobi rotations); returns [{val, vec}] */
+function eig3(A){A=A.map(r=>r.slice());let V=[[1,0,0],[0,1,0],[0,0,1]];
+  for(let sweep=0;sweep<30;sweep++)for(const [p,q] of [[0,1],[0,2],[1,2]]){if(Math.abs(A[p][q])<1e-9)continue;
+    const th=(A[q][q]-A[p][p])/(2*A[p][q]),t=Math.sign(th||1)/(Math.abs(th)+Math.sqrt(th*th+1)),c=1/Math.sqrt(t*t+1),s=t*c;
+    for(let k=0;k<3;k++){const a=A[k][p],b=A[k][q];A[k][p]=c*a-s*b;A[k][q]=s*a+c*b}
+    for(let k=0;k<3;k++){const a=A[p][k],b=A[q][k];A[p][k]=c*a-s*b;A[q][k]=s*a+c*b}
+    for(let k=0;k<3;k++){const a=V[k][p],b=V[k][q];V[k][p]=c*a-s*b;V[k][q]=s*a+c*b}}
+  return [0,1,2].map(i=>({val:A[i][i],vec:[V[0][i],V[1][i],V[2][i]]}))}
+/* an ellipsoid on the points' own principal axes, just reaching their furthest extent along each axis (the
+   coronaries lie on the heart's surface), plus a margin (mm) for the epicardial fat they run in */
+function fitEllipsoid(pts,margin){
+  const n=pts.length,m=[0,0,0];for(const p of pts)for(let i=0;i<3;i++)m[i]+=p[i]/n;
+  const C=[[0,0,0],[0,0,0],[0,0,0]];for(const p of pts){const d=sub(p,m);for(let i=0;i<3;i++)for(let j=0;j<3;j++)C[i][j]+=d[i]*d[j]/n}
+  let c=m.slice();const ax=[];
+  for(const e of eig3(C)){let lo=1e9,hi=-1e9;for(const p of pts){const t=dot(sub(p,m),e.vec);lo=Math.min(lo,t);hi=Math.max(hi,t)}c=add(c,mul(e.vec,(lo+hi)/2));ax.push({u:e.vec,r:(hi-lo)/2+margin})}
+  return {c,ax};
+}
+const ell=(c,ax)=>({c,ax:ax.map(([u,r])=>({u:norm(u),r}))});
+const ellPts=e=>FIBO.map(f=>{let p=e.c.slice();e.ax.forEach((a,i)=>{p=add(p,mul(a.u,a.r*f[i]))});return p});
+/* atria, appendages and great vessels (mm), placed relative to the coronary tree: the RA behind the right AV groove,
+   the LA behind the left main and circumflex, in front of the spine */
+const HEART_PARTS={
+  RA:ell([-38,14,-12],[[[1,0,0.2],22],[[0,1,0],30],[[-0.2,0,1],21]]),
+  LA:ell([18,30,-46],[[[1,0,0],30],[[0,1,0],18],[[0,0,1],19]]),
+  LAA:ell([36,36,-14],[[[0.5,0.2,0.8],13],[[0,1,0],8],[[0.8,0,-0.5],8]]),
+  RAA:ell([-20,38,14],[[[-0.4,0.2,0.9],13],[[0,1,0],9],[[0.9,0,0.4],8]]),
+};
+const PA_TRUNK=[[14,40,32],[20,54,24],[26,66,10],[30,71,-2]],PA_L=[[30,71,-2],[44,74,-12],[58,72,-20]],PA_R=[[30,71,-2],[12,72,-12],[-8,70,-16]];
+const SVC_LINE=[[-30,46,-14],[-29,80,-14],[-27,126,-14]],IVC_LINE=[[-30,-12,-30],[-29,-50,-32],[-28,-95,-34]];
+function heartGeometry(){
+  const ids=['LAD','D1','D2','RI','LCx','OM1','OM2','RCA','AM','PDA','PLV','LPDA','LPL'],pts=[];
+  for(const id of ids){const v=VBY[id];if(!v)continue;const from=id==='RCA'?0.3:id==='LCx'?0.25:0;for(let i=Math.floor(v.n*from);i<v.n;i+=2)pts.push(v.p[i])}
+  const all=[];for(const v of VESSELS)for(let i=0;i<v.n;i+=2)all.push(v.p[i]);const mc=m3(pts);
+  return {V:fitEllipsoid(pts,4),pts:all.map(p=>add(p,mul(norm(sub(p,mc)),4)))};
+}
+const m3=pts=>{const m=[0,0,0];for(const p of pts)for(let i=0;i<3;i++)m[i]+=p[i]/pts.length;return m};
+/* the cardiac silhouette as a filled mask for view B: the ventricles (the rounded fit, merged with the coronary
+   tree's own outline so every vessel stays inside), the atria and appendages, the aorta, pulmonary trunk and cavae */
+function heartMask(B,geo){
+  const P=q=>proj(q,B),{V,pts}=geo||heartGeometry(),parts=HEART_PARTS,hullOf=e=>hull2(ellPts(e).map(P));
+  const c=document.createElement('canvas');c.width=c.height=W;const m=c.getContext('2d');m.fillStyle='#000';m.strokeStyle='#000';m.lineCap='round';m.lineJoin='round';
+  for(const e of [V,parts.RA,parts.LA,parts.LAA,parts.RAA]){smoothClosed(m,hullOf(e),0,0);m.fill()}
+  smoothClosed(m,hull2(pts.map(P)),0,0);m.fill();
+  for(const [pts3,r] of heartTubes()){if(pts3===PA_L||pts3===PA_R)continue; // the pulmonary branches are hilar, not part of the cardiac outline
+    const q=pts3.map(P);m.beginPath();q.forEach((p,i)=>i?m.lineTo(p[0],p[1]):m.moveTo(p[0],p[1]));m.lineWidth=2*r*SCALE;m.stroke()}
+  return c;
+}
+const heartTubes=()=>[[AO.p.filter((p,i)=>i%3===0&&p[1]>-110),13],[PA_TRUNK,13],[PA_L,8.5],[PA_R,8.5],[SVC_LINE,10],[IVC_LINE,11]];
 function drawHeartSketch(g,B){
-  const P=q=>proj(q,B),ink=a=>`rgba(62,54,46,${a})`;
-  // ventricles: the coronary tree pushed out a few millimetres (epicardial fat), plus the two atria
-  const vc=[22,-12,-6],pts=[];
-  for(const v of VESSELS)for(let i=0;i<v.n;i+=3){const p=v.p[i];pts.push(add(p,mul(norm(sub(p,vc)),5)))}
-  pts.push(...sphere(HEART_RA,21),...sphere(HEART_LA,20));
-  const H=hull2(pts.map(P));
-  g.save();g.lineCap='round';g.lineJoin='round';
-  smoothClosed(g,H,0,1);g.save();g.clip();hatch(g,-32,8,0.9,ink(0.09),3);g.restore();
-  for(let k=0;k<2;k++){smoothClosed(g,H.map(q=>[q[0]+k*1.3,q[1]-k*0.9]),2.2,5+k);g.lineWidth=1.5-k*0.5;g.strokeStyle=ink(0.3-k*0.1);g.stroke()}
-  // tubes: great vessels as two pencil walls
-  const tube=(pts3,r,a,seed)=>{const q=pts3.map(P);for(const side of [-1,1]){g.beginPath();q.forEach((p,i)=>{const A=q[Math.max(0,i-1)],Bq=q[Math.min(q.length-1,i+1)];let nx=A[1]-Bq[1],ny=Bq[0]-A[0];const l=Math.hypot(nx,ny)||1;const o=r*SCALE+(hsh(seed+side,i)-0.5)*1.5;const x=p[0]+nx/l*o*side,y=p[1]+ny/l*o*side;i?g.lineTo(x,y):g.moveTo(x,y)});g.lineWidth=1.2;g.strokeStyle=ink(a);g.stroke()}};
-  tube(AO_ASC.filter((_,i)=>i%2===0),14,0.26,11);
-  tube([[10,44,26],[16,56,22],[24,66,12],[30,72,2]],12,0.24,21);
-  tube([[-30,44,-12],[-29,70,-12],[-27,100,-12],[-26,126,-12]],10,0.2,31);
-  // atria
-  for(const [c,r,sd] of [[HEART_RA,21,41],[HEART_LA,20,51]]){const q=P(c),rr=r*SCALE*0.92;g.beginPath();g.ellipse(q[0]+(hsh(sd,1)-0.5)*2,q[1],rr,rr*0.86,hsh(sd,2),0.4,5.9);g.lineWidth=1;g.strokeStyle=ink(0.16);g.stroke()}
-  // grooves: AV groove along the RCA and circumflex, interventricular groove along the LAD and PDA (dashed, very faint)
-  g.setLineDash([5,5]);
-  for(const id of ['RCA','LCx','LAD','PDA','LPDA']){const v=VBY[id];if(!v)continue;g.beginPath();for(let i=0;i<v.n;i+=2){const q=P(add(v.p[i],mul(norm(sub(v.p[i],vc)),3)));i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1])}g.lineWidth=1;g.strokeStyle=ink(0.16);g.stroke()}
-  g.setLineDash([]);
-  // labels
-  g.font='17px "Patrick Hand", "Kalam", cursive';g.fillStyle=ink(0.34);g.textAlign='center';
-  for(const [t,c] of [['RA',HEART_RA],['LA',HEART_LA],['RV',[8,-18,34]],['LV',[56,-26,-12]],['Ao',[-4,62,2]],['PA',[24,64,14]],['SVC',[-28,104,-12]]])
-    {const q=P(c);if(q[0]>14&&q[0]<W-14&&q[1]>14&&q[1]<W-14)g.fillText(t,q[0],q[1])}
-  g.textAlign='left';g.restore();
+  if(HEART_MODE==='none')return;
+  const P=q=>proj(q,B),ink=a=>`rgba(62,54,46,${a})`,geo=heartGeometry(),{V}=geo,parts=HEART_PARTS;
+  const hullOf=e=>hull2(ellPts(e).map(P));
+  const tubes=heartTubes();
+  const pathOf=pts=>{const q=pts.map(P);g.beginPath();q.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]))};
+  // the silhouette: fill every part into a mask, then keep a thin ring just outside it
+  const mk=()=>{const c=document.createElement('canvas');c.width=c.height=W;return c};
+  const mask=heartMask(B,geo);
+  const ringOf=(w,ox,oy)=>{const r=mk(),x=r.getContext('2d');for(let k=0;k<12;k++){const a=k/12*Math.PI*2;x.drawImage(mask,ox+Math.cos(a)*w,oy+Math.sin(a)*w)}
+    x.globalCompositeOperation='destination-out';x.drawImage(mask,ox,oy);x.globalCompositeOperation='source-in';x.fillStyle='rgb(62,54,46)';x.fillRect(0,0,W,W);return r};
+  g.save();
+  if(HEART_MODE==='chambers'){const h=mk(),x=h.getContext('2d');hatch(x,-32,8,0.9,ink(0.1),3);x.globalCompositeOperation='destination-in';x.drawImage(mask,0,0);g.drawImage(h,0,0)}
+  g.globalAlpha=HEART_MODE==='chambers'?0.42:0.34;g.drawImage(ringOf(1.6,0,0),0,0);g.globalAlpha*=0.5;g.drawImage(ringOf(1.1,1.3,-0.9),0,0);g.globalAlpha=1;
+  if(HEART_MODE==='chambers'){
+    g.lineCap='round';g.lineJoin='round';
+    // each chamber's own outline, faint, where it overlaps the others
+    for(const [e,sd] of [[V,61],[parts.RA,41],[parts.LA,51],[parts.LAA,71],[parts.RAA,81]]){smoothClosed(g,hullOf(e),1.6,sd);g.lineWidth=0.9;g.strokeStyle=ink(0.16);g.stroke()}
+    // great vessel walls
+    for(const [pts,r] of tubes){const q=pts.map(P);for(const side of [-1,1]){g.beginPath();q.forEach((p,i)=>{const A=q[Math.max(0,i-1)],Bq=q[Math.min(q.length-1,i+1)];let nx=A[1]-Bq[1],ny=Bq[0]-A[0];const l=Math.hypot(nx,ny)||1;const x=p[0]+nx/l*r*SCALE*side,y=p[1]+ny/l*r*SCALE*side;i?g.lineTo(x,y):g.moveTo(x,y)});g.lineWidth=0.9;g.strokeStyle=ink(0.15);g.stroke()}}
+    // grooves between the chambers: atrioventricular (RCA, circumflex) and interventricular (LAD, PDA)
+    g.setLineDash([5,5]);
+    for(const id of ['RCA','LCx','LAD','PDA','LPDA']){const v=VBY[id];if(!v)continue;g.beginPath();for(let i=0;i<v.n;i+=2){const q=P(v.p[i]);i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1])}g.lineWidth=1;g.strokeStyle=ink(0.2);g.stroke()}
+    g.setLineDash([]);
+    // labels: the RV on the right/anterior side of the interventricular groove, the LV on the left/posterior side
+    const toward=id=>{const v=VBY[id];return v?norm(sub(v.p[Math.floor(v.n*0.6)],V.c)):[0,0,0]};
+    const rv=add(V.c,add(mul(toward(VBY.AM?'AM':'RCA'),24),[0,0,14])),lv=add(V.c,mul(toward('OM1'),22));
+    g.font='18px "Patrick Hand", "Kalam", cursive';g.fillStyle=ink(0.42);g.textAlign='center';g.textBaseline='middle';
+    for(const [t,c] of [['RA',parts.RA.c],['LA',parts.LA.c],['RV',rv],['LV',lv],['Ao',[-6,70,4]],['PA',[24,62,16]],['SVC',[-29,104,-14]]])
+      {const q=P(c);if(q[0]>16&&q[0]<W-16&&q[1]>16&&q[1]<W-16)g.fillText(t,q[0],q[1])}
+    g.textAlign='left';g.textBaseline='alphabetic';
+  }
+  g.restore();
 }
 function getBg(a,b){
-  const key=Math.round(a)+'|'+Math.round(b)+'|'+ANAT_VER;if(bgCache.has(key))return bgCache.get(key);
+  const key=Math.round(a)+'|'+Math.round(b)+'|'+ANAT_VER+'|'+HEART_MODE;if(bgCache.has(key))return bgCache.get(key);
   const c=document.createElement('canvas');c.width=c.height=W;const B=basis(a,b);
   // the anatomy is drawn in black on a transparent layer, then laid on paper as graphite (see the end)
   const lay=document.createElement('canvas');lay.width=lay.height=W;const g=lay.getContext('2d');
