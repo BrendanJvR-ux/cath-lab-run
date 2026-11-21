@@ -458,20 +458,20 @@ function drawHemo(){
   if(!HB)return;const w=hemo.width,h=hemo.height;hctx.clearRect(0,0,w,h);
   const rowH=h*0.19,pTop=h*0.62,pBot=h-6*dpr,pm=v=>pBot-(v/160)*(pBot-pTop);
   // ECG paper: fine pink grid with heavier lines every fifth square
-  const sq=6*dpr;for(let x=0,n=0;x<w;x+=sq,n++){hctx.strokeStyle=n%5?'rgba(226,120,110,0.16)':'rgba(226,120,110,0.38)';hctx.lineWidth=n%5?1:1.4;hctx.beginPath();hctx.moveTo(x,0);hctx.lineTo(x,h);hctx.stroke()}
-  for(let y=0,n=0;y<h;y+=sq,n++){hctx.strokeStyle=n%5?'rgba(226,120,110,0.16)':'rgba(226,120,110,0.38)';hctx.lineWidth=n%5?1:1.4;hctx.beginPath();hctx.moveTo(0,y);hctx.lineTo(w,y);hctx.stroke()}
-  hctx.strokeStyle='rgba(43,42,51,0.18)';hctx.setLineDash([4*dpr,4*dpr]);
+  const sq=6*dpr;for(let x=0,n=0;x<w;x+=sq,n++){hctx.strokeStyle=n%5?'rgba(17,17,17,0.035)':'rgba(17,17,17,0.09)';hctx.lineWidth=1;hctx.beginPath();hctx.moveTo(x,0);hctx.lineTo(x,h);hctx.stroke()}
+  for(let y=0,n=0;y<h;y+=sq,n++){hctx.strokeStyle=n%5?'rgba(17,17,17,0.035)':'rgba(17,17,17,0.09)';hctx.lineWidth=1;hctx.beginPath();hctx.moveTo(0,y);hctx.lineTo(w,y);hctx.stroke()}
+  hctx.strokeStyle='rgba(17,17,17,0.12)';hctx.setLineDash([4*dpr,4*dpr]);
   for(const v of [40,80,120]){hctx.beginPath();hctx.moveTo(0,pm(v));hctx.lineTo(w,pm(v));hctx.stroke()}hctx.setLineDash([]);
   const trace=(arr,map,col)=>{hctx.strokeStyle=col;hctx.lineWidth=1.5*dpr;hctx.beginPath();let pen=false;for(let x=0;x<w;x++){const v=arr[x];if(isNaN(v)){pen=false;continue}const y=map(v);pen?hctx.lineTo(x,y):hctx.moveTo(x,y);pen=true}hctx.stroke()};
-  hctx.font=`${14*dpr}px "Patrick Hand", "Kalam", cursive`;
-  LEADS.forEach((l,i)=>{const base=rowH*(i+0.72);trace(HB[l],v=>base-v*rowH*0.62,'#2b2a33');hctx.fillStyle='#2b2a33';hctx.fillText(l,6*dpr,rowH*i+12*dpr);
-    const stv=S?S.st[l]:0;if(Math.abs(stv)>0.25){hctx.fillStyle=stv>0?'#c2452d':'#2f5d8a';hctx.fillText(`ST ${stv>0?'↑':'↓'} ${(Math.abs(stv)*2).toFixed(1)} mm`,26*dpr,rowH*i+12*dpr)}});
-  trace(HB.p,pm,'#c2452d');trace(HB.pd,pm,'#2f5d8a');
-  if(S&&S.pdRatio!=null){hctx.fillStyle='#2f5d8a';hctx.fillText(`Pd/Pa ${S.pdRatio.toFixed(2)}`,6*dpr,pTop+24*dpr)}
-  hctx.fillStyle='#c2452d';hctx.fillText('AO 0–160',6*dpr,pTop+8*dpr);
+  hctx.font=`500 ${11*dpr}px Inter, system-ui, sans-serif`;
+  LEADS.forEach((l,i)=>{const base=rowH*(i+0.72);trace(HB[l],v=>base-v*rowH*0.62,'#111111');hctx.fillStyle='#111111';hctx.fillText(l,6*dpr,rowH*i+12*dpr);
+    const stv=S?S.st[l]:0;if(Math.abs(stv)>0.25){hctx.fillStyle=stv>0?'#E5432D':'#4A5A70';hctx.fillText(`ST ${stv>0?'↑':'↓'} ${(Math.abs(stv)*2).toFixed(1)} mm`,26*dpr,rowH*i+12*dpr)}});
+  trace(HB.p,pm,'#E5432D');trace(HB.pd,pm,'#4A5A70');
+  if(S&&S.pdRatio!=null){hctx.fillStyle='#4A5A70';hctx.fillText(`Pd/Pa ${S.pdRatio.toFixed(2)}`,6*dpr,pTop+24*dpr)}
+  hctx.fillStyle='#E5432D';hctx.fillText('AO 0–160',6*dpr,pTop+8*dpr);
   const hr=S?Math.round(S.hr):72,sp=S?Math.round(S.sysP):128,dp=S?Math.round(S.diaP):74;
-  hctx.textAlign='right';hctx.font=`700 ${18*dpr}px "Kalam", "Patrick Hand", cursive`;hctx.fillStyle='#2b2a33';hctx.fillText('HR '+hr,w-8*dpr,16*dpr);
-  hctx.fillStyle='#c2452d';hctx.fillText(`${sp}/${dp} (${Math.round(dp+(sp-dp)/3)})`,w-8*dpr,pTop+10*dpr);hctx.textAlign='left';
+  hctx.textAlign='right';hctx.font=`300 ${17*dpr}px Inter, system-ui, sans-serif`;hctx.fillStyle='#111111';hctx.fillText('HR '+hr,w-8*dpr,16*dpr);
+  hctx.fillStyle='#E5432D';hctx.fillText(`${sp}/${dp} (${Math.round(dp+(sp-dp)/3)})`,w-8*dpr,pTop+10*dpr);hctx.textAlign='left';
 }
 
 /* ---------- PCI: wire, balloon, stent ---------- */

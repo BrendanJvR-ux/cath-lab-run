@@ -21,7 +21,7 @@ function toonMat(color,opts={}){
   if(!TOON){const d=new Uint8Array([90,170,255]);TOON=new THREE.DataTexture(d,3,1,THREE.LuminanceFormat);TOON.minFilter=TOON.magFilter=THREE.NearestFilter;TOON.needsUpdate=true}
   return new THREE.MeshToonMaterial({color,gradientMap:TOON,...opts});
 }
-const INK3=0x2b2a33;
+const INK3=0x3a3a3a;
 /* a tube plus a slightly fatter dark back-face tube round it: the classic inked outline */
 const OUTLINE=new Map();
 function inkedTube(pts,r,mat,seg){
@@ -30,10 +30,10 @@ function inkedTube(pts,r,mat,seg){
   g.add(new THREE.Mesh(tubeGeo(pts,r+Math.max(0.45,r*0.22),seg),om));return g;
 }
 /* a handwritten label that always faces the camera */
-function label3(text,pos,color='#2b2a33',size=1){
-  const c=document.createElement('canvas'),x=c.getContext('2d');x.font='700 44px "Kalam", "Patrick Hand", cursive';
+function label3(text,pos,color='#111111',size=1){
+  const c=document.createElement('canvas'),x=c.getContext('2d');x.font='500 36px Inter, system-ui, sans-serif';
   const w=Math.ceil(x.measureText(text).width)+28;c.width=w;c.height=64;
-  x.font='700 44px "Kalam", "Patrick Hand", cursive';x.fillStyle='rgba(251,246,234,0.88)';x.strokeStyle='#2b2a33';x.lineWidth=3;
+  x.font='500 36px Inter, system-ui, sans-serif';x.fillStyle='rgba(255,255,255,0.9)';x.strokeStyle='rgba(17,17,17,0.25)';x.lineWidth=2;
   x.beginPath();x.roundRect?x.roundRect(3,6,w-6,52,14):x.rect(3,6,w-6,52);x.fill();x.stroke();
   x.fillStyle=color;x.textBaseline='middle';x.fillText(text,14,33);
   const t=new THREE.CanvasTexture(c),s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}));
@@ -49,30 +49,30 @@ function tubeGeo(pts,r,seg){const curve=new THREE.CatmullRomCurve3(pts.map(v3));
 
 /* build the scene: post = after the case (show disease, devices and complications) */
 function buildHeartScene(post){
-  const scene=new THREE.Scene();scene.background=new THREE.Color(0xf3ead4);
+  const scene=new THREE.Scene();scene.background=new THREE.Color(0xffffff);
   scene.add(new THREE.AmbientLight(0xffffff,0.55));
   const sun=new THREE.DirectionalLight(0xffffff,0.75);sun.position.set(-120,180,260);scene.add(sun);
   const {V}=heartGeometry(),parts=HEART_PARTS;
   // chambers: see-through so the coronaries on the back still show
   const cham=(e,col,op)=>{const g=ellMesh(e,toonMat(col,{transparent:true,opacity:op,depthWrite:false}));g.renderOrder=1;scene.add(g);return g};
-  cham(V,0xe0a090,0.6);cham(parts.RA,0xb9a3c9,0.6);cham(parts.LA,0xe7b3a6,0.6);cham(parts.LAA,0xe7b3a6,0.65);cham(parts.RAA,0xb9a3c9,0.65);
+  cham(V,0xdedcd8,0.55);cham(parts.RA,0xcfd2d6,0.55);cham(parts.LA,0xe4e1dc,0.55);cham(parts.LAA,0xe4e1dc,0.6);cham(parts.RAA,0xcfd2d6,0.6);
   // great vessels
   const ves=(pts,r,col)=>scene.add(inkedTube(pts,r,toonMat(col)));
   const tubes=heartTubes();
-  const colours=[0xd0685c,0x9aaad8,0x9aaad8,0x9aaad8,0x8f9fcf,0x8f9fcf,0xd0685c,0xd0685c,0xd0685c];
+  const colours=[0xbdbdb8,0xa9aeb5,0xa9aeb5,0xa9aeb5,0xa9aeb5,0xa9aeb5,0xbdbdb8,0xbdbdb8,0xbdbdb8];
   tubes.forEach(([pts,r],i)=>{if(i===0)pts=pts.filter(p=>p[1]>18); // the aorta from just below the arch, as anatomy drawings show it
-    ves(pts,r*0.95,colours[i]||0xd0685c)});
+    ves(pts,r*0.95,colours[i]||0xbdbdb8)});
   // coronary tree, each vessel tapering from its origin
   for(const v of VESSELS){
     const pts=v.p.filter((_,i)=>i%2===0||i===v.n-1),r=(v.r0+v.r1)/2*1.15;
-    scene.add(inkedTube(pts,Math.max(0.55,r),toonMat(0xe0503f),pts.length*2));
+    scene.add(inkedTube(pts,Math.max(0.55,r),toonMat(0xe5432d),pts.length*2));
   }
   // labels
   const tl=(t,p,c)=>scene.add(label3(t,v3(p),c));
   tl('RA',parts.RA.c);tl('LA',add(parts.LA.c,[0,0,-14]));tl('Ao',[-8,96,6]);tl('PA',[30,72,10]);tl('SVC',[-29,112,-14]);tl('IVC',[-29,-70,-33]);
   const toward=id=>{const v=VBY[id];return v?norm(sub(v.p[Math.floor(v.n*0.6)],V.c)):[0,0,0]};
   tl('RV',add(V.c,add(mul(toward(VBY.AM?'AM':'RCA'),30),[0,0,26])));tl('LV',add(V.c,mul(toward('OM1'),34)));
-  for(const [id,f] of [['LAD',0.55],['LCx',0.6],['RCA',0.45]]){const v=VBY[id];if(v)scene.add(label3(id==='LCx'?'Cx':id,v3(add(v.p[Math.floor(v.n*f)],mul(norm(sub(v.p[Math.floor(v.n*f)],V.c)),9))),'#8f2614',0.8))}
+  for(const [id,f] of [['LAD',0.55],['LCx',0.6],['RCA',0.45]]){const v=VBY[id];if(v)scene.add(label3(id==='LCx'?'Cx':id,v3(add(v.p[Math.floor(v.n*f)],mul(norm(sub(v.p[Math.floor(v.n*f)],V.c)),9))),'#B32D1A',0.8))}
   if(post&&S){
     // lesions: a ring round the vessel, coloured by what is left, labelled before → after
     for(const L of S.lesions){

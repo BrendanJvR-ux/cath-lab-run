@@ -276,7 +276,7 @@ const vign=document.createElement('canvas');vign.width=vign.height=W;{const g=vi
 let RES=2;
 const hiCanvas=()=>{const c=document.createElement('canvas');c.width=c.height=W*RES;const g=c.getContext('2d');g.setTransform(RES,0,0,RES,0,0);return c};
 const bgCache=new Map();
-const PAPER='#f3ead4';
+const PAPER='#F7F7F5';
 /* hand-drawn helpers: a stable pseudo-random number per (i, j), and pencil hatching over the whole canvas (clip it first) */
 const hsh=(i,j)=>{const x=Math.sin(i*127.1+j*311.7)*43758.5453;return x-Math.floor(x)};
 function hatch(g,deg,gap,lw,col,seed){
@@ -387,7 +387,7 @@ function drawHeartSketch(g,B){
     // labels: the RV on the right/anterior side of the interventricular groove, the LV on the left/posterior side
     const toward=id=>{const v=VBY[id];return v?norm(sub(v.p[Math.floor(v.n*0.6)],V.c)):[0,0,0]};
     const rv=add(V.c,add(mul(toward(VBY.AM?'AM':'RCA'),24),[0,0,14])),lv=add(V.c,mul(toward('OM1'),22));
-    g.font='18px "Patrick Hand", "Kalam", cursive';g.fillStyle=ink(0.42);g.textAlign='center';g.textBaseline='middle';
+    g.font='500 14px Inter, system-ui, sans-serif';g.fillStyle=ink(0.42);g.textAlign='center';g.textBaseline='middle';
     for(const [t,c] of [['RA',parts.RA.c],['LA',parts.LA.c],['RV',rv],['LV',lv],['Ao',[-6,70,4]],['PA',[24,62,16]],['SVC',[-29,104,-14]],...(B.u[1]>0.9?[['IVC',[-29,-84,-33]]]:[])])
       {const q=P(c);if(q[0]>16&&q[0]<W-16&&q[1]>16&&q[1]<W-16)g.fillText(t,q[0],q[1])}
     g.textAlign='left';g.textBaseline='alphabetic';
@@ -470,8 +470,8 @@ function getBg(a,b){
   // compose: paper, cross-hatched heart shadow, then the anatomy as graphite drawn twice slightly offset (a sketchy pencil line)
   const gc=c.getContext('2d');gc.fillStyle=PAPER;gc.fillRect(0,0,W,W);
   drawHeartSketch(gc,B);
-  const tint=hiCanvas();{const t=tint.getContext('2d');t.drawImage(lay,0,0,W,W);t.globalCompositeOperation='source-in';t.fillStyle='rgb(62,54,46)';t.fillRect(0,0,W,W)}
-  gc.globalAlpha=1;gc.drawImage(tint,0,0,W,W);gc.globalAlpha=0.55;gc.drawImage(tint,1.4,-1,W,W);gc.globalAlpha=0.3;gc.drawImage(tint,-1,1.3,W,W);gc.globalAlpha=1;
+  const tint=hiCanvas();{const t=tint.getContext('2d');t.drawImage(lay,0,0,W,W);t.globalCompositeOperation='source-in';t.fillStyle='rgb(38,38,38)';t.fillRect(0,0,W,W)}
+  gc.globalAlpha=0.9;gc.drawImage(tint,0,0,W,W);gc.globalAlpha=1;
   if(bgCache.size>16)bgCache.delete(bgCache.keys().next().value);
   bgCache.set(key,c);return c;
 }
@@ -486,7 +486,7 @@ let vcan=hiCanvas(),vctx=vcan.getContext('2d');
 /* drop to a lighter resolution (for slow devices): rebuilds the working canvases and the background cache */
 function setResolution(r){if(r===RES)return;RES=r;dcan=hiCanvas();dctx=dcan.getContext('2d');vcan=hiCanvas();vctx=vcan.getContext('2d');bgCache.clear()}
 /* ink: v = 1 is bare paper (white in the multiply layer), v = 0 is full blue-black ink */
-const INK=[34,33,56];
+const INK=[22,22,22];
 const grey=v=>{v=clamp(v,0,1);return 'rgb('+Math.round(INK[0]+(255-INK[0])*v)+','+Math.round(INK[1]+(255-INK[1])*v)+','+Math.round(INK[2]+(255-INK[2])*v)+')'};
 let lastProj=null;
 function renderImage(st){
@@ -565,8 +565,8 @@ function renderImage(st){
   lastProj={B,k,projV};
   if(st.labels)drawVesselLabels(ctx,projV);
   if(st.marks&&st.marks.length){
-    ctx.lineWidth=2.2;ctx.font='700 18px "Kalam", "Patrick Hand", cursive';
-    st.marks.forEach((m,i)=>{const q=proj(motion(m.p3,k),B);ctx.strokeStyle='#c2452d';ctx.beginPath();ctx.ellipse(q[0],q[1],15,12,-0.3,0.3,6.75);ctx.stroke();ctx.fillStyle='#c2452d';ctx.fillText(String(i+1),q[0]+16,q[1]-10)});
+    ctx.lineWidth=1.6;ctx.font='500 14px Inter, system-ui, sans-serif';
+    st.marks.forEach((m,i)=>{const q=proj(motion(m.p3,k),B);ctx.strokeStyle='#E5432D';ctx.beginPath();ctx.arc(q[0],q[1],14,0,7);ctx.stroke();ctx.fillStyle='#E5432D';ctx.fillText(String(i+1),q[0]+16,q[1]-10)});
   }
 }
 
@@ -577,16 +577,16 @@ function renderImage(st){
 /* Teaching mode (Easy): name each vessel that is holding contrast, in handwriting beside it. */
 const VESSEL_SHORT={LAD:'LAD',D1:'D1',D2:'D2',LCx:'Cx',OM1:'OM1',OM2:'OM2',RI:'Ramus',RCA:'RCA',AM:'AM',PDA:'PDA',PLV:'PL',LPDA:'PDA',LPL:'PL'}; // small septals, conus and the short left main would crowd the bifurcation
 function drawVesselLabels(ctx,projV){
-  ctx.save();ctx.font='700 15px "Kalam", "Patrick Hand", cursive';ctx.textBaseline='middle';ctx.lineJoin='round';
+  ctx.save();ctx.font='500 12px Inter, system-ui, sans-serif';ctx.textBaseline='middle';ctx.lineJoin='round';
   for(const P of projV){
     const v=P.v,name=VESSEL_SHORT[v.id];if(!name)continue;
     const i=Math.min(v.n-2,Math.floor(v.n*(v.id==='LM'?0.5:v.id==='LAD'||v.id==='RCA'||v.id==='LCx'?0.42:0.6)));
     if(P.cs[i]<0.25)continue;
     let nx=P.ys[i-1]-P.ys[i+1],ny=P.xs[i+1]-P.xs[i-1];const l=Math.hypot(nx,ny)||1;nx/=l;ny/=l;
     const x=P.xs[i]+nx*14,y=P.ys[i]+ny*14,w=ctx.measureText(name).width;
-    ctx.fillStyle='rgba(251,246,234,0.82)';ctx.strokeStyle='#2f5d8a';ctx.lineWidth=1.3;
-    ctx.beginPath();ctx.roundRect?ctx.roundRect(x-w/2-5,y-10,w+10,20,6):ctx.rect(x-w/2-5,y-10,w+10,20);ctx.fill();ctx.stroke();
-    ctx.fillStyle='#2f5d8a';ctx.fillText(name,x-w/2,y+1);
+    ctx.fillStyle='rgba(255,255,255,0.88)';ctx.strokeStyle='rgba(17,17,17,0.25)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect?ctx.roundRect(x-w/2-6,y-9,w+12,18,9):ctx.rect(x-w/2-5,y-10,w+10,20);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#111';ctx.fillText(name,x-w/2,y+1);
   }
   ctx.restore();
 }
