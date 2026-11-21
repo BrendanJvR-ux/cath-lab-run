@@ -75,12 +75,13 @@ const BALLOON_LENS=[12,15,20];
 /* Difficulty. tol = engagement window (deg) per system, seek = how far (deg) beyond the window the tip
    is pulled into the ostium (0 = no help), deep = how far past the ostium (u) before damping,
    budgetX scales each case's contrast budget (null = no limit), dissectT = seconds for an untreated dissection to
-   close the vessel. Complications are set per case (caseChallenge in js/gen.js): none on Easy, some cases on
+   close the vessel. torque = how the shaft grips the aortic wall: fric = twist (deg) it holds before the tip moves,
+   dyn = how much grip is left once it slips (low = a big whip), damp = how quickly the tip settles. Complications are set per case (caseChallenge in js/gen.js): none on Easy, some cases on
    Medium, most cases on Hard (or a severe contrast restriction), tokenX scales coffee tokens. */
 const DIFFICULTY={
-  easy:{label:'Easy',blurb:'Wide engagement windows, the tip drops into the ostia, no contrast limit and no complications.',tol:{L:45,R:55},seek:70,seekSpeed:90,deep:1.5,budgetX:null,dissectT:80,tokenX:1,level:1},
-  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Some cases have complications. Tokens ×1.5.',tol:{L:28,R:32},seek:30,seekSpeed:45,deep:1.42,budgetX:1,dissectT:55,tokenX:1.5,level:2},
-  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, 25% less contrast. Most cases bring a complication or a severe contrast restriction. Tokens ×2.',tol:{L:16,R:18},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,dissectT:35,tokenX:2,level:3},
+  easy:{label:'Easy',blurb:'Wide engagement windows, the tip drops into the ostia, no contrast limit and no complications.',tol:{L:45,R:55},seek:70,seekSpeed:90,deep:1.5,budgetX:null,dissectT:80,torque:{fric:0,dyn:0.5,damp:8},tokenX:1,level:1},
+  medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Some cases have complications. Tokens ×1.5.',tol:{L:28,R:32},seek:30,seekSpeed:45,deep:1.42,budgetX:1,dissectT:55,torque:{fric:10,dyn:0.45,damp:7},tokenX:1.5,level:2},
+  hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, 25% less contrast. Most cases bring a complication or a severe contrast restriction. Tokens ×2.',tol:{L:16,R:18},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,dissectT:35,torque:{fric:26,dyn:0.12,damp:3.2},tokenX:2,level:3},
 };
 
 /* Drugs. Intracoronary ones go down the engaged guide; iv ones do not need it. gain = how much they restore flow in

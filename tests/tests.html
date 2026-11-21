@@ -233,6 +233,15 @@ test('Round the arch the catheter rides the outer wall; it rejoins the centre li
   ok(dist3(pointAt(AO,S_ROOT),pointAt(AO_CATH,S_ROOT))<0.5,'offset should be gone at the root');return `up to ${mx.toFixed(1)} mm off the centre line`;
 });
 
+test('The whip is noticeable on Hard, gentle on Medium, absent on Easy',()=>{
+  const over=d=>{const T=DIFFICULTY[d].torque,c={th:0,hub:0,w:0};let peak=0;
+    for(let i=0;i<24;i++){c.hub+=170/60;stepTorque(c,1/60,{...T,fric:T.fric*1.2})}  // turn the hub for 0.4 s round the arch, then let go
+    for(let i=0;i<120;i++){stepTorque(c,1/60,{...T,fric:T.fric*1.2});peak=Math.max(peak,c.th-c.hub)}return peak};
+  const e=over('easy'),m=over('medium'),h=over('hard');
+  ok(h>=12,'Hard should whip at least 12° past the hub, got '+h.toFixed(0));ok(h>m+5,'Hard should whip more than Medium');ok(e<3,'Easy should barely overshoot');
+  return `overshoot past the hub: Easy ${e.toFixed(0)}°, Medium ${m.toFixed(0)}°, Hard ${h.toFixed(0)}°`;
+});
+
 /* random patients (run last; they rebuild the anatomy, and the final test restores the default) */
 test('Case codes round-trip, and a code always gives the same patient',()=>{
   for(const n of [0,1,12345,CODE_SPACE-1])ok(codeToSeed(seedToCode(n))===n,'round trip '+n);

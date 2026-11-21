@@ -110,11 +110,13 @@ function angDiff(a,b){let d=(a-b)%360;if(d>180)d-=360;if(d<-180)d+=360;return Ma
    through smoothly, as in the lab. cat = {th (tip, deg), hub (deg), w (tip spin, deg/s)}; fric = static friction (deg
    of twist the wall can hold). Returns the twist still stored in the shaft. */
 function stepTorque(cat,dt,o){
-  const wrap=a=>{a=(a+540)%360-180;return a},K=60,Cd=8;
+  const wrap=a=>{a=(a+540)%360-180;return a},K=60,Cd=o.damp!=null?o.damp:8,dyn=o.dyn!=null?o.dyn:0.5;
   const F=o.fric*(o.moving?0.25:1)*(o.engaged?1.8:1);
+  if(!o.fric){cat.th=wrap(cat.hub);cat.hub=wrap(cat.hub);cat.w=0;return 0} // no wall friction (Easy): the tip follows the hub exactly
   for(let t=0;t<dt-1e-9;t+=1/120){const h=Math.min(1/120,dt-t),tw=wrap(cat.hub-cat.th);
     if(Math.abs(tw)<=F&&Math.abs(cat.w)<5){cat.w=0;continue}
-    const acc=K*(tw-Math.sign(tw)*F*0.5)-Cd*cat.w;cat.w+=acc*h;cat.th+=cat.w*h}
+    // once it slips only the dynamic grip (dyn × static) holds it back: low dyn releases the stored twist all at once
+    const acc=K*(tw-Math.sign(cat.w||tw)*F*dyn)-Cd*cat.w;cat.w+=acc*h;cat.th+=cat.w*h}
   cat.th=wrap(cat.th);cat.hub=wrap(cat.hub);
   return wrap(cat.hub-cat.th);
 }

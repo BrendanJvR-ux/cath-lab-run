@@ -50,7 +50,7 @@ const ICONS={
 function shopIcon(it){if(it.kind==='avatar')return avatarSVG(it.avatar,44);return `<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[it.id]}</svg>`}
 function showMenu(view){
   if(typeof close3D==='function')close3D();
-  menuView=view||(profile?'home':'profile');S=null;document.body.classList.add('inmenu');
+  menuView=view||(profile?'home':'profile');S=null;if(typeof renderCoach==='function')renderCoach();document.body.classList.add('inmenu');
   $('resultOv').hidden=true;$('startOv').hidden=false;$('reviewbar').hidden=true;
   demoFrame();syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   $('caseHead').innerHTML='<h2>Patient</h2><b>No case loaded</b><p>Pick a case on the monitor to begin.</p>';$('status').textContent='Catheter in the femoral sheath.';$('status').className='status';
@@ -97,6 +97,20 @@ function renderMenu(){
     const inp=$('opName');inp.addEventListener('input',()=>{draft.name=inp.value;ov.querySelector('[data-act="saveop"]').disabled=!inp.value.trim()});
     return;
   }
+  if(menuView==='exp'){
+    ov.innerHTML=`<h1>How much angiography have you done?</h1>
+      <p>The tutorial is a short play-through of one patient. Your answer sets how much it explains and where you start afterwards.</p>
+      <div class="diffs">${EXPERIENCE.map(e=>`<button class="diff${profile.exp===e.k?' sel':''}" data-exp="${e.k}"><b>${e.name}</b><span>${e.desc}</span></button>`).join('')}</div>
+      <div class="row"><button class="btn" data-act="home">Back</button></div>`;
+    return;
+  }
+  if(menuView==='tutoffer'){
+    const e=EXPERIENCE[profile.exp];
+    ov.innerHTML=`<h1>Ready for a quick tutorial?</h1>
+      <p>${e.k===0?'One patient, start to finish: getting the catheter to the heart, filming the arteries, finding the narrowing and stenting it. The coach under the monitor explains each step and waits for you. About ten minutes.':e.k===1?'One patient, start to finish, with the game\'s controls explained as you go. About five minutes.':'A fast run through this game\'s controls on one patient: torque, cine, marking, the PCI panel and the report. A couple of minutes.'}</p>
+      <div class="row"><button class="btn primary big" data-act="tutorial">Start the tutorial</button><button class="btn big" data-act="skiptut">Skip: new patient on ${DIFFICULTY[e.diff].label}</button></div>`;
+    return;
+  }
   if(menuView==='play'){
     const d=profile.diff;
     ov.innerHTML=`<h1>New patient</h1>
@@ -131,18 +145,22 @@ function renderMenu(){
   ov.innerHTML=`<div class="hero"><img class="heroimg" src="assets/cardiologists.png" alt="Cartoon of two cardiologists, a woman with a stethoscope and a man holding a guide catheter, in scrubs and lead aprons"><div class="herotxt"><span class="kicker">Coronary angiography · PCI</span><h1>Cath Lab Run</h1><p>Drive the catheter to the aortic root, engage each coronary, record cine runs in the right projections, then find, grade and treat the stenosis.</p></div></div>
     <div class="opcard">${avatarSVG(profile.avatar,64)}<div><b>${esc(profile.name)}</b><span>${CUP} ${profile.tokens} coffee tokens · ${DIFFICULTY[profile.diff].label}</span></div><button class="btn" data-act="editop">Change operator</button></div>
     ${dailyCard()}
-    <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button></div>
+    <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button><button class="btn big" data-act="exp">Tutorial</button></div>
     <p class="fine">Teaching game with simplified anatomy and physics. Not a clinical training device.</p>`;
 }
 $('startOv').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const d=b.dataset;
   if(d.av!=null){draft.name=($('opName')||{}).value||draft.name;draft.avatar=+d.av;renderMenu();return}
+  if(d.exp!=null){profile.exp=+d.exp;profile.diff=EXPERIENCE[+d.exp].diff;saveProfile();renderWho();menuView='tutoffer';renderMenu();return}
   if(d.diff){profile.diff=d.diff;saveProfile();renderMenu();renderWho();return}
   if(d.up){const u=UPGRADES.find(x=>x.id===d.up),t=tierOf(d.up),next=u&&u.tiers[t];if(!next||profile.tokens<next.price)return;profile.tokens-=next.price;profile.tiers={...(profile.tiers||{}),[u.id]:t+1};saveProfile();renderWho();renderMenu();toast(`${u.name} tier ${['I','II','III'][t]}: ${u.what(next.val)}.`);return}
   if(d.buy){const it=SHOP.find(x=>x.id===d.buy);if(!it||owns(it.id)||profile.tokens<it.price)return;profile.tokens-=it.price;profile.owned=[...(profile.owned||[]),it.id];saveProfile();renderWho();renderMenu();toast(`Bought: ${it.name}.`);return}
-  if(d.act==='saveop'){const n=($('opName').value||'').trim().slice(0,24);if(!n)return;profile=profile?{...profile,name:n,avatar:draft.avatar}:{name:n,avatar:draft.avatar,tokens:0,best:{},diff:'easy',owned:[],tiers:{}};draft=null;saveProfile();renderWho();menuView='home';renderMenu()}
+  if(d.act==='saveop'){const n=($('opName').value||'').trim().slice(0,24);if(!n)return;profile=profile?{...profile,name:n,avatar:draft.avatar}:{name:n,avatar:draft.avatar,tokens:0,best:{},diff:'easy',owned:[],tiers:{}};const isNew=profile.exp==null;draft=null;saveProfile();renderWho();menuView=isNew?'exp':'home';renderMenu()}
   else if(d.act==='editop'){draft=null;menuView='profile';renderMenu()}
-  else if(d.act==='play'){menuView='play';renderMenu()}
+  else if(d.act==='play'){menuView=profile.exp==null?'exp':'play';renderMenu()}
+  else if(d.act==='exp'){menuView='exp';renderMenu()}
+  else if(d.act==='tutorial'){startTutorial()}
+  else if(d.act==='skiptut'){menuView='play';renderMenu()}
   else if(d.act==='rand'){startCase(randomCode())}
   else if(d.act==='daily'){startCase(dailyCode(),{daily:true})}
   else if(d.act==='code'){const v=($('codeIn').value||'').trim(),n=codeToSeed(v);if(n==null){toast('That is not a case code. Codes look like CLR-7KQ2M.',true);return}startCase(seedToCode(n))}
@@ -156,16 +174,16 @@ $('who').addEventListener('click',()=>{if(!S||S.done)showMenu('home')});
 let S=null;
 const keys={};
 /* ci is a random patient's case code ('CLR-XXXXX'). */
-const caseName=S=>'patient '+S.c.code;
+const caseName=S=>S.c.tutorial?'the tutorial patient':'patient '+S.c.code;
 function newState(ci){
-  const base=DIFFICULTY[profile.diff]||DIFFICULTY.easy,ch=caseChallenge(ci,profile.diff),c={...generatePatient(ci)};
+  const tut=ci==='TUTORIAL',dk=tut?'easy':profile.diff,base=DIFFICULTY[dk]||DIFFICULTY.easy,ch=caseChallenge(ci,dk),c=tut?tutorialCase():{...generatePatient(ci)};
   // a severe contrast restriction halves the budget and joins the story
   if(ch.contrastX<1&&base.budgetX!=null){c.budget=Math.round(c.budget*ch.contrastX);c.budgetInTask=true;c.hx+=` Severe chronic kidney disease (eGFR ${12+(codeToSeed(ci)%14)}): every millilitre of contrast counts.`}
   buildAnatomy(c.anatomy);
   HEART_MODE=['chambers','outline','none'][base.level-1]||'outline'; // the heart sketch: labelled chambers on Easy, outline on Medium, none on Hard
   // shop perks adjust a copy of the difficulty settings
   const D={...base,tol:{...base.tol}},tq=upgradeVal('torque');D.tol.L+=tq;D.tol.R+=tq;
-  return {ci,c,D,ch,forced:ch.forced,diff:profile.diff,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,hub:CATH.JL.home,w:0,type:'JL'},twist:0,exch:0,
+  return {ci,c,D,ch,forced:ch.forced,diff:dk,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,hub:CATH.JL.home,w:0,type:'JL'},twist:0,exch:0,
     cL:0,cR:0,cRoot:0,hist:{L:[],R:[],root:[]},histN:0,contrast:0,ak:0,ftime:0,ctime:0,blind:0,wasted:0,
     cine:null,runs:[],marks:[],pending:null,review:null,imgAcc:0,frame:0,deepInj:0,rcaInj:0,complication:null,done:false,
     sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),events:[],drugs:[],hrDip:0,bpDip:0,isch:0,effusion:0,tamponade:false,pcT:0,pcCount:0,protamine:false,seals:[],prevEng:null,prevDeep:false,
@@ -186,6 +204,7 @@ $('sA').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.a=+e.targ
 $('sB').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.b=+e.target.value;syncArm()});
 
 function startCase(ci,opt={}){
+  if(typeof renderCoach==='function')setTimeout(renderCoach,0);
   if(typeof close3D==='function')close3D();
   S=newState(ci);S.daily=!!opt.daily&&ci===dailyCode();document.body.classList.remove('inmenu');
   $('startOv').hidden=true;$('resultOv').hidden=true;closeReview();
@@ -518,7 +537,7 @@ function loop(now){
   const dt=Math.min(0.05,(now-last)/1000);last=now;
   if(S&&!S.done)tick(dt);else{const p0=demoPhase;demoPhase=(demoPhase+dt*72/60)%1;hemoStep(dt,p0,demoPhase,false)}
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true}
-  drawHemo();updateUI();
+  drawHemo();updateUI();if(typeof tutorialTick==='function')tutorialTick();
   requestAnimationFrame(loop);
 }
 function tick(dt){
@@ -537,7 +556,10 @@ function tick(dt){
     if(down('ArrowLeft','KeyA')){c.hub-=170*dt;moved=true}
     // torque reaches the tip through the shaft: it drags on the aortic wall (most round the arch), winds up, then lets go
     {const c0=cst(c),region=c.s<S_ARCH0?0.3:c.s<=S_ROOT?1.2:1;
-     S.twist=stepTorque(c,dt,{fric:[0,5,10,16][D.level]*region,moving:axial,engaged:!!c0.eng})}
+     const th0=c.th;S.twist=stepTorque(c,dt,{...D.torque,fric:D.torque.fric*region,moving:axial,engaged:!!c0.eng});
+     // a sudden jump of the tip is a whip: say so (once per jump)
+     if(Math.abs(c.w)>260&&!S.whipT){S.whipT=1.2;toast(`Whip! The tip jumped as the stored twist let go. Turn in small steps and nudge the catheter in or out as you torque.`,true)}
+     S.whipT=Math.max(0,(S.whipT||0)-dt);void th0}
     // near the ostium a preshaped Judkins tends to drop in on its own (more help on easier settings): the whole catheter turns
     if(D.seek>0){const C=CATH[c.type],c0=cst(c);if(!c0.eng&&c0.u>=0.55&&!down('ArrowLeft','KeyA','ArrowRight','KeyD')){const diff=((OSTANG[C.sys]-c.th+540)%360)-180;if(Math.abs(diff)<D.tol[C.sys]+D.seek){const d=Math.sign(diff)*Math.min(Math.abs(diff),D.seekSpeed*dt);c.th+=d;c.hub+=d}}}
     if(c.th>180)c.th-=360;if(c.th<-180)c.th+=360;
@@ -816,7 +838,7 @@ function finish(){
   const saf=10-Math.min(10,Math.round(S.blind*2));rows.push(['Safety (catheter moved under fluoro)',saf,10]);
   let total=lesPts+tx+comp+cm+rad+saf;
   if(S.complication){total=Math.min(total,35);notes.unshift({c:'bad',t:S.complication+(/damped/.test(S.complication)?' A damped or ventricularised pressure trace means the tip is against the vessel wall. Withdraw before injecting.':' Seal a perforation early, reverse heparin, and drain the pericardium as soon as BP falls.')})}
-  notes.push({c:'',t:`This patient on ${S.D.label}: ${S.ch.label}.`});
+  if(S.c.tutorial){if(S.tut)tutorialWrapUp(notes);profile.tutDone=true}else notes.push({c:'',t:`This patient on ${S.D.label}: ${S.ch.label}.`});
   if(S.c.random){notes.push({c:'',t:`Anatomy: ${S.c.anatomyNote.join('; ')}.`});notes.push({c:'',t:`Case code <b>${S.c.code}</b>: enter it under Random patient to replay this exact patient, or share it.`})}
   if(capEv<100&&total>capEv){total=capEv}
   total=Math.round(total);

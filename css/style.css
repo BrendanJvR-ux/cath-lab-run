@@ -269,3 +269,16 @@ body.inmenu .lab{grid-template-columns:minmax(0,1fr);max-width:820px}
 .v3msg{position:absolute;inset:0;display:grid;place-items:center;font-size:17px;color:var(--muted);padding:20px;text-align:center}
 .v3legend{display:flex;flex-wrap:wrap;gap:4px 14px;padding:6px 12px;font-size:14px;border-top:2px dashed var(--faint)}
 .v3legend i{display:inline-block;width:12px;height:12px;border:1.5px solid var(--line);border-radius:50%;margin-right:4px;vertical-align:-1px}
+
+/* tutorial coach, under the monitor */
+.coach{width:100%;max-width:640px;background:#fff8dc;border:2.5px solid var(--line);border-radius:var(--wob);padding:9px 14px 10px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:6px}
+.coach p{margin:0;font-size:16px;line-height:1.35}
+.coachhead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.coachhead b{font-family:var(--f-display);font-size:19px}
+.coachhead .btn{font-size:13px;padding:3px 8px}
+.coachdots{display:flex;gap:5px}
+.coachdots i{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--line);background:var(--panel)}
+.coachdots i.done{background:var(--ok)}.coachdots i.now{background:var(--amber)}
+.coach-hl{outline:3px dashed var(--danger)!important;outline-offset:3px;animation:coachpulse 1.2s ease-in-out infinite}
+@keyframes coachpulse{50%{outline-color:transparent}}
+@media (prefers-reduced-motion:reduce){.coach-hl{animation:none}}
