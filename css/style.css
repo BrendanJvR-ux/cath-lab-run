@@ -443,3 +443,8 @@ body.inmenu .txpop,body.inmenu .txdot,body.inreport .txpop,body.inreport .txdot{
 .bind:hover{background:#fff8dc}
 .bind.empty{color:var(--muted);border-style:dashed}
 .bind.cap{background:var(--hi);animation:txpulse 1s ease-in-out infinite}
+.txhead{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.txhead.drag{cursor:grabbing}
+.txgrip{color:var(--muted);font-size:16px;line-height:1;flex:none}
+.txpop .lnk{background:none;border:0;padding:0;font:inherit;font-size:14px;color:var(--blue);text-decoration:underline;cursor:pointer}
+.mark select{font:inherit;font-size:14px;border:1.5px solid var(--line);border-radius:var(--wob-s);background:var(--panel);padding:1px 4px;color:var(--fg)}
