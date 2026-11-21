@@ -33,7 +33,7 @@ const VESSEL_DEFS=[
 
 /* The tree is drawn a little larger than the raw control points: every vessel is stretched away from its
    own ostium by TREE_SCALE (lumen radii by TREE_RSCALE). Lesion positions in the case files are scaled to match. */
-const TREE_SCALE=1.12, TREE_RSCALE=1.06;
+const TREE_SCALE=1.344, TREE_RSCALE=1.06; // 1.344 = 1.12 × 1.2: every coronary 20% longer
 
 /* Extra vessels used by anatomical variants (random patients). */
 const VARIANT_PARTS={

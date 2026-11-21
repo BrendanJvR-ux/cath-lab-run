@@ -29,7 +29,7 @@
   </defs>
 
   <!-- shadow -->
-  <ellipse cx="215" cy="418" rx="120" ry="12" fill="#000" opacity="0.35"/>
+  <g stroke="#6e6a60" stroke-width="1.4" opacity="0.6"><path d="M110 420 L320 416"/><path d="M118 426 L300 423"/><path d="M135 431 L285 429"/></g>
 
   <!-- arch vessels -->
   <g stroke-linecap="round" fill="none">
@@ -42,26 +42,27 @@
   </g>
 
   <!-- descending aorta (behind) -->
-  <path d="M300 92 C306 130 306 170 302 215" stroke="#6e2420" stroke-width="40" fill="none" stroke-linecap="round"/>
+  <path d="M300 92 C306 130 306 170 302 215" stroke="#2b2a33" stroke-width="45" fill="none" stroke-linecap="round"/><path d="M300 92 C306 130 306 170 302 215" stroke="#6e2420" stroke-width="40" fill="none" stroke-linecap="round"/>
 
   <!-- superior vena cava -->
-  <path d="M100 30 L100 178 L134 178 L134 30 Q117 22 100 30 Z" fill="url(#svc)"/>
+  <path d="M100 30 L100 178 L134 178 L134 30 Q117 22 100 30 Z" fill="url(#svc)" stroke="#2b2a33" stroke-width="2.6" stroke-linejoin="round"/>
   <ellipse cx="117" cy="30" rx="17" ry="5" fill="#2c3766"/>
 
   <!-- ascending aorta and arch -->
+  <path d="M178 205 C172 150 168 112 184 78 C204 36 274 36 296 78 C304 96 304 112 302 128" fill="none" stroke="#2b2a33" stroke-width="51" stroke-linecap="round"/>
   <path d="M178 205 C172 150 168 112 184 78 C204 36 274 36 296 78 C304 96 304 112 302 128" fill="none" stroke="url(#aorta)" stroke-width="46" stroke-linecap="round"/>
   <path d="M170 150 C168 118 176 90 192 70" fill="none" stroke="#e79a8c" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
 
   <!-- left auricle (viewer's right, under the pulmonary trunk) -->
-  <path d="M296 176 C320 160 352 178 338 206 C328 220 306 214 300 200 Z" fill="url(#atr)"/>
+  <path d="M296 176 C320 160 352 178 338 206 C328 220 306 214 300 200 Z" fill="url(#atr)" stroke="#2b2a33" stroke-width="2.6" stroke-linejoin="round"/>
 
   <!-- right atrium -->
-  <path d="M94 168 C66 188 70 252 116 272 C140 258 146 212 136 182 C126 164 104 160 94 168 Z" fill="url(#atr)"/>
+  <path d="M94 168 C66 188 70 252 116 272 C140 258 146 212 136 182 C126 164 104 160 94 168 Z" fill="url(#atr)" stroke="#2b2a33" stroke-width="2.6" stroke-linejoin="round"/>
   <!-- right auricle -->
-  <path d="M128 176 C118 150 150 136 170 158 C164 176 144 184 128 176 Z" fill="#a8443d"/>
+  <path d="M128 176 C118 150 150 136 170 158 C164 176 144 184 128 176 Z" fill="#a8443d" stroke="#2b2a33" stroke-width="2.6" stroke-linejoin="round"/>
 
   <!-- ventricles -->
-  <path d="M118 214 C108 266 150 344 256 410 C302 384 334 322 324 252 C318 212 292 190 262 186 L162 186 C140 190 124 198 118 214 Z" fill="url(#vent)"/>
+  <path d="M118 214 C108 266 150 344 256 410 C302 384 334 322 324 252 C318 212 292 190 262 186 L162 186 C140 190 124 198 118 214 Z" fill="url(#vent)" stroke="#2b2a33" stroke-width="2.6" stroke-linejoin="round"/>
   <!-- muscle sheen -->
   <path d="M150 230 C160 280 190 330 236 372" fill="none" stroke="#e28a7a" stroke-width="10" opacity="0.18" stroke-linecap="round"/>
   <path d="M286 232 C300 270 304 310 292 350" fill="none" stroke="#e28a7a" stroke-width="7" opacity="0.14" stroke-linecap="round"/>
@@ -74,6 +75,8 @@
   </g>
 
   <!-- pulmonary trunk (in front of the aorta) -->
+  <path d="M206 222 C208 176 222 146 250 122" fill="none" stroke="#2b2a33" stroke-width="47" stroke-linecap="round"/>
+  <path d="M250 122 C278 108 310 110 340 122" fill="none" stroke="#2b2a33" stroke-width="27" stroke-linecap="round"/>
   <path d="M206 222 C208 176 222 146 250 122" fill="none" stroke="url(#pulm)" stroke-width="42" stroke-linecap="round"/>
   <path d="M250 122 C278 108 310 110 340 122" fill="none" stroke="#4a5b94" stroke-width="22" stroke-linecap="round"/>
   <path d="M198 196 C200 170 210 150 226 136" fill="none" stroke="#a6b4e0" stroke-width="4" stroke-linecap="round" opacity="0.55"/>

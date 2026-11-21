@@ -22,7 +22,7 @@ function avatarSVG(i,size){
     crop:`<path d="M21.5 25Q22 15 32 15Q42 15 42.5 25Q38 20 32 20Q26 20 21.5 25Z" fill="${a.hair}"/>`,
     bald:`<path d="M21 30Q20 24 23 22L23 30ZM43 30Q44 24 41 22L41 30Z" fill="${a.hair}"/>`}[a.style];
   const cap=a.cap?`<path d="M20 24Q20 12 32 12Q44 12 44 24Q32 19 20 24Z" fill="${a.cap}"/><path d="M43 22L48 25" stroke="${a.cap}" stroke-width="2" stroke-linecap="round"/>`:'';
-  return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="#222c31"/><path d="M10 64Q12 46 32 44Q52 46 54 64Z" fill="${a.scrub}"/><path d="M26 45L32 53L38 45" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="2"/><rect x="28" y="35" width="8" height="10" fill="${a.skin}"/><ellipse cx="32" cy="28" rx="11" ry="12" fill="${a.skin}"/>${hair}${cap}<circle cx="28" cy="29" r="1.3" fill="#2a1a12"/><circle cx="36" cy="29" r="1.3" fill="#2a1a12"/><path d="M29 34Q32 36.5 35 34" fill="none" stroke="#5a3424" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+  return `<svg class="sketch" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#f5edda" stroke="#2b2a33" stroke-width="1.5"/><g stroke="#2b2a33" stroke-width="1.3" stroke-linejoin="round"><path d="M10 64Q12 46 32 44Q52 46 54 64Z" fill="${a.scrub}"/><path d="M26 45L32 53L38 45" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="2"/><rect x="28" y="35" width="8" height="10" fill="${a.skin}"/><ellipse cx="32" cy="28" rx="11" ry="12" fill="${a.skin}"/>${hair}${cap}</g><circle cx="28" cy="29" r="1.3" fill="#2a1a12"/><circle cx="36" cy="29" r="1.3" fill="#2a1a12"/><path d="M29 34Q32 36.5 35 34" fill="none" stroke="#5a3424" stroke-width="1.4" stroke-linecap="round"/></svg>`;
 }
 const DICE='<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="vertical-align:-3px"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5" cy="5" r="1.3" fill="currentColor"/><circle cx="11" cy="11" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/></svg>';
 const CUP='<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h9v5a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3Z" fill="currentColor"/><path d="M11 6h1.5a2 2 0 0 1 0 4H11" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 1.5q1 1 0 2M8 1.5q1 1 0 2" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>';
@@ -35,7 +35,7 @@ const LEVEL_BARS=n=>`<span class="lvl" aria-hidden="true">${[1,2,3].map(i=>`<i c
 function miniECG(c){
   const lead=(c.ecg&&c.ecg.twi&&c.ecg.twi[0])||'II',twi=!!(c.ecg&&c.ecg.twi);let d='';
   for(let i=0;i<=140;i++){const ph=(i/70+0.55)%1,x=i*1.2,y=19-ecgAt(ph,0,twi,1)*14;d+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)}
-  return `<svg class="mini" viewBox="0 0 170 30" aria-hidden="true"><path d="${d}" fill="none" stroke="#5fe08c" stroke-width="1.3"/><text x="164" y="9" text-anchor="end">${lead}</text></svg>`;
+  return `<svg class="mini" viewBox="0 0 170 30" aria-hidden="true"><path d="${d}" fill="none" stroke="#2b2a33" stroke-width="1.4"/><text x="164" y="9" text-anchor="end">${lead}</text></svg>`;
 }
 const ICONS={
   torque:'<circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M5 5l2.5 2.5M16.5 16.5L19 19"/><path d="M17 8a6 6 0 0 1 0 8" />',
@@ -98,7 +98,7 @@ function renderMenu(){
     <div class="opcard">${avatarSVG(profile.avatar,64)}<div><b>${esc(profile.name)}</b><span>${CUP} ${profile.tokens} coffee tokens · ${DIFFICULTY[profile.diff].label}</span></div><button class="btn" data-act="editop">Change operator</button></div>
     <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button></div>
     <div class="keys">
-      <div><kbd>Space</kbd> hold for fluoro (live X-ray)</div><div><kbd>C</kbd> start / stop a cine run</div>
+      <div><kbd>Space</kbd> hold for fluoro (live X-ray)</div><div><kbd>X</kbd> switch catheter (JL4 / JR4)</div><div><kbd>C</kbd> start / stop a cine run</div>
       <div><kbd>J</kbd> hold to inject contrast</div><div><kbd>↑</kbd><kbd>↓</kbd> advance / withdraw</div>
       <div><kbd>←</kbd><kbd>→</kbd> torque counter-clockwise / clockwise</div><div><kbd>B</kbd> hold to inflate a balloon or stent</div>
       <div><kbd>1</kbd>–<kbd>7</kbd> C-arm presets</div>
@@ -164,13 +164,14 @@ function startCase(ci){
 }
 
 /* ---------- input ---------- */
-const GAME_KEYS=new Set(['Space','KeyJ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyW','KeyS','KeyA','KeyD','KeyC','KeyF','KeyB']);
+const GAME_KEYS=new Set(['Space','KeyJ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyW','KeyS','KeyA','KeyD','KeyC','KeyF','KeyB','KeyX']);
 window.addEventListener('keydown',e=>{
   if(e.target&&(e.target.tagName==='INPUT'&&e.target.type!=='range'))return;
   if(e.target&&e.target.type==='range'&&e.code.startsWith('Arrow'))return;
   if(GAME_KEYS.has(e.code)||/^Digit[1-7]$/.test(e.code)){if(S&&!S.done)e.preventDefault()}else return;
   if(e.repeat)return;
   if(e.code==='KeyC'){toggleCine();return}
+  if(e.code==='KeyX'){if(S&&!S.done)exchangeTo(S.cath.type==='JL'?'JR':'JL');return}
   if(e.code.startsWith('Digit')){setPreset(+e.code.slice(5)-1);return}
   keys[e.code]=true;
 });
@@ -184,14 +185,16 @@ document.querySelectorAll('.hold[data-k]').forEach(b=>{
 $('bCine').addEventListener('click',toggleCine);
 const down=(...ks)=>ks.some(k=>keys[k]||keys['btn_'+k]);
 
-$('bExch').addEventListener('click',()=>{
-  if(!S||S.done||S.exch>0)return;
+function exchangeTo(type){
+  if(!S||S.done||S.exch>0||type===S.cath.type)return;
   if(S.pci){toast('Finish or cancel the PCI first.');return}
   // a long exchange wire is parked in the aorta, so this works from anywhere short of an engaged ostium
   if(S.cs&&S.cs.eng){S.cath.s=Math.min(S.cath.s,S_ROOT);toast('Backed out of the ostium. Exchanging catheter over a 0.035" wire…')}
   else toast('Exchanging catheter over a 0.035" wire…');
   S.exch=1.6;
-});
+}
+$('cathToggle').addEventListener('click',e=>{const b=e.target.closest('button[data-cath]');if(b)exchangeTo(b.dataset.cath)});
+
 
 function toggleCine(){
   if(!S||S.done||S.complication)return;
@@ -285,17 +288,20 @@ function hemoStep(dt,ph0,ph1,damped){
 function drawHemo(){
   if(!HB)return;const w=hemo.width,h=hemo.height;hctx.clearRect(0,0,w,h);
   const rowH=h*0.19,pTop=h*0.62,pBot=h-6*dpr,pm=v=>pBot-(v/160)*(pBot-pTop);
-  hctx.strokeStyle='rgba(120,140,150,0.13)';hctx.lineWidth=1;
-  for(const v of [40,80,120]){hctx.beginPath();hctx.moveTo(0,pm(v));hctx.lineTo(w,pm(v));hctx.stroke()}
+  // ECG paper: fine pink grid with heavier lines every fifth square
+  const sq=6*dpr;for(let x=0,n=0;x<w;x+=sq,n++){hctx.strokeStyle=n%5?'rgba(226,120,110,0.16)':'rgba(226,120,110,0.38)';hctx.lineWidth=n%5?1:1.4;hctx.beginPath();hctx.moveTo(x,0);hctx.lineTo(x,h);hctx.stroke()}
+  for(let y=0,n=0;y<h;y+=sq,n++){hctx.strokeStyle=n%5?'rgba(226,120,110,0.16)':'rgba(226,120,110,0.38)';hctx.lineWidth=n%5?1:1.4;hctx.beginPath();hctx.moveTo(0,y);hctx.lineTo(w,y);hctx.stroke()}
+  hctx.strokeStyle='rgba(43,42,51,0.18)';hctx.setLineDash([4*dpr,4*dpr]);
+  for(const v of [40,80,120]){hctx.beginPath();hctx.moveTo(0,pm(v));hctx.lineTo(w,pm(v));hctx.stroke()}hctx.setLineDash([]);
   const trace=(arr,map,col)=>{hctx.strokeStyle=col;hctx.lineWidth=1.5*dpr;hctx.beginPath();let pen=false;for(let x=0;x<w;x++){const v=arr[x];if(isNaN(v)){pen=false;continue}const y=map(v);pen?hctx.lineTo(x,y):hctx.moveTo(x,y);pen=true}hctx.stroke()};
-  hctx.font=`${10.5*dpr}px "IBM Plex Mono", monospace`;
-  LEADS.forEach((l,i)=>{const base=rowH*(i+0.72);trace(HB[l],v=>base-v*rowH*0.62,'#5fe08c');hctx.fillStyle='#5fe08c';hctx.fillText(l,6*dpr,rowH*i+12*dpr);
-    const stv=S?S.st[l]:0;if(Math.abs(stv)>0.25){hctx.fillStyle=stv>0?'#ffb15e':'#9fd0ff';hctx.fillText(`ST ${stv>0?'↑':'↓'} ${(Math.abs(stv)*2).toFixed(1)} mm`,26*dpr,rowH*i+12*dpr)}});
-  trace(HB.p,pm,'#ff6a63');
-  hctx.fillStyle='#ff6a63';hctx.fillText('AO 0–160',6*dpr,pTop+8*dpr);
+  hctx.font=`${14*dpr}px "Patrick Hand", "Kalam", cursive`;
+  LEADS.forEach((l,i)=>{const base=rowH*(i+0.72);trace(HB[l],v=>base-v*rowH*0.62,'#2b2a33');hctx.fillStyle='#2b2a33';hctx.fillText(l,6*dpr,rowH*i+12*dpr);
+    const stv=S?S.st[l]:0;if(Math.abs(stv)>0.25){hctx.fillStyle=stv>0?'#c2452d':'#2f5d8a';hctx.fillText(`ST ${stv>0?'↑':'↓'} ${(Math.abs(stv)*2).toFixed(1)} mm`,26*dpr,rowH*i+12*dpr)}});
+  trace(HB.p,pm,'#c2452d');
+  hctx.fillStyle='#c2452d';hctx.fillText('AO 0–160',6*dpr,pTop+8*dpr);
   const hr=S?Math.round(S.hr):72,sp=S?Math.round(S.sysP):128,dp=S?Math.round(S.diaP):74;
-  hctx.textAlign='right';hctx.font=`600 ${15*dpr}px "IBM Plex Mono", monospace`;hctx.fillStyle='#5fe08c';hctx.fillText('HR '+hr,w-8*dpr,16*dpr);
-  hctx.fillStyle='#ff6a63';hctx.fillText(`${sp}/${dp} (${Math.round(dp+(sp-dp)/3)})`,w-8*dpr,pTop+10*dpr);hctx.textAlign='left';
+  hctx.textAlign='right';hctx.font=`700 ${18*dpr}px "Kalam", "Patrick Hand", cursive`;hctx.fillStyle='#2b2a33';hctx.fillText('HR '+hr,w-8*dpr,16*dpr);
+  hctx.fillStyle='#c2452d';hctx.fillText(`${sp}/${dp} (${Math.round(dp+(sp-dp)/3)})`,w-8*dpr,pTop+10*dpr);hctx.textAlign='left';
 }
 
 /* ---------- PCI: wire, balloon, stent ---------- */
@@ -601,8 +607,9 @@ function updateUI(){
   $('rdAK').querySelector('b').innerHTML=`${Math.round(S.ak)}<small>mGy</small>`;$('rdAK').classList.toggle('hot',S.ak>800);
   $('rdCM').querySelector('b').innerHTML=`${Math.round(S.contrast)}<small>${S.budget==null?'mL':'/ '+S.budget+' mL'}</small>`;$('rdCM').classList.toggle('hot',S.budget!=null&&S.contrast>S.budget);
   $('rdHD').querySelector('b').innerHTML=`${Math.round(S.hr)}<small>${Math.round(S.sysP)}/${Math.round(S.diaP)}</small>`;$('rdHD').classList.toggle('hot',S.hr<55||(S.cs&&S.cs.deep));
-  $('cathType').textContent=S.exch>0?'Exchanging…':CATH[S.cath.type].label+(S.pci?' guide':'')+' · 6F';
-  const other=S.cath.type==='JL'?'JR4':'JL4';const be=$('bExch');be.textContent='Exchange for '+other;be.disabled=S.exch>0||!!S.complication||!!S.pci;
+  $('cathType').textContent=S.exch>0?'Exchanging…':(S.pci?'6F guide':'6F');
+  {const tgt=S.exch>0?(S.cath.type==='JL'?'JR':'JL'):S.cath.type,lock=S.exch>0||!!S.complication||!!S.pci;
+   for(const b of $('cathToggle').querySelectorAll('button')){const on=b.dataset.cath===tgt;if(b.getAttribute('aria-pressed')!==String(on))b.setAttribute('aria-pressed',on);b.disabled=lock&&!on;b.classList.toggle('busy',on&&S.exch>0)}}
   const st=$('status');const cs=S.cs||{};let cls='',msg='';
   if(S.complication){cls='danger';msg=S.complication+' Finish the study to see your report.'}
   else if(S.exch>0){msg='Exchanging catheter over a 0.035" wire…'}

@@ -4,7 +4,7 @@ A coronary angiography and stenting game with fictional patients. Drive a Judkin
 
 **Play it:** https://brendanjvr-ux.github.io/cath-lab-run/ (tests at [/tests/tests.html](https://brendanjvr-ux.github.io/cath-lab-run/tests/tests.html))
 
-Plain HTML, CSS and JavaScript with Canvas 2D: no build step and no image assets. Fonts load from Google Fonts.
+Plain HTML, CSS and JavaScript with Canvas 2D: no build step. Drawn in a hand-drawn sketchbook style: ink and coloured pencil on paper, the X-ray as pencil anatomy with inked, cross-hatched shading and contrast that fills the vessels like an ink wash (the pen lines "boil" gently like hand-drawn animation), and the ECG on pink ECG paper. The only image is the menu heart (`assets/heart.svg`). Fonts (Kalam, Patrick Hand) load from Google Fonts.
 
 ## Run it locally
 
@@ -56,7 +56,7 @@ Items are defined in `SHOP` in `config/config.js`.
 | Step | What you do |
 |---|---|
 | Access | Start with a 6F JL4 catheter in the femoral sheath. Hold fluoro and advance up the descending aorta, over the arch, into the aortic root. |
-| Engage | Torque the tip into the ostium: JL4 for the left main, JR4 (a clockwise turn) for the RCA. Near an ostium the tip drops in on its own. Exchange catheters in the descending aorta. |
+| Engage | Torque the tip into the ostium: JL4 for the left main, JR4 (a clockwise turn) for the RCA. Near an ostium the tip drops in on its own. Switch between JL4 and JR4 with the catheter toggle (or X) from anywhere outside an ostium; it backs out of an engaged ostium first. |
 | Watch the pressure | Advance too far and the aortic trace damps. Injecting through a damped catheter causes an ostial dissection and ends the case. |
 | Record | Start a cine run, then inject. Contrast flows down the tree and washes out; flow beyond a severe stenosis is slow. RCA injections can cause brief bradycardia. |
 | Choose views | The C-arm rotates in 3D (LAO/RAO, cranial/caudal). Some lesions are eccentric, so they look tight in one projection and mild in another. |
@@ -98,7 +98,7 @@ The report names the anatomy at the end. Random patients keep their own best sco
 |---|---|
 | Lesion detection and grading (a significant lesion you imaged but didn't mark earns 30% of its share) | 35 |
 | Treatment: every ≥70% lesion stented, complications recognised and managed (−6 untreated dissection, −5 persistent no-reflow, −8 and a score cap of 45 for an unsealed perforation, −10 and the same cap for a vessel left closed, −3 for protamine with nothing bleeding), covered, sized within 0.4 mm smaller / 0.75 mm larger than the vessel, deployed at ≥12 atm, subtotal lesions predilated. Balloon only earns 40%. −8 per unnecessary stent, −4 per oversized or unnecessary balloon | 15 |
-| Complete study: views (LCA 3+, RCA 2+) up to 8, plus up to 7 for the share of the 32 coronary segments you opacified | 15 |
+| Complete study: views (LCA 3+, RCA 2+) up to 8, plus up to 7 for the share of the 36 coronary segments you opacified | 15 |
 | Contrast against the case budget | 15 |
 | Air kerma (full marks up to 400 mGy) | 10 |
 | Safety (catheter moved only under fluoro) | 10 |
@@ -107,6 +107,6 @@ A complication caps the score at 35. The report says which projection showed eac
 
 ## Controls
 
-Space hold fluoro · C start/stop cine · J hold to inject · ↑/↓ advance/withdraw · ←/→ torque counter-clockwise/clockwise · B hold to inflate a balloon or stent · 1–7 C-arm presets. Touch devices use the on-screen buttons.
+Space hold fluoro · X switch catheter · C start/stop cine · J hold to inject · ↑/↓ advance/withdraw · ←/→ torque counter-clockwise/clockwise · B hold to inflate a balloon or stent · 1–7 C-arm presets. Touch devices use the on-screen buttons.
 
 Teaching game with simplified anatomy and physics. Not a clinical training device.

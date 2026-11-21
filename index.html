@@ -7,10 +7,12 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Patrick+Hand&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<!-- "rough" wobbles the edges of drawings so they look inked by hand (used on the menu heart and avatars) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="rough" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="5" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
 
 <header class="top">
   <div class="brand">Cath Lab Run<small>Diagnostic coronary angiography simulator · femoral access · 6F</small></div>
@@ -73,7 +75,7 @@
     </div>
     <div class="sec">
       <h2>Catheter</h2>
-      <div class="cath"><span class="chip" id="cathType">JL4 · 6F</span><button class="btn" id="bExch">Exchange for JR4</button></div>
+      <div class="cath"><div class="cathtoggle" id="cathToggle" role="group" aria-label="Catheter (X to switch)"><button data-cath="JL" aria-pressed="true">JL4<small>left</small></button><button data-cath="JR" aria-pressed="false">JR4<small>right</small></button></div><span class="chip" id="cathType">6F</span></div>
       <div class="status" id="status">Catheter in the femoral sheath.</div>
     </div>
     <div class="sec">

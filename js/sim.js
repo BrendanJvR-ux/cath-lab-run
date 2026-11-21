@@ -111,9 +111,12 @@ function cathState(c,D){
   const reach=Math.min(1,0.5+u),free=add(ROOT,add(mul(dir,19*reach),[0,5*reach,0]));
   let tip=add(mul(base,1-open),mul(free,open));
   const C=CATH[c.type],tol=D?D.tol[C.sys]:C.tol,deepU=D?D.deep:1.5;
-  if(u>=0.55&&angDiff(c.th,OSTANG[C.sys])<tol){out.eng=C.sys;out.deep=u>deepU;
-    // slide into the ostium over a few millimetres instead of snapping
-    const ost=add(OST[C.sys],mul(OSTDIR[C.sys],Math.max(0,u-1)*11)),w=sm((u-0.55)/0.3);tip=add(mul(tip,1-w),mul(ost,w))}
+  const inWin=angDiff(c.th,OSTANG[C.sys])<tol;
+  if(inWin&&u>0.4){
+    // slide into the ostium over the last few millimetres before engaging, so an engaged tip is always seated in it
+    const ost=add(OST[C.sys],mul(OSTDIR[C.sys],Math.max(0,u-1)*11)),w=sm((u-0.4)/0.15);tip=add(mul(tip,1-w),mul(ost,w));
+    if(u>=0.55){out.eng=C.sys;out.deep=u>deepU}
+  }
   const full=add(ROOT,add(mul(dir,c.type==='JL'?-13:-6),[0,c.type==='JL'?22:12,0]));
   const ctrl=add(mul(mul(add(base,tip),0.5),1-open),mul(full,open));
   for(let i=1;i<=20;i++){const t=i/20,a=(1-t)*(1-t),b=2*(1-t)*t,cc=t*t;pts.push([a*base[0]+b*ctrl[0]+cc*tip[0],a*base[1]+b*ctrl[1]+cc*tip[1],a*base[2]+b*ctrl[2]+cc*tip[2]])}
@@ -201,15 +204,22 @@ function dissectRisk(x){if(x.over)return 1;if(x.atm>16)return 0.5;return x.kind=
 function segLabel(v,ld){if(v.id==='LM')return 'left main';const f=ld/v.len;return (f<0.33?'proximal ':f<0.66?'mid ':'distal ')+v.name}
 
 /* ---------- static image layers ---------- */
-const noise=[];for(let n=0;n<4;n++){const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');const id=g.createImageData(256,256);for(let i=0;i<id.data.length;i+=4){const v=128+(Math.random()+Math.random()-1)*80;id.data[i]=id.data[i+1]=id.data[i+2]=v;id.data[i+3]=255}g.putImageData(id,0,0);noise.push(c)}
-const vign=document.createElement('canvas');vign.width=vign.height=W;{const g=vign.getContext('2d');const rg=g.createRadialGradient(W/2,W/2,W*0.32,W/2,W/2,W*0.74);rg.addColorStop(0,'rgba(0,0,0,0)');rg.addColorStop(1,'rgba(0,0,0,0.62)');g.fillStyle=rg;g.fillRect(0,0,W,W)}
+const noise=[];for(let n=0;n<4;n++){const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');const id=g.createImageData(256,256);for(let i=0;i<id.data.length;i+=4){const v=128+(Math.random()+Math.random()-1)*46;id.data[i]=id.data[i+1]=id.data[i+2]=v;id.data[i+3]=255}g.putImageData(id,0,0);noise.push(c)}
+const vign=document.createElement('canvas');vign.width=vign.height=W;{const g=vign.getContext('2d');const rg=g.createRadialGradient(W/2,W/2,W*0.32,W/2,W/2,W*0.74);rg.addColorStop(0,'rgba(120,90,50,0)');rg.addColorStop(1,'rgba(120,90,50,0.32)');g.fillStyle=rg;g.fillRect(0,0,W,W)}
 const bgCache=new Map();
+const PAPER='#f3ead4';
+/* hand-drawn helpers: a stable pseudo-random number per (i, j), and pencil hatching over the whole canvas (clip it first) */
+const hsh=(i,j)=>{const x=Math.sin(i*127.1+j*311.7)*43758.5453;return x-Math.floor(x)};
+function hatch(g,deg,gap,lw,col,seed){
+  const a=deg*D2R,dx=Math.cos(a),dy=Math.sin(a),nx=-dy,ny=dx,R=W*0.75;g.strokeStyle=col;g.lineCap='round';
+  for(let k=-R,n=0;k<=R;k+=gap,n++){const j=(hsh(seed,n)-0.5)*gap*0.5,cx=W/2+nx*(k+j),cy=W/2+ny*(k+j),l=R*(0.8+0.4*hsh(seed+1,n));
+    g.lineWidth=lw*(0.7+0.6*hsh(seed+2,n));g.beginPath();g.moveTo(cx-dx*l,cy-dy*l);g.lineTo(cx+dx*l,cy+dy*l);g.stroke()}
+}
 function getBg(a,b){
   const key=Math.round(a)+'|'+Math.round(b);if(bgCache.has(key))return bgCache.get(key);
-  const c=document.createElement('canvas');c.width=c.height=W;const g=c.getContext('2d');const B=basis(a,b);
-  g.fillStyle='rgb(178,178,176)';g.fillRect(0,0,W,W);
-  for(const x of [-62,66]){const q=proj([x,45,-5],B);const rg=g.createRadialGradient(q[0],q[1],10,q[0],q[1],170);rg.addColorStop(0,'rgba(255,255,255,0.26)');rg.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=rg;g.fillRect(0,0,W,W)}
-  {const q=proj(HC,B);const rg=g.createRadialGradient(q[0],q[1],20,q[0],q[1],78*SCALE);rg.addColorStop(0,'rgba(0,0,0,0.17)');rg.addColorStop(0.75,'rgba(0,0,0,0.11)');rg.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=rg;g.fillRect(0,0,W,W)}
+  const c=document.createElement('canvas');c.width=c.height=W;const B=basis(a,b);
+  // the anatomy is drawn in black on a transparent layer, then laid on paper as graphite (see the end)
+  const lay=document.createElement('canvas');lay.width=lay.height=W;const g=lay.getContext('2d');
   // ribs: twelve pairs, each articulating with its thoracic vertebra (T1 at the top of the spine below). A rib runs
   // back and out from the spine to its angle, sweeps round the side of the chest, then slopes down and forwards
   // to the costochondral junction, three or four levels below where it started. The posterior part is dense with
@@ -272,9 +282,19 @@ function getBg(a,b){
    }}
   // diaphragm
   g.beginPath();for(let x=-150;x<=150;x+=6){const y=-58-Math.pow((x-6)/60,2)*12+(x>20?-8:0)*Math.min(1,(x-20)/40);const q=proj([x,y,0],B);x===-150?g.moveTo(q[0],q[1]):g.lineTo(q[0],q[1])}
-  g.lineTo(W+50,W+400);g.lineTo(-50,W+400);g.closePath();const dg=g.createLinearGradient(0,W*0.7,0,W);dg.addColorStop(0,'rgba(0,0,0,0.2)');dg.addColorStop(1,'rgba(0,0,0,0.28)');g.fillStyle=dg;g.fill();
+  g.lineTo(W+50,W+400);g.lineTo(-50,W+400);g.closePath();
+  g.save();g.clip();hatch(g,-38,6,1.1,'rgba(0,0,0,0.22)',7);hatch(g,52,9,0.9,'rgba(0,0,0,0.1)',8);g.restore();
+  g.beginPath();for(let x=-150;x<=150;x+=6){const y=-58-Math.pow((x-6)/60,2)*12+(x>20?-8:0)*Math.min(1,(x-20)/40);const q=proj([x,y,0],B);x===-150?g.moveTo(q[0],q[1]):g.lineTo(q[0],q[1])}
+  g.lineWidth=2.2;g.strokeStyle='rgba(0,0,0,0.45)';g.stroke();
   // ECG electrodes and leads on the skin
   for(const e of [[-74,-30,96],[82,-48,90],[-60,110,70]]){const q=proj(e,B);g.beginPath();g.arc(q[0],q[1],9,0,7);g.strokeStyle='rgba(0,0,0,0.42)';g.lineWidth=2.5;g.stroke();g.beginPath();g.arc(q[0],q[1],3,0,7);g.fillStyle='rgba(0,0,0,0.5)';g.fill();g.beginPath();g.moveTo(q[0],q[1]);g.bezierCurveTo(q[0]+30,q[1]+40,q[0]-10,q[1]+120,q[0]+40,q[1]+260);g.lineWidth=1.6;g.strokeStyle='rgba(0,0,0,0.32)';g.stroke()}
+  // compose: paper, cross-hatched heart shadow, then the anatomy as graphite drawn twice slightly offset (a sketchy pencil line)
+  const gc=c.getContext('2d');gc.fillStyle=PAPER;gc.fillRect(0,0,W,W);
+  {const q=proj(add(HC,[-2,-8,0]),B),rx=70*SCALE*(0.75+0.25*Math.abs(Math.cos(a*D2R))),ry=64*SCALE*Math.max(0.6,Math.abs(Math.cos(b*D2R)));
+   gc.save();gc.beginPath();gc.ellipse(q[0],q[1],rx,ry,-0.35,0,7);gc.clip();hatch(gc,-30,7,1,'rgba(70,60,50,0.13)',3);hatch(gc,35,11,0.9,'rgba(70,60,50,0.07)',4);gc.restore();
+   for(let p=0;p<2;p++){gc.beginPath();gc.ellipse(q[0]+p*1.6,q[1]-p*1.1,rx*(1+p*0.012),ry*(1-p*0.01),-0.35+p*0.02,0.15*p,6.2+p*0.1);gc.lineWidth=1.6-p*0.6;gc.strokeStyle='rgba(70,60,50,0.28)';gc.stroke()}}
+  const tint=document.createElement('canvas');tint.width=tint.height=W;{const t=tint.getContext('2d');t.drawImage(lay,0,0);t.globalCompositeOperation='source-in';t.fillStyle='rgb(62,54,46)';t.fillRect(0,0,W,W)}
+  gc.globalAlpha=1;gc.drawImage(tint,0,0);gc.globalAlpha=0.55;gc.drawImage(tint,1.4,-1);gc.globalAlpha=0.3;gc.drawImage(tint,-1,1.3);gc.globalAlpha=1;
   if(bgCache.size>40)bgCache.delete(bgCache.keys().next().value);
   bgCache.set(key,c);return c;
 }
@@ -282,7 +302,9 @@ function getBg(a,b){
 /* ---------- rendering ---------- */
 let ictx=null; // set by js/game.js (or a test) to the 2D context the image is drawn into
 const dcan=document.createElement('canvas');dcan.width=dcan.height=W;const dctx=dcan.getContext('2d');
-const grey=v=>{const n=Math.round(clamp(v,0,1)*255);return 'rgb('+n+','+n+','+n+')'};
+/* ink: v = 1 is bare paper (white in the multiply layer), v = 0 is full blue-black ink */
+const INK=[34,33,56];
+const grey=v=>{v=clamp(v,0,1);return 'rgb('+Math.round(INK[0]+(255-INK[0])*v)+','+Math.round(INK[1]+(255-INK[1])*v)+','+Math.round(INK[2]+(255-INK[2])*v)+')'};
 let lastProj=null;
 function renderImage(st){
   const B=basis(st.a,st.b),k=contraction(st.phase);
@@ -309,7 +331,7 @@ function renderImage(st){
       if(st.events){const m=flowMod(v,i,st.events);delay+=m.delay;att*=m.att}
       cs[i]=st.conc(v.sys,st.t-delay)*att;
     }
-    projV.push({v,xs,ys,cs});
+    projV.push({v,xs,ys,cs});const rws=new Float32Array(v.n);
     for(let i=0;i<v.n-1;i++){
       const c=(cs[i]+cs[i+1])/2;if(c<0.02)continue;
       let rf=1;for(const [L,ap] of les){const dd=Math.abs(v.ld[i]-L.at),h=L.len/2;if(dd<h)rf*=1-ap*0.5*(1+Math.cos(Math.PI*dd/h))}
@@ -320,24 +342,34 @@ function renderImage(st){
       dctx.beginPath();dctx.moveTo(xs[i],ys[i]);dctx.lineTo(xs[i+1],ys[i+1]);
       dctx.lineWidth=w;dctx.strokeStyle=grey(1-0.6*c*dens);dctx.stroke();
       dctx.lineWidth=w*0.5;dctx.strokeStyle=grey(1-0.86*c*dens);dctx.stroke();
+      rws[i]=r;
     }
+    // pen outline along both walls of the filled lumen, re-inked every few frames so the line "boils" like hand-drawn animation
+    const boil=Math.floor((st.frame||0)/4);
+    for(const side of [-1,1]){dctx.beginPath();let pen=false;
+      for(let i=0;i<v.n;i++){const c=i<v.n-1?(cs[i]+cs[i+1])/2:cs[i];if(c<0.12||!rws[i]){pen=false;continue}
+        const a=Math.max(0,i-1),b=Math.min(v.n-1,i+1);let nx=ys[a]-ys[b],ny=xs[b]-xs[a];const l=Math.hypot(nx,ny)||1;
+        const j=(hsh(i*7+side,boil+v.n)-0.5)*1.3,o=rws[i]*SCALE+0.5+j,x=xs[i]+nx/l*o*side,y=ys[i]+ny/l*o*side;
+        pen?dctx.lineTo(x,y):dctx.moveTo(x,y);pen=true}
+      dctx.lineWidth=1.15;dctx.strokeStyle=grey(1-0.9*Math.min(1,Math.max(...cs)*1.2));dctx.stroke()}
   }
   if(st.events){drawDissections(st.events,projV);drawPerforations(st.events,projV)}
   if(st.pci)drawPCI(st.pci,projV);
   if(st.cath){
     const cs=st.cathState;const pp=cs.pts.map(p=>proj(motion(p,k),B));
     dctx.beginPath();pp.forEach((q,i)=>i?dctx.lineTo(q[0],q[1]):dctx.moveTo(q[0],q[1]));
-    dctx.lineWidth=5.2;dctx.strokeStyle=grey(0.5);dctx.stroke();
+    dctx.lineWidth=5.2;dctx.strokeStyle=grey(0.55);dctx.stroke();
+    for(const side of [-1,1]){dctx.beginPath();pp.forEach((q,i)=>{const a=pp[Math.max(0,i-1)],b=pp[Math.min(pp.length-1,i+1)];let nx=a[1]-b[1],ny=b[0]-a[0];const l=Math.hypot(nx,ny)||1;const x=q[0]+nx/l*2.7*side,y=q[1]+ny/l*2.7*side;i?dctx.lineTo(x,y):dctx.moveTo(x,y)});dctx.lineWidth=1;dctx.strokeStyle=grey(0.2);dctx.stroke()}
     const tq=pp[pp.length-1];dctx.beginPath();dctx.arc(tq[0],tq[1],2.8,0,7);dctx.fillStyle=grey(0.36);dctx.fill();
     if(st.wire){const p2=proj(motion(add(cs.tip,[0,14,0]),k),B);dctx.beginPath();dctx.moveTo(tq[0],tq[1]);dctx.lineTo(p2[0],p2[1]);dctx.lineWidth=1.6;dctx.strokeStyle=grey(0.35);dctx.stroke()}
   }
   ctx.globalCompositeOperation='multiply';ctx.drawImage(dcan,0,0);
-  ctx.globalCompositeOperation='overlay';ctx.globalAlpha=st.mode==='cine'?0.11:0.26;ctx.imageSmoothingEnabled=true;ctx.drawImage(noise[st.frame%4],0,0,W,W);
+  ctx.globalCompositeOperation='overlay';ctx.globalAlpha=st.mode==='cine'?0.07:0.16;ctx.imageSmoothingEnabled=true;ctx.drawImage(noise[st.frame%4],0,0,W,W);
   ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.drawImage(vign,0,0);
   lastProj={B,k,projV};
   if(st.marks&&st.marks.length){
-    ctx.lineWidth=2;ctx.font='600 13px "IBM Plex Mono", monospace';
-    st.marks.forEach((m,i)=>{const q=proj(motion(m.p3,k),B);ctx.strokeStyle='#f2a53b';ctx.beginPath();ctx.arc(q[0],q[1],13,0,7);ctx.stroke();ctx.fillStyle='#f2a53b';ctx.fillText(String(i+1),q[0]+15,q[1]-10)});
+    ctx.lineWidth=2.2;ctx.font='700 18px "Kalam", "Patrick Hand", cursive';
+    st.marks.forEach((m,i)=>{const q=proj(motion(m.p3,k),B);ctx.strokeStyle='#c2452d';ctx.beginPath();ctx.ellipse(q[0],q[1],15,12,-0.3,0.3,6.75);ctx.stroke();ctx.fillStyle='#c2452d';ctx.fillText(String(i+1),q[0]+16,q[1]-10)});
   }
 }
 
