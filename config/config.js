@@ -82,12 +82,13 @@ const DIFFICULTY={
   hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, the catheter damps sooner, 25% less contrast. Tokens ×2.',tol:{L:16,R:18},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,dissectT:35,compX:1.3,tokenX:2,level:3},
 };
 
-/* Intracoronary drugs, given through the guide. gain = how much they restore flow in no-reflow (1 = fully),
-   side = what else they do. */
+/* Drugs. Intracoronary ones go down the engaged guide; iv ones do not need it. gain = how much they restore flow in
+   no-reflow (1 = fully), spasm = how completely they relieve spasm, side = what else they do. */
 const IC_DRUGS=[
-  {id:'gtn',name:'GTN 200 mcg',short:'GTN',gain:0.05,side:'bp',desc:'Nitrate. Relieves spasm; does little for no-reflow. Lowers BP.'},
-  {id:'adeno',name:'Adenosine 100 mcg',short:'Adenosine',gain:0.3,side:'brady',desc:'Microvascular vasodilator. Short-lived; brief bradycardia.'},
-  {id:'vera',name:'Verapamil 200 mcg',short:'Verapamil',gain:0.42,side:'bp',desc:'Microvascular vasodilator. Lowers BP.'},
+  {id:'gtn',name:'GTN 200 mcg',short:'GTN',gain:0.05,spasm:1,side:'bp',desc:'Nitrate. Relieves coronary spasm; does little for no-reflow. Lowers BP.'},
+  {id:'adeno',name:'Adenosine 100 mcg',short:'Adenosine',gain:0.3,spasm:0,side:'brady',desc:'Microvascular vasodilator for no-reflow. Short-lived; brief bradycardia.'},
+  {id:'vera',name:'Verapamil 200 mcg',short:'Verapamil',gain:0.42,spasm:0.7,side:'bp',desc:'Calcium-channel blocker for no-reflow and spasm. Lowers BP.'},
+  {id:'prot',name:'Protamine 50 mg IV',short:'Protamine',gain:0,spasm:0,side:'none',iv:true,desc:'Reverses heparin. Slows bleeding from a perforation; risks clotting a fresh stent if given otherwise.'},
 ];
 
 /* ECG lead that shows ischaemia in each vessel's territory: V3 anterior (LAD), V5 lateral (circumflex), II inferior (RCA). */

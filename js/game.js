@@ -137,7 +137,7 @@ function newState(ci){
   return {ci,c,D,diff:profile.diff,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,type:'JL'},exch:0,
     cL:0,cR:0,cRoot:0,hist:{L:[],R:[],root:[]},histN:0,contrast:0,ak:0,ftime:0,ctime:0,blind:0,wasted:0,
     cine:null,runs:[],marks:[],pending:null,review:null,imgAcc:0,frame:0,deepInj:0,rcaInj:0,complication:null,done:false,
-    sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),events:[],drugs:[],hrDip:0,bpDip:0,isch:0,
+    sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),events:[],drugs:[],hrDip:0,bpDip:0,isch:0,effusion:0,tamponade:false,pcT:0,pcCount:0,protamine:false,seals:[],prevEng:null,prevDeep:false,
     st:{II:0,V3:0,V5:0},twi:new Set((c.ecg&&c.ecg.twi)||[])};
 }
 const histAt=(arr,t)=>{if(t<0||!arr.length)return 0;const i=Math.floor(t*50);return i<arr.length?arr[i]:arr[arr.length-1]};
@@ -313,65 +313,87 @@ function startPCIAt(m){
   S.pci={vid:m.vid,ld:m.ld,mark:m.ld,label:m.label,stage:'wire',wire:0,kind:null,diam:3.0,len:18,atm:0,maxAtm:0,slow:closed};
   toast(closed?'Recrossing an occluded, dissected vessel: the wire will be slow. Hold fluoro.':'Hold fluoro while the wire crosses the lesion.');renderPCI(true);
 }
-/* ---------- complications: dissection and no-reflow ---------- */
-const evRender=()=>S.events.map(e=>({kind:e.kind,vid:e.vid,ld:e.ld,len:e.len,flow:e.flow,progress:e.progress,closed:e.closed,treated:e.treated,stain:e.stain}));
+/* ---------- complications: dissection, no-reflow, perforation, spasm ---------- */
+const evRender=()=>S.events.map(e=>({kind:e.kind,vid:e.vid,ld:e.ld,len:e.len,flow:e.flow,progress:e.progress,closed:e.closed,treated:e.treated,stain:e.stain,sev:e.sev,pool:e.pool,sealed:e.sealed,grade:e.grade}));
+const EV_NAME={dissection:'Dissection',noreflow:'No-reflow',perforation:'Perforation',spasm:'Spasm'};
 const isACS=()=>/STEMI/.test(S.c.title||'');
-function addEvent(kind,vid,ld,cause){
+function addEvent(kind,vid,ld,cause,opt={}){
   if(S.events.some(e=>e.kind===kind&&e.vid===vid&&!e.treated&&Math.abs(e.ld-ld)<15))return null;
-  const v=VBY[vid];ld=clamp(ld,4,v.len-4);
-  const ev={kind,vid,ld,len:kind==='dissection'?10:0,label:segLabel(v,ld),cause,t0:S.clock,seen:false,treated:false,closed:false,progress:0,stain:0,flow:1,target:kind==='noreflow'?0.12+Math.random()*0.18:1,doses:[]};
+  const v=VBY[vid];ld=clamp(ld,Math.min(4,v.len/2),Math.max(v.len/2,v.len-4));
+  const ev={kind,vid,ld,len:kind==='dissection'?10:kind==='spasm'?8:0,label:segLabel(v,ld),cause,t0:S.clock,seen:false,treated:false,closed:false,progress:0,stain:0,flow:1,
+    target:kind==='noreflow'?0.12+Math.random()*0.18:1,doses:[],grade:opt.grade||null,sev:opt.sev||0,sevTarget:opt.sev||0,pool:0,sealed:false,sealedBy:null,tamponT:0,temporised:false,byDrug:false};
   S.events.push(ev);
   const l=TERRITORY[vid];
-  setTimeout(()=>{if(S&&!S.done&&S.events.includes(ev))toast(`The patient has chest pain. ST rising in ${l}, BP falling.`,true)},kind==='noreflow'?1500:400);
+  const msg=kind==='perforation'?'The patient is restless and short of breath.':kind==='spasm'?(ev.sev>0.8?`The patient has chest pain. ST rising in ${l}.`:null):`The patient has chest pain. ST rising in ${l}, BP falling.`;
+  if(msg)setTimeout(()=>{if(S&&!S.done&&S.events.includes(ev)&&!ev.treated)toast(msg,true)},kind==='noreflow'?1500:kind==='perforation'?3000:400);
   renderPCI(true);return ev;
 }
+const coversEv=(P,e)=>P&&P.vid===e.vid&&Math.abs(P.ld-e.ld)<=P.len/2+1;
 function applyDevice(){
   const P=S.pci,dev={vid:P.vid,ld:P.ld,len:P.len,diam:P.diam,atm:Math.round(P.maxAtm),label:segLabel(VBY[P.vid],P.ld),hits:[],t:S.clock};
-  if(P.kind==='stent'){
+  const diff=dev.diam-refDiam(dev.vid,dev.ld);
+  if(P.kind==='stent'||P.kind==='covered'){
     for(const L of S.lesions){const o=stentOutcome(L,dev);if(o){L.cur=o.residual;L.stented=true;dev.hits.push({L,o})}}
-    S.stents.push(dev);toast(`Stent deployed: ${P.diam.toFixed(1)} × ${P.len} mm at ${dev.atm} atm.`);
+    if(P.kind==='covered'){dev.covered=true;for(const ev of S.events)if(ev.kind==='perforation'&&!ev.sealed&&stentCovers(dev,ev)){ev.sealed=ev.treated=true;ev.sealedBy='a covered stent';ev.tx=S.clock;dev.sealed=true}}
+    S.stents.push(dev);toast(dev.sealed?`Covered stent deployed: the perforation is sealed.`:`${dev.covered?'Covered stent':'Stent'} deployed: ${P.diam.toFixed(1)} × ${P.len} mm at ${dev.atm} atm.`);
+    for(const ev of S.events)if(ev.kind==='spasm'&&!ev.treated&&stentCovers(dev,ev)){ev.stented=true}
     for(const ev of S.events)if(ev.kind==='dissection'&&!ev.treated&&stentCovers(dev,ev)){ev.treated=true;ev.tx=S.clock;setTimeout(()=>{if(S&&!S.done)toast(`Dissection in the ${ev.label} covered: the flap is tacked back and flow restored.`)},2900)}
     const sigHit=dev.hits.find(h=>h.L.sev>=0.7),over=dev.hits.some(h=>h.o.over);
-    // edge dissection beyond the stent
-    if(Math.random()<dissectRisk({kind:'stent',over,atm:dev.atm})*(over?1:S.D.compX))addEvent('dissection',dev.vid,dev.ld+dev.len/2+3,over?'an oversized stent':dev.atm>16?'deploying above the rated burst pressure':'stent deployment (an edge tear)');
+    // perforation from an oversized stent or excess pressure, else an edge dissection beyond the stent
+    if(!dev.covered&&Math.random()<perfRisk({diff,atm:dev.atm})*S.D.compX)addEvent('perforation',dev.vid,dev.ld,diff>1?'an oversized stent':'deploying above the rated burst pressure',{grade:'major'});
+    else if(Math.random()<dissectRisk({kind:'stent',over,atm:dev.atm})*(over?1:S.D.compX))addEvent('dissection',dev.vid,dev.ld+dev.len/2+3,over?'an oversized stent':dev.atm>16?'deploying above the rated burst pressure':'stent deployment (an edge tear)');
     // no-reflow: debris and spasm in the microcirculation beyond a freshly stented, often thrombotic, lesion
     else if(sigHit&&Math.random()<noReflowRisk({acs:isACS(),sev:sigHit.L.sev,len:dev.len})*S.D.compX)addEvent('noreflow',dev.vid,dev.ld,'');
   }else{
     for(const L of S.lesions){const o=balloonOutcome(L,dev);if(o){L.cur=o.residual;if(!o.under&&!o.lowP)L.predil=true;dev.hits.push({L,o})}}
     S.balloons.push(dev);const over=dev.hits.some(h=>h.o.over);
     const hit=dev.hits[0];
-    if(Math.random()<dissectRisk({kind:'balloon',over,atm:dev.atm,sev:hit?hit.L.sev:0,stented:hit&&hit.L.stented})*(over?1:S.D.compX))addEvent('dissection',dev.vid,hit?hit.L.at:dev.ld,over?'an oversized balloon':dev.atm>16?'inflating above the rated burst pressure':'balloon angioplasty of a hard lesion');
+    if(!(hit&&hit.L.stented)&&Math.random()<perfRisk({diff,atm:dev.atm})*S.D.compX)addEvent('perforation',dev.vid,hit?hit.L.at:dev.ld,diff>1?'an oversized balloon':'inflating above the rated burst pressure',{grade:'major'});
+    else if(Math.random()<dissectRisk({kind:'balloon',over,atm:dev.atm,sev:hit?hit.L.sev:0,stented:hit&&hit.L.stented})*(over?1:S.D.compX))addEvent('dissection',dev.vid,hit?hit.L.at:dev.ld,over?'an oversized balloon':dev.atm>16?'inflating above the rated burst pressure':'balloon angioplasty of a hard lesion');
     toast(over?'Balloon oversized: dissection flap at the lesion edge.':`Balloon ${P.diam.toFixed(1)} × ${P.len} mm inflated to ${dev.atm} atm.`,over);
   }
   P.stage='tools';P.kind=null;P.atm=0;P.maxAtm=0;P.warned=P.pain=false;P.ld=P.mark;renderPCI(true);
 }
 function giveDrug(id){
   const D=IC_DRUGS.find(x=>x.id===id),cs=S.cs;if(!D)return;
+  if(D.iv){
+    const perf=S.events.some(e=>e.kind==='perforation'&&!e.sealed);
+    if(S.protamine){toast('Heparin is already reversed.');return}
+    S.protamine=true;S.drugs.push({id,t:S.clock,useful:perf});for(const e of S.events)if(e.kind==='perforation'&&!e.sealed)e.prot=true;
+    toast(perf?'Protamine IV: heparin reversed, the leak slows.':'Protamine IV: heparin reversed. With no bleeding to stop, a fresh stent may now clot.',!perf);renderPCI(true);return;
+  }
   if(!cs||!cs.eng||cs.deep){toast('Engage the guide (not deep-seated) to give drugs into the coronary.');return}
   const nr=S.events.filter(e=>e.kind==='noreflow'&&!e.treated&&VBY[e.vid].sys===cs.eng);
   for(const e of nr){e.target=Math.min(1,e.target+D.gain);e.doses.push(D.short)}
-  S.drugs.push({id,t:S.clock,useful:nr.length>0&&D.gain>0.1});
+  const sp=S.events.filter(e=>e.kind==='spasm'&&!e.treated&&VBY[e.vid].sys===cs.eng);
+  if(D.spasm>0)for(const e of sp){e.sevTarget=e.sev*(1-D.spasm);e.byDrug=true;e.doses.push(D.short)}
+  S.drugs.push({id,t:S.clock,useful:(nr.length>0&&D.gain>0.1)||(sp.length>0&&D.spasm>0)});
   if(D.side==='brady')S.hrDip=3.5;else S.bpDip=8;
-  toast(`${D.name} into the ${cs.eng==='L'?'left':'right'} coronary.`+(D.side==='brady'?' Brief bradycardia.':' BP dips.')+(nr.length?(D.gain>0.1?' Distal flow improving.':' Little effect on the slow flow.'):''));
+  toast(`${D.name} into the ${cs.eng==='L'?'left':'right'} coronary.`+(D.side==='brady'?' Brief bradycardia.':' BP dips.')+(nr.length?(D.gain>0.1?' Distal flow improving.':' Little effect on the slow flow.'):'')+(sp.length&&D.spasm>0?' The narrowing is relaxing.':''));
   renderPCI(true);
 }
 let pciSig='';
 function sizeChips(list,cur,attr,fmt){return `<div class="sev">${list.map(v=>`<button data-${attr}="${v}" class="${v===cur?'sel':''}">${fmt(v)}</button>`).join('')}</div>`}
 function renderPCI(force){
   const el=$('pci');
-  const sig=!S?'none':JSON.stringify([S.done,S.cs&&S.cs.eng,S.cs&&S.cs.deep,S.events.map(e=>[e.seen,e.closed,e.treated,e.doses.length]),S.pci&&[S.pci.stage,S.pci.kind,S.pci.diam,S.pci.len,Math.round(S.pci.ld)],S.marks.map(m=>m.vid+m.ld+canTreat(m)),S.stents.length,S.balloons.length]);
+  const sig=!S?'none':JSON.stringify([S.done,S.cs&&S.cs.eng,S.cs&&S.cs.deep,S.events.map(e=>[e.seen,e.closed,e.treated,e.doses.length,e.sealed,e.temporised,Math.round(e.sev*10)]),Math.round(S.effusion*5),S.pcT>0,S.tamponade,S.protamine,S.pci&&[S.pci.stage,S.pci.kind,S.pci.diam,S.pci.len,Math.round(S.pci.ld)],S.marks.map(m=>m.vid+m.ld+canTreat(m)),S.stents.length,S.balloons.length]);
   if(!force&&sig===pciSig)return;pciSig=sig;
   if(!S){el.innerHTML='<div class="empty">Load a case to begin.</div>';return}
   const P=S.pci;let h='';
   // complications come first: what the patient shows, and once imaged, what it is and what to do
-  const active=S.events.filter(e=>!e.treated);
-  const alerts=active.map(e=>{const i=S.events.indexOf(e),l=TERRITORY[e.vid];
-    if(!e.seen)return `<div class="alert"><b>Chest pain · ST ↑ ${l} · BP falling</b><span>Inject and look at the vessel you just treated.</span></div>`;
-    if(e.kind==='dissection')return `<div class="alert"><b>${e.closed?'Abrupt closure':'Dissection'} · ${e.label}</b><span>${e.closed?'No flow beyond the flap. Recross it with a wire and stent it.':'Flap with contrast staining. Cover it with a stent before it closes.'}</span>${!P?`<button class="btn" data-rewire="${i}" ${canTreat(e)?'':'disabled'}>Wire it</button>`:P.vid===e.vid&&P.stage!=='wire'?`<button class="btn" data-aim="${i}">Aim devices here</button>`:''}</div>`;
+  const active=S.events.filter(e=>!e.treated&&!(e.kind==='spasm'&&!(e.sev>0.8||(e.seen&&S.D.level===1))));
+  const aimBtn=(e,i)=>!P?`<button class="btn" data-rewire="${i}" ${canTreat(e)?'':'disabled'}>Wire it</button>`:P.vid===e.vid&&P.stage!=='wire'?`<button class="btn" data-aim="${i}">Aim devices here</button>`:'';
+  let alerts=active.map(e=>{const i=S.events.indexOf(e),l=TERRITORY[e.vid];
+    if(!e.seen)return e.kind==='perforation'?`<div class="alert"><b>Restless · BP falling · HR rising</b><span>Inject and look at the vessel you just treated.</span></div>`
+      :`<div class="alert"><b>Chest pain · ST ↑ ${l}${e.kind==='spasm'?'':' · BP falling'}</b><span>Inject and look at the vessel you just ${e.kind==='spasm'?'engaged':'treated'}.</span></div>`;
+    if(e.kind==='perforation')return `<div class="alert"><b>Perforation · ${e.label} · ${e.grade==='major'?'jet of contrast out of the vessel':'wire exit at the tip'}</b><span>Blood is leaking into the pericardium${e.temporised?' (slowed)':''}. ${e.grade==='major'?'Seal it with a covered stent. A low-pressure balloon inflation over the hole stops the leak while you hold it.':'Seal it with a coil, or hold a low-pressure balloon inflation over it for 15 s.'} IV protamine slows the leak.</span>${aimBtn(e,i)}</div>`;
+    if(e.kind==='spasm')return `<div class="alert"><b>Spasm · ${e.label} · about ${Math.round(e.sev*100)}%</b><span>Smooth, concentric narrowing ${e.cause==='the wire'?'where the wire passed':'at the catheter tip'}, not plaque. Give intracoronary GTN${e.cause==='the wire'?'':' and ease the catheter back'}. Don't stent it.</span></div>`;
+    if(e.kind==='dissection')return `<div class="alert"><b>${e.closed?'Abrupt closure':'Dissection'} · ${e.label}</b><span>${e.closed?'No flow beyond the flap. Recross it with a wire and stent it.':'Flap with contrast staining. Cover it with a stent before it closes.'}</span>${aimBtn(e,i)}</div>`;
     return `<div class="alert"><b>No-reflow · ${e.label}</b><span>Stent open, slow distal flow (${e.flow<0.35?'TIMI 1':'TIMI 2'}). Give intracoronary vasodilators below.${e.doses.length?' Given: '+e.doses.join(', ')+'.':''}</span></div>`;}).join('');
+  if(S.effusion>0.3&&!S.complication)alerts=`<div class="alert"><b>${S.tamponade?'Tamponade':'Pericardial effusion'} · BP ${Math.round(S.sysP)}/${Math.round(S.diaP)}</b><span>${S.tamponade?'The heart is being squeezed by blood in the pericardium. Drain it now.':'Blood is collecting around the heart. Drain it before it tamponades.'}</span><button class="btn${S.tamponade?' primary':''}" data-pc="1" ${S.pcT>0?'disabled':''}>${S.pcT>0?'Draining…':'Pericardiocentesis'}</button></div>`+alerts;
   const eng=S.cs&&S.cs.eng&&!S.cs.deep&&!S.complication;
-  const drugs=`<div class="grouplabel">Intracoronary drugs</div><div class="drugs">${IC_DRUGS.map(d=>`<button class="btn" data-drug="${d.id}" title="${d.desc}" ${eng?'':'disabled'}>${d.short}</button>`).join('')}</div>`;
-  const resolved=S.events.filter(e=>e.treated).map(e=>`<div class="mark"><span>${e.kind==='dissection'?'Dissection':'No-reflow'} · ${e.label} · resolved</span></div>`).join('');
+  const drugs=`<div class="grouplabel">Drugs</div><div class="drugs">${IC_DRUGS.map(d=>`<button class="btn" data-drug="${d.id}" title="${d.desc}" ${(d.iv?!S.complication&&!S.protamine:eng)?'':'disabled'}>${d.short}</button>`).join('')}</div>`;
+  const resolved=S.events.filter(e=>e.treated).map(e=>`<div class="mark"><span>${EV_NAME[e.kind]} · ${e.label} · ${e.kind==='perforation'?'sealed':'resolved'}</span></div>`).join('');
   const log=[...S.balloons.map(b=>`Balloon ${b.diam.toFixed(1)} × ${b.len} mm · ${b.label} · ${b.atm} atm`),...S.stents.map(s=>`Stent ${s.diam.toFixed(1)} × ${s.len} mm · ${s.label} · ${s.atm} atm`)].map(t=>`<div class="mark"><span>${t}</span></div>`).join('');
   if(!P){
     if(!S.marks.length)h='<div class="empty">Mark a lesion on a cine run, then treat it here with the guide engaged.</div>';
@@ -381,16 +403,16 @@ function renderPCI(force){
     h=`<div class="pending"><div>Crossing the ${P.label} with a 0.014" wire. Hold fluoro. <b id="pciWire" class="pci-read">0%</b></div><div class="row"><button class="btn" data-cancel="1">Cancel</button></div></div>`;
   }else if(P.stage==='tools'){
     h=`<div class="pending"><div>Wire across the ${P.label}. Choose a device:</div>
-      <div class="tools"><button class="btn" data-tool="balloon"><b>Balloon</b><span>Angioplasty, pre- or post-dilation</span></button><button class="btn" data-tool="stent"><b>Stent</b><span>Drug-eluting stent</span></button></div>
+      <div class="tools"><button class="btn" data-tool="balloon"><b>Balloon</b><span>Angioplasty, pre- or post-dilation</span></button><button class="btn" data-tool="stent"><b>Stent</b><span>Drug-eluting stent</span></button>${S.events.some(e=>e.kind==='perforation'&&!e.sealed&&e.vid===P.vid)?'<button class="btn" data-tool="covered"><b>Covered stent</b><span>Seals a perforation</span></button>':''}${S.events.some(e=>e.kind==='perforation'&&!e.sealed&&e.grade==='distal'&&e.vid===P.vid)?'<button class="btn" data-tool="coil"><b>Coil</b><span>Plugs a distal wire perforation</span></button>':''}</div>
       <div class="row"><button class="btn" data-finish="1">Remove wire</button></div></div>`;
   }else if(P.stage==='size'){
-    const isS=P.kind==='stent';
-    h=`<div class="pending"><div>Choose the ${isS?'stent':'balloon'} for the ${P.label}. For scale, the 6F guide is 2 mm wide.</div>
+    const isS=P.kind!=='balloon',nm=P.kind==='covered'?'covered stent':P.kind;
+    h=`<div class="pending"><div>Choose the ${nm} for the ${P.label}. For scale, the 6F guide is 2 mm wide.</div>
       <div class="grouplabel">Diameter (mm)</div>${sizeChips(isS?STENT_DIAMS:BALLOON_DIAMS,P.diam,'d',v=>v.toFixed(1))}
       <div class="grouplabel">Length (mm)</div>${sizeChips(isS?STENT_LENS:BALLOON_LENS,P.len,'l',v=>v)}
-      <div class="row"><button class="btn primary" data-pos="1">Position ${isS?'stent':'balloon'}</button><button class="btn" data-back="1">Back</button></div></div>`;
+      <div class="row"><button class="btn primary" data-pos="1">Position ${nm}</button><button class="btn" data-back="1">Back</button></div></div>`;
   }else if(P.stage==='positioned'){
-    h=`<div class="pending"><div>${P.diam.toFixed(1)} × ${P.len} mm ${P.kind} across the ${P.label}. Line the markers up around the narrowing, then hold Inflate. ${P.kind==='stent'?'Deploy at 12–14 atm.':'Inflate to 8–12 atm.'}</div>
+    h=`<div class="pending"><div>${P.diam.toFixed(1)} × ${P.len} mm ${P.kind==='covered'?'covered stent':P.kind} across the ${P.label}. ${P.seal&&P.kind==='balloon'?'Sealing inflation: hold Inflate at low pressure (capped at 6 atm) over the hole; release when it is sealed.':`Line the markers up around the narrowing, then hold Inflate. ${P.kind!=='balloon'?'Deploy at 12–14 atm.':'Inflate to 8–12 atm.'}`}</div>
       <div class="row"><button class="btn" data-nudge="-2">◀ Proximal</button><button class="btn" data-nudge="2">Distal ▶</button></div>
       <div class="row"><button class="hold" data-hold="1"><span>Inflate</span><kbd>B</kbd></button><b id="pciAtm" class="pci-read">0.0 atm</b><button class="btn" data-back="1">Back</button></div></div>`;
   }
@@ -401,9 +423,11 @@ $('pci').addEventListener('click',e=>{
   if(d.treat!=null)startPCI(+d.treat);
   else if(d.rewire!=null){const e=S.events[+d.rewire];startPCIAt({vid:e.vid,ld:e.ld,label:e.label})}
   else if(d.drug){giveDrug(d.drug);return}
-  else if(d.aim!=null){const e=S.events[+d.aim];P.mark=P.ld=e.ld;P.label=e.label;toast(`Devices will be positioned at the ${e.label}.`)}
+  else if(d.aim!=null){const e=S.events[+d.aim];P.mark=P.ld=e.ld;P.label=e.label;P.seal=e.kind==='perforation';toast(`Devices will be positioned at the ${e.label}.`+(P.seal?' A balloon here inflates at low pressure to seal the hole.':''))}
+  else if(d.pc){if(S.pcT<=0){S.pcT=4;toast('Pericardiocentesis: needle under the xiphoid, draining the effusion…')}}
   else if(d.cancel){S.pci=null;toast('Wire withdrawn.')}
-  else if(d.tool){P.kind=d.tool;P.stage='size';P.diam=d.tool==='stent'?3.0:2.5;P.len=d.tool==='stent'?18:15}
+  else if(d.tool==='coil'){const e=S.events.find(x=>x.kind==='perforation'&&!x.sealed&&x.grade==='distal'&&x.vid===P.vid);if(e){e.sealed=e.treated=true;e.sealedBy='a coil';e.tx=S.clock;S.seals.push({how:'coil',label:e.label,t:S.clock});toast(`Coil deployed at the ${e.label}: the leak has stopped. The tiny vessel beyond it is sacrificed.`)}}
+  else if(d.tool){P.kind=d.tool;P.stage='size';P.diam=d.tool==='balloon'?2.5:3.0;P.len=d.tool==='balloon'?15:18;if(d.tool!=='balloon')P.seal=false}
   else if(d.d)P.diam=+d.d;else if(d.l)P.len=+d.l;
   else if(d.pos){P.stage='positioned';toast(`${P.kind==='stent'?'Stent':'Balloon'} delivered over the wire. Markers show its ends.`)}
   else if(d.back){P.stage=P.stage==='positioned'?'size':'tools';P.atm=0;P.maxAtm=0}
@@ -448,6 +472,10 @@ function tick(dt){
     cs=cst(c);
   }
   S.cs=cs;
+  // catheter-induced spasm: on engaging an ostium, more so the RCA, and very likely if the catheter deep-seats
+  if(cs.eng&&cs.eng!==S.prevEng&&Math.random()<spasmRisk({cause:'eng',sys:cs.eng})*D.compX)addEvent('spasm',cs.eng==='L'?'LM':'RCA',4,'the catheter',{sev:0.55+Math.random()*0.37});
+  if(cs.deep&&!S.prevDeep&&Math.random()<spasmRisk({cause:'deep'})*D.compX)addEvent('spasm',cs.eng==='L'?'LM':'RCA',4,'the catheter',{sev:0.75+Math.random()*0.17});
+  S.prevEng=cs.eng;S.prevDeep=cs.deep;
   // contrast dynamics at 50 Hz
   const inj=down('KeyJ')&&!S.complication&&S.exch<=0;
   while(S.histN/50<=S.clock){
@@ -476,21 +504,54 @@ function tick(dt){
       if(!ev.closed){ev.progress=Math.min(1,ev.progress+dt/S.D.dissectT);if(ev.progress>=1){ev.closed=true;toast(`Abrupt closure of the ${ev.label}: no flow beyond the dissection. Rewire and stent it.`,true);renderPCI(true)}}
       ev.stain=c>0.3?Math.min(1,ev.stain+dt*0.7*c):ev.stain*Math.exp(-dt/12);
     }
+    if(ev.kind==='perforation'){
+      const Pp=S.pci,plug=!!(Pp&&Pp.stage==='positioned'&&Pp.kind==='balloon'&&Pp.atm>2&&coversEv(Pp,ev));
+      if(!ev.sealed){
+        S.effusion+=perfLeak(ev,{protamine:S.protamine,balloon:plug})*dt;
+        if(plug){const t0=ev.tamponT;ev.tamponT+=dt;
+          if(ev.grade==='distal'&&ev.tamponT>=15){ev.sealed=ev.treated=true;ev.sealedBy='a prolonged low-pressure balloon inflation';ev.tx=S.clock;toast(`The ${ev.label} perforation has sealed. Deflate.`);renderPCI(true)}
+          else if(ev.grade==='major'&&ev.tamponT>=20&&!ev.temporised){ev.temporised=true;toast('The leak has slowed, but a hole this size needs a covered stent.');renderPCI(true)}
+          else if(Math.floor(ev.tamponT/5)>Math.floor(t0/5))toast(`Balloon tamponade of the hole: ${Math.round(ev.tamponT)} s.`)}
+        ev.pool+=c>0.1&&!plug?dt*c*(ev.grade==='major'?0.5:0.25):0;
+      }
+      ev.pool*=Math.exp(-dt/90);
+    }
+    if(ev.kind==='spasm'&&!ev.treated){
+      // relieved by drugs, or settles by itself once the catheter or wire that provoked it is gone
+      const gone=ev.cause==='the wire'?!S.pci:cs.eng!==VBY[ev.vid].sys;if(gone&&!ev.byDrug)ev.sevTarget=0;
+      ev.sev+=(ev.sevTarget-ev.sev)*Math.min(1,dt/(ev.byDrug?3:14));
+      if(ev.sev<0.1){ev.treated=true;ev.tx=S.clock;if(ev.seen||ev.byDrug)toast(`The spasm in the ${ev.label} has resolved.`);renderPCI(true)}
+    }
     if(ev.kind==='noreflow'){ev.flow+=(ev.target-ev.flow)*Math.min(1,dt/(ev.flow>ev.target?2.5:4));if(!ev.treated&&ev.target>=0.95&&ev.flow>0.92){ev.treated=true;ev.tx=S.clock;toast(`Flow in the ${ev.label} restored. ST settling.`);renderPCI(true)}}
-    if(!ev.seen&&xr&&c>0.35&&S.clock-ev.t0>1){ev.seen=true;renderPCI(true);
-      toast(ev.kind==='dissection'?`Dissection: a flap with contrast staining in the ${ev.label}. Cover it with a stent before it closes.`
-        :`No-reflow: the stent in the ${ev.label} is open but contrast crawls beyond it. Give intracoronary vasodilators through the guide.`,true)}
+    if(!ev.seen&&xr&&c>0.35&&S.clock-ev.t0>1&&!ev.treated){ev.seen=true;renderPCI(true);
+      const m={dissection:`Dissection: a flap with contrast staining in the ${ev.label}. Cover it with a stent before it closes.`,
+        noreflow:`No-reflow: the stent in the ${ev.label} is open but contrast crawls beyond it. Give intracoronary vasodilators through the guide.`,
+        perforation:`Perforation: contrast is squirting out of the ${ev.label} into the pericardium. Seal it.`,
+        spasm:`Spasm: a smooth narrowing in the ${ev.label}. Intracoronary GTN should relieve it.`}[ev.kind];
+      if(ev.kind!=='spasm'||ev.sev>0.8||S.D.level===1)toast(m,true)}
   }
   let isch=0,ischLead=null;for(const ev of S.events){const x=1-evFlow(ev);if(x>isch){isch=x;ischLead=TERRITORY[ev.vid]}}
   S.isch=isch;S.hrDip=Math.max(0,S.hrDip-dt);S.bpDip=Math.max(0,S.bpDip-dt);
-  S.bpDrop=Math.min(55,isch*38+(S.bpDip>0?14:0));
-  if(S.hrDip>0)S.hrT=38;else if(isch>0.5)S.hrT=ischLead==='II'?50:98;
+  if(S.pcT>0){S.pcT-=dt;S.effusion=Math.max(0,S.effusion-dt*0.3);if(S.pcT<=0){S.pcCount++;for(const e of S.events)if(e.kind==='perforation'&&(!e.sealed||e.tx>S.clock-60))e.pc=(e.pc||0)+1;toast(`Pericardiocentesis: ${S.effusion<0.1?'the effusion is drained':'most of the effusion is drained'}, BP recovering.${S.events.some(e=>e.kind==='perforation'&&!e.sealed)?' It will reaccumulate until the hole is sealed.':''}`);renderPCI(true)}}
+  if(S.effusion>0.8&&!S.tamponade){S.tamponade=true;toast('Tamponade: BP collapsing, HR racing. Pericardiocentesis now.',true);renderPCI(true)}
+  if(S.effusion<0.5&&S.tamponade){S.tamponade=false;renderPCI(true)}
+  if(S.effusion>=1.6&&!S.complication){S.complication='Untreated cardiac tamponade from a coronary perforation caused a cardiac arrest.';if(S.cine)stopCine();S.pci=null;toast('Cardiac arrest from tamponade.',true);renderMarks();renderPCI(true)}
+  const tamp=clamp((S.effusion-0.2)/1.0,0,1);
+  S.bpDrop=Math.min(70,isch*38+(S.bpDip>0?14:0)+tamp*55);
+  if(S.hrDip>0)S.hrT=38;else if(tamp>0.4)S.hrT=104+20*tamp;else if(isch>0.5)S.hrT=ischLead==='II'?50:98;
+  if(Math.floor(S.clock/4)!==Math.floor((S.clock-dt)/4)&&S.effusion>0.3)renderPCI(true);
   // PCI: wire crossing (under X-ray) and balloon inflation
   const P=S.pci,xray=down('Space','KeyF')||!!S.cine;
-  if(P&&P.stage==='wire'&&xray){P.wire+=dt*(owns('wire')?1:0.5)*(P.slow?0.4:1);if(P.wire>=1){P.wire=1;P.stage='tools';toast('Wire is across. Choose a device.');renderPCI(true)}}
+  if(P&&P.stage==='wire'&&xray){P.wire+=dt*(owns('wire')?1:0.5)*(P.slow?0.4:1);if(P.wire>=1){P.wire=1;P.stage='tools';toast('Wire is across. Choose a device.');
+    const v=VBY[P.vid];
+    if(Math.random()<perfRisk({kind:'wire',hydrophilic:owns('wire')})*D.compX)addEvent('perforation',P.vid,v.len-3,'the wire tip',{grade:'distal'});
+    else if(Math.random()<spasmRisk({cause:'wire'})*D.compX)addEvent('spasm',P.vid,Math.min(v.len-6,P.ld+16+Math.random()*10),'the wire',{sev:0.5+Math.random()*0.35});
+    renderPCI(true)}}
   if(P&&P.stage==='positioned'){
-    if(down('KeyB')){P.atm=Math.min(18,P.atm+7*dt);P.maxAtm=Math.max(P.maxAtm,P.atm);if(P.atm>=16.5&&!P.warned){P.warned=true;toast('Above the 16 atm rated burst pressure.',true)}if(P.atm>4&&!P.pain){P.pain=true;toast(`Balloon up. Chest pain, ST rising in ${P.vid==='LM'?'V3 and V5':TERRITORY[P.vid]}.`)}}
-    else if(P.atm>0){if(P.maxAtm>=4)applyDevice();else{P.atm=Math.max(0,P.atm-20*dt);if(P.atm===0)P.maxAtm=0}}
+    const sealing=P.seal&&P.kind==='balloon';
+    if(down('KeyB')){P.atm=Math.min(sealing?6:18,P.atm+7*dt);P.maxAtm=Math.max(P.maxAtm,P.atm);if(P.atm>=16.5&&!P.warned){P.warned=true;toast('Above the 16 atm rated burst pressure.',true)}if(P.atm>4&&!P.pain){P.pain=true;toast(`Balloon up. Chest pain, ST rising in ${P.vid==='LM'?'V3 and V5':TERRITORY[P.vid]}.`)}}
+    else if(P.atm>0){if(sealing){S.seals.push({how:'balloon',label:P.label,t:S.clock,atm:Math.round(P.maxAtm)});P.stage='tools';P.kind=null;P.atm=P.maxAtm=0;P.pain=false;toast('Balloon deflated.');renderPCI(true)}
+      else if(P.maxAtm>=4)applyDevice();else{P.atm=Math.max(0,P.atm-20*dt);if(P.atm===0)P.maxAtm=0}}
   }
   // ECG territories: an inflated balloon raises ST in the lead facing that vessel, with reciprocal change elsewhere
   const tgt={II:0,V3:0,V5:0};
@@ -593,7 +654,7 @@ function finish(){
     const post=bh.some(x=>x.o.post);
     notes.push({c:good?'good':'',t:`Stented ${L.label}: ${s.diam.toFixed(1)} × ${s.len} mm at ${s.atm} atm${post?', post-dilated':''}, residual ${Math.round(L.cur*100)}%.`+(iss.length?' But '+iss.join('; ')+'.':` Well sized for a ~${o.refD.toFixed(1)} mm vessel.`)});
   }
-  for(const s of S.stents){if(!s.hits.some(h=>h.L.sev>=0.5)){tx-=8;notes.push({c:'bad',t:`Unnecessary stent in the ${s.label}: ${s.hits.length?'that lesion was not flow-limiting.':'there was no lesion there.'}`})}else if(s.hits.some(h=>h.o.over))tx-=4}
+  for(const s of S.stents){if(s.sealed&&!s.hits.length)continue;if(!s.hits.some(h=>h.L.sev>=0.5)){tx-=8;notes.push({c:'bad',t:`Unnecessary stent in the ${s.label}: ${s.hits.length?'that lesion was not flow-limiting.':'there was no lesion there.'}`})}else if(s.hits.some(h=>h.o.over))tx-=4}
   for(const b of S.balloons){if(b.hits.some(h=>h.o.over)){tx-=4;notes.push({c:'bad',t:`Oversized balloon in the ${b.label} (${b.diam.toFixed(1)} mm) caused an edge dissection.`})}if(!b.hits.some(h=>h.L.sev>=0.5)){tx-=4;notes.push({c:'bad',t:`Unnecessary balloon inflation in the ${b.label}.`})}}
   for(const sy of new Set(S.stents.map(s=>VBY[s.vid].sys))){const t=Math.max(...S.stents.filter(s=>VBY[s.vid].sys===sy).map(s=>s.t));if(!S.runs.some(r=>r.sys===sy&&r.t0>t))notes.push({c:'',t:`Record a final cine run of the ${sy==='L'?'left':'right'} system after stenting to confirm the result.`})}
   // complications during the case
@@ -605,13 +666,26 @@ function finish(){
       if(e.treated)notes.push({c:'good',t:`Dissection in the ${e.label} at ${when}${cause}: ${e.seen?'recognised and ':''}covered with a stent${e.closed?' after it had closed the vessel':''}. Bailout stenting is the right response.`});
       else if(e.closed){tx-=10;capEv=45;notes.push({c:'bad',t:`Abrupt closure of the ${e.label}: the dissection${cause} progressed and occluded the vessel. Recross it with a wire and stent it; a closed vessel means an infarct.`})}
       else{tx-=6;notes.push({c:'bad',t:`Untreated dissection in the ${e.label}${cause}. It can close the vessel after you leave the lab: cover it with a stent.`})}
+    }else if(e.kind==='perforation'){
+      const what=e.grade==='major'?`Perforation of the ${e.label} after ${e.cause}`:`Distal wire perforation of the ${e.label}`;
+      if(e.sealed)notes.push({c:'good',t:`${what} at ${when}: sealed with ${e.sealedBy}${e.prot?', heparin reversed with protamine':''}${e.pc?`, effusion drained by pericardiocentesis${e.pc>1?' ×'+e.pc:''}`:''}.`});
+      else{tx-=8;capEv=Math.min(capEv,45);notes.push({c:'bad',t:`${what} was never sealed: it keeps bleeding into the pericardium. ${e.grade==='major'?'A covered stent':'A coil or a 15 s low-pressure balloon inflation'} seals it; protamine and pericardiocentesis only buy time.`})}
+    }else if(e.kind==='spasm'){
+      const nearMark=S.marks.some(m=>m.vid===e.vid&&Math.abs(m.ld-e.ld)<10&&!S.lesions.some(L=>L.vid===m.vid&&Math.abs(m.ld-L.at)<=L.len/2+7));
+      const by=e.cause==='the wire'?'the wire':'the catheter tip';
+      if(e.stented)notes.push({c:'bad',t:`The stent in the ${e.label} went into spasm, not plaque. Spasm is smooth and concentric and melts away with intracoronary GTN: give it before you treat.`});
+      else if(e.treated&&e.byDrug)notes.push({c:'good',t:`Spasm from ${by} in the ${e.label} at ${when}: relieved with ${e.doses.join(', ')} and rightly left unstented.`});
+      else if(e.treated)notes.push({c:'',t:`Spasm from ${by} in the ${e.label} at ${when} settled by itself. Intracoronary GTN relieves it at once and tells spasm from plaque.`});
+      else notes.push({c:'',t:`Spasm from ${by} in the ${e.label} was still there at the end (about ${Math.round(e.sev*100)}%). Give intracoronary GTN before grading anything near it.`});
+      if(nearMark)notes.push({c:'bad',t:`Your mark in the ${e.label} was spasm, not a stenosis.`});
     }else{
       const dz=e.doses.length?` with ${e.doses.join(', ')}`:'';
       if(e.treated)notes.push({c:'good',t:`No-reflow in the ${e.label} at ${when}: ${e.seen?'recognised and ':''}treated${dz} through the guide; flow restored.`});
       else{tx-=5;notes.push({c:'bad',t:`Persistent no-reflow in the ${e.label}${dz?` despite ${e.doses.join(', ')}`:''}. Give intracoronary adenosine or verapamil (repeat doses) until distal flow is brisk. GTN alone does little for the microcirculation.`})}
     }
   }
-  const idle=S.drugs.filter(x=>!x.useful&&x.id!=='gtn').length;if(idle)notes.push({c:'',t:`${idle} dose${idle>1?'s':''} of vasodilator given without no-reflow to treat.`});
+  const idle=S.drugs.filter(x=>!x.useful&&x.id!=='gtn'&&x.id!=='prot').length;if(idle)notes.push({c:'',t:`${idle} dose${idle>1?'s':''} of vasodilator given with nothing for it to treat.`});
+  if(S.drugs.some(x=>x.id==='prot'&&!x.useful)){tx-=3;notes.push({c:'bad',t:'Protamine reversed the heparin with no bleeding to stop, which risks clotting a fresh stent.'})}
   tx=clamp(tx,0,15);rows.push(['Treatment (balloon and stent)',tx,15]);
   // study quality
   const distinct=sys=>{const v=[];for(const r of S.runs){if(r.sys!==sys)continue;if(!v.some(o=>Math.abs(o.a-r.a)<15&&Math.abs(o.b-r.b)<15))v.push(r)}return v.length};
@@ -626,7 +700,7 @@ function finish(){
   if(S.ak>400)notes.push({c:'',t:'Steep angles and long cine runs drive dose up. Keep runs to 3–4 seconds and collimate your pedal time.'});
   const saf=10-Math.min(10,Math.round(S.blind*2));rows.push(['Safety (catheter moved under fluoro)',saf,10]);
   let total=lesPts+tx+comp+cm+rad+saf;
-  if(S.complication){total=Math.min(total,35);notes.unshift({c:'bad',t:S.complication+' A damped or ventricularised pressure trace means the tip is against the vessel wall. Withdraw before injecting.'})}
+  if(S.complication){total=Math.min(total,35);notes.unshift({c:'bad',t:S.complication+(/damped/.test(S.complication)?' A damped or ventricularised pressure trace means the tip is against the vessel wall. Withdraw before injecting.':' Seal a perforation early, reverse heparin, and drain the pericardium as soon as BP falls.')})}
   if(S.c.random){notes.push({c:'',t:`Anatomy: ${S.c.anatomyNote.join('; ')}.`});notes.push({c:'',t:`Case code <b>${S.c.code}</b>: enter it under Random patient to replay this exact patient, or share it.`})}
   if(capEv<100&&total>capEv){total=capEv}
   total=Math.round(total);

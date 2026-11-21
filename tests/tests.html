@@ -148,6 +148,25 @@ test('Complication risks follow the clinical picture',()=>{
   ok(IC_DRUGS.find(d=>d.id==='vera').gain>IC_DRUGS.find(d=>d.id==='gtn').gain*4,'verapamil should beat GTN for no-reflow');
 });
 
+test('A perforation bleeds into the pericardium until sealed; distal flow is kept',()=>{
+  const maj={kind:'perforation',grade:'major'},dis={kind:'perforation',grade:'distal'};
+  ok(evFlow(maj)===1,'a perforation should not stop distal flow');
+  ok(perfLeak(maj)>2*perfLeak(dis),'a big hole should bleed faster than a wire exit');
+  ok(perfLeak(maj,{protamine:true})<perfLeak(maj)&&perfLeak(maj,{balloon:true})===0&&perfLeak({...maj,sealed:true})===0,'protamine slows, a balloon stops, sealing ends the leak');
+  const t=0.8/perfLeak(maj);ok(t>25&&t<60,`tamponade after ${t.toFixed(0)} s`);
+  return `untreated big hole tamponades in ~${t.toFixed(0)} s, a wire exit in ~${(0.8/perfLeak(dis)).toFixed(0)} s`;
+});
+test('Perforation risk follows oversizing, pressure and wire type',()=>{
+  ok(perfRisk({diff:1.2,atm:12})>=0.5&&perfRisk({diff:0.3,atm:12})===0,'oversize');ok(perfRisk({diff:0.3,atm:17})>0,'over burst pressure');
+  ok(perfRisk({kind:'wire',hydrophilic:true})>perfRisk({kind:'wire'}),'hydrophilic wires perforate more');
+});
+test('Spasm: tight spasm limits flow, mild spasm does not; GTN relieves it, adenosine does not',()=>{
+  ok(evFlow({kind:'spasm',sev:0.6})===1,'mild spasm');ok(evFlow({kind:'spasm',sev:0.92})<0.5,'tight spasm');
+  const v=VBY.RCA,i=v.n-1;ok(flowMod(v,i,[{kind:'spasm',vid:'RCA',ld:4,sev:0.92}]).att<0.7,'distal RCA should fade behind a tight ostial spasm');
+  const d=id=>IC_DRUGS.find(x=>x.id===id);ok(d('gtn').spasm===1&&d('adeno').spasm===0&&d('vera').spasm>0.5);
+  ok(spasmRisk({cause:'eng',sys:'R'})>spasmRisk({cause:'eng',sys:'L'})&&spasmRisk({cause:'deep'})>spasmRisk({cause:'eng',sys:'R'}),'RCA and deep-seating are touchier');
+});
+
 /* random patients (run last; they rebuild the anatomy, and the final test restores the default) */
 test('Case codes round-trip, and a code always gives the same patient',()=>{
   for(const n of [0,1,12345,CODE_SPACE-1])ok(codeToSeed(seedToCode(n))===n,'round trip '+n);

@@ -162,9 +162,11 @@ function balloonOutcome(L,b){
   return {residual:Math.min(before,res),refD,diff,covered,over,under,lowP,post:!!L.stented};
 }
 /* ---------- PCI complications ----------
-   Events are {kind:'dissection'|'noreflow', vid, ld (mm along the vessel), len, ...}. Dissections narrow the vessel
-   as they progress (0–1) and close it at 1 unless a stent covers them; no-reflow leaves the stent open but slows
-   flow beyond it (flow 0–1) until vasodilators restore it. */
+   Events are {kind:'dissection'|'noreflow'|'perforation'|'spasm', vid, ld (mm along the vessel), len, ...}.
+   Dissections narrow the vessel as they progress (0–1) and close it at 1 unless a stent covers them; no-reflow leaves
+   the stent open but slows flow beyond it (flow 0–1) until vasodilators restore it. A perforation leaks blood (and
+   contrast) into the pericardium until it is sealed; flow beyond it is preserved. Spasm is a smooth, concentric,
+   reversible narrowing (sev 0–1) that limits flow only when tight. */
 function evDownstream(v,i,ev){
   const E=VBY[ev.vid];if(!E||v.sys!==E.sys)return false;
   if(v.id===ev.vid)return v.ld[i]>ev.ld;
@@ -172,7 +174,17 @@ function evDownstream(v,i,ev){
   let cur=v;while(cur.parent!==ev.vid)cur=VBY[cur.parent];
   return E.ld[cur.joinIdx]>ev.ld;
 }
-function evFlow(ev){return ev.kind==='noreflow'?ev.flow:ev.treated?1:ev.closed?0:1-0.85*ev.progress}
+function evFlow(ev){
+  if(ev.kind==='noreflow')return ev.flow;if(ev.kind==='perforation')return 1;
+  if(ev.kind==='spasm')return 1-clamp((ev.sev-0.7)*2.6,0,0.85);
+  return ev.treated?1:ev.closed?0:1-0.85*ev.progress;
+}
+/* Blood leaking into the pericardium, as a fraction of a tamponading effusion per second. */
+function perfLeak(ev,x){if(ev.sealed)return 0;return (ev.grade==='major'?1/45:1/150)*(x&&x.protamine?0.4:1)*(x&&x.balloon?0:1)*(ev.temporised?0.5:1)}
+/* Chance of a perforation after a balloon or stent (diff = device minus vessel diameter, mm), or a distal wire exit. */
+function perfRisk(x){if(x.kind==='wire')return x.hydrophilic?0.045:0.03;return (x.diff>1?0.5:0)+(x.atm>16?0.22:0)}
+/* Chance of spasm: catheter engagement (the RCA is touchier), deep-seating, or the wire crossing. */
+function spasmRisk(x){return x.cause==='deep'?0.35:x.cause==='wire'?0.06:x.sys==='R'?0.1:0.05}
 /* Extra transit delay (s) and attenuation of contrast at point i of vessel v from all events. */
 function flowMod(v,i,events){
   let delay=0,att=1;if(!events)return {delay,att};
@@ -301,14 +313,16 @@ function renderImage(st){
     for(let i=0;i<v.n-1;i++){
       const c=(cs[i]+cs[i+1])/2;if(c<0.02)continue;
       let rf=1;for(const [L,ap] of les){const dd=Math.abs(v.ld[i]-L.at),h=L.len/2;if(dd<h)rf*=1-ap*0.5*(1+Math.cos(Math.PI*dd/h))}
-      if(st.events)for(const ev of st.events){if(ev.kind!=='dissection'||ev.treated||ev.vid!==v.id)continue;const dd=Math.abs(v.ld[i]-ev.ld),h=ev.len/2;if(dd<h)rf*=1-(ev.closed?0.85:0.25+0.55*ev.progress)*0.5*(1+Math.cos(Math.PI*dd/h))}
+      if(st.events)for(const ev of st.events){if(ev.vid!==v.id)continue;const dd=Math.abs(v.ld[i]-ev.ld),h=ev.len/2;if(dd>=h)continue;
+        if(ev.kind==='dissection'&&!ev.treated)rf*=1-(ev.closed?0.85:0.25+0.55*ev.progress)*0.5*(1+Math.cos(Math.PI*dd/h));
+        else if(ev.kind==='spasm'&&ev.sev>0.02)rf*=1-ev.sev*0.5*(1+Math.cos(Math.PI*dd/h))}
       const r=v.r[i]*rf,w=Math.max(1.1,2*r*SCALE),dens=0.5+0.5*Math.min(1,r/1.5);
       dctx.beginPath();dctx.moveTo(xs[i],ys[i]);dctx.lineTo(xs[i+1],ys[i+1]);
       dctx.lineWidth=w;dctx.strokeStyle=grey(1-0.6*c*dens);dctx.stroke();
       dctx.lineWidth=w*0.5;dctx.strokeStyle=grey(1-0.86*c*dens);dctx.stroke();
     }
   }
-  if(st.events)drawDissections(st.events,projV);
+  if(st.events){drawDissections(st.events,projV);drawPerforations(st.events,projV)}
   if(st.pci)drawPCI(st.pci,projV);
   if(st.cath){
     const cs=st.cathState;const pp=cs.pts.map(p=>proj(motion(p,k),B));
@@ -343,6 +357,22 @@ function drawDissections(events,projV){
     idx.forEach((i,j)=>{const a=idx[Math.max(0,j-1)],b=idx[Math.min(idx.length-1,j+1)];let nx=P.ys[a]-P.ys[b],ny=P.xs[b]-P.xs[a];const l=Math.hypot(nx,ny)||1;
       const taper=Math.sin(Math.PI*(j+0.5)/idx.length),x=P.xs[i]+nx/l*off*taper,y=P.ys[i]+ny/l*off*taper;j?dctx.lineTo(x,y):dctx.moveTo(x,y)});
     dctx.lineWidth=Math.max(1.2,v.r[idx[0]]*0.8*SCALE);dctx.strokeStyle=grey(1-0.7*c);dctx.stroke();
+  }
+}
+/* A perforation squirts a jet of contrast out of the vessel while it is injected, and the contrast that escaped
+   pools as a haze beside the heart that hardly washes out. */
+function drawPerforations(events,projV){
+  for(const ev of events){
+    if(ev.kind!=='perforation')continue;const P=projV.find(x=>x.v.id===ev.vid);if(!P)continue;const v=P.v;
+    let i=v.ld.findIndex(x=>x>=ev.ld);if(i<0)i=v.n-1;const a=Math.max(0,i-2),b=Math.min(v.n-1,i+2);
+    let nx=P.ys[a]-P.ys[b],ny=P.xs[b]-P.xs[a];const l=Math.hypot(nx,ny)||1;nx/=l;ny/=l;
+    if(ev.grade==='distal'){nx=(P.xs[b]-P.xs[a])/l;ny=(P.ys[b]-P.ys[a])/l} // a wire exit leaks off the end
+    const x0=P.xs[i],y0=P.ys[i],c=P.cs[i];
+    if(ev.pool>0.02){const R=(4+9*Math.min(1.5,ev.pool))*SCALE,cx=x0+nx*R*0.6,cy=y0+ny*R*0.6,g=dctx.createRadialGradient(cx,cy,R*0.15,cx,cy,R);
+      g.addColorStop(0,grey(1-0.38*Math.min(1,ev.pool)));g.addColorStop(1,'#fff');dctx.fillStyle=g;dctx.beginPath();dctx.arc(cx,cy,R,0,7);dctx.fill()}
+    if(!ev.sealed&&c>0.05){const L=(ev.grade==='major'?9:5)*SCALE*Math.min(1,0.4+c);
+      dctx.beginPath();dctx.moveTo(x0,y0);dctx.lineTo(x0+nx*L,y0+ny*L);dctx.lineWidth=(ev.grade==='major'?2.2:1.3)*SCALE;dctx.strokeStyle=grey(1-0.75*c);dctx.stroke();
+      dctx.beginPath();dctx.arc(x0+nx*L,y0+ny*L,(ev.grade==='major'?2.6:1.6)*SCALE,0,7);dctx.fillStyle=grey(1-0.6*c);dctx.fill()}
   }
 }
 function drawPCI(pci,projV){
