@@ -301,3 +301,15 @@ body.inmenu .lab{grid-template-columns:minmax(0,1fr);max-width:820px}
 #gllist dd{margin:0;font-size:15.5px}
 #gllist .hit{background:var(--hi);border-radius:var(--wob-s);padding:4px 8px}
 .glterm{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline dotted var(--blue) 2px;text-underline-offset:3px;cursor:help}
+
+/* menu and report: the monitor grows to fit its content instead of staying square (matters most on phones) */
+body.inmenu .monitor,body.inreport .monitor{aspect-ratio:auto;min-height:min(560px,70vh)}
+body.inmenu #img,body.inmenu .hud,body.inreport #img,body.inreport .hud{display:none}
+body.inmenu #startOv,body.inreport #resultOv{position:relative;inset:auto;min-height:inherit}
+
+/* phones: the catheter and pedal buttons straight under the monitor, so you can steer while you watch */
+@media (max-width:600px){
+  .stage>.monitor{order:1}.stage>.pad{order:2}.stage>.coach{order:3}.stage>.hemo{order:4}
+  .top{margin-bottom:8px}.brand{font-size:26px}.brand small{font-size:13px}
+  .hold{padding:10px 2px 8px;font-size:15px}
+}

@@ -1,6 +1,13 @@
 /* Cath Lab Run: menu and operator profile, game state, input, UI, PCI tools, hemodynamic strip, main loop and scoring. */
 "use strict";
 const img=document.getElementById('img');img.width=img.height=W*RES;ictx=img.getContext('2d');ictx.setTransform(RES,0,0,RES,0,0);
+/* touch devices: name the on-screen buttons instead of keys */
+const TOUCH=matchMedia('(pointer:coarse)').matches;
+const keyName=(k,btn)=>TOUCH?btn:k;
+/* if frames are slow (an older phone), drop to a lighter image resolution once */
+let renderEMA=0,lowRes=false;
+let renderN=0;
+function noteRenderTime(ms){renderN++;renderEMA=renderEMA?renderEMA*0.92+ms*0.08:ms;if(!lowRes&&renderN>40&&renderEMA>30){lowRes=true;setResolution(1);img.width=img.height=W;ictx=img.getContext('2d');ictx.setTransform(1,0,0,1,0,0);toast('Lighter image quality for a smoother run on this device.')}}
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -53,7 +60,7 @@ function shopIcon(it){if(it.kind==='avatar')return avatarSVG(it.avatar,44);retur
 function showMenu(view){
   if(typeof close3D==='function')close3D();
   if(S&&!S.done)saveCase();
-  menuView=view||(profile?'home':'profile');S=null;if(typeof renderCoach==='function')renderCoach();document.body.classList.add('inmenu');
+  menuView=view||(profile?'home':'profile');S=null;if(typeof renderCoach==='function')renderCoach();document.body.classList.add('inmenu');document.body.classList.remove('inreport');
   $('resultOv').hidden=true;$('startOv').hidden=false;$('reviewbar').hidden=true;
   demoFrame();syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   $('caseHead').innerHTML='<h2>Patient</h2><b>No case loaded</b><p>Pick a case on the monitor to begin.</p>';$('status').textContent='Catheter in the femoral sheath.';$('status').className='status';
@@ -90,7 +97,7 @@ function resumeCase(){
   S.stents=sv.stents.map(relink);S.balloons=sv.balloons.map(relink);
   S.daily=!!sv.daily&&sv.ci===dailyCode();S.cine=null;S.review=null;
   syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);if(typeof renderCoach==='function')renderCoach();
-  toast(`Resumed ${caseName(S)} at ${fmtT(S.clock)}. Hold Space for fluoro to pick up where you left off.`);
+  toast(`Resumed ${caseName(S)} at ${fmtT(S.clock)}. ${keyName('Hold Space','Hold the Fluoro button')} for fluoro to pick up where you left off.`);
 }
 function resumeCard(){
   const sv=loadSave();if(!sv)return '';
@@ -253,12 +260,12 @@ $('sB').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.b=+e.targ
 function startCase(ci,opt={}){
   if(typeof renderCoach==='function')setTimeout(renderCoach,0);
   if(typeof close3D==='function')close3D();
-  S=newState(ci);S.daily=!!opt.daily&&ci===dailyCode();document.body.classList.remove('inmenu');
+  S=newState(ci);S.daily=!!opt.daily&&ci===dailyCode();document.body.classList.remove('inmenu','inreport');
   $('startOv').hidden=true;$('resultOv').hidden=true;closeReview();
   const c=S.c;$('caseHead').innerHTML=`<h2>${S.c.code?'Random patient · '+S.c.code:'Patient · '+caseName(S)} · ${S.D.label}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
   ictx.fillStyle=PAPER;ictx.fillRect(0,0,W,W);
   syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
-  toast('Sheath in the right femoral artery. Hold Space for fluoro and advance.');
+  toast(`Sheath in the right femoral artery. ${keyName('Hold Space','Hold Fluoro')} for X-ray and ${keyName('↑','Advance')} to advance.`);
 }
 
 /* ---------- input ---------- */
@@ -739,7 +746,7 @@ function tick(dt){
   if(S.review){if(S.review.playing){S.review.acc+=dt;if(S.review.acc>=1/15){S.review.acc=0;S.review.idx=(S.review.idx+1)%S.review.run.frames.length;drawReview()}}}
   else if(imaging&&S.imgAcc>=1/15){
     S.imgAcc=0;S.frame++;
-    renderImage({t:S.clock,phase:S.phase,a:S.a,b:S.b,mode:S.cine?'cine':'fluoro',frame:S.frame,lesions:S.lesions,pci:pciRender(),events:evRender(),cath:true,cathState:cs,wire:S.exch>0,conc:(sys,t)=>histAt(S.hist[sys],t),root:histAt(S.hist.root,S.clock)});
+    const rt0=performance.now();renderImage({t:S.clock,phase:S.phase,a:S.a,b:S.b,mode:S.cine?'cine':'fluoro',frame:S.frame,lesions:S.lesions,pci:pciRender(),events:evRender(),cath:true,cathState:cs,wire:S.exch>0,conc:(sys,t)=>histAt(S.hist[sys],t),root:histAt(S.hist.root,S.clock)});if(!document.hidden)noteRenderTime(performance.now()-rt0);
     if(S.cine){S.cine.frames.push({t:S.clock,phase:S.phase,frame:S.frame,cath:{...c},pci:pciRender(),ev:evRender()});if(S.cine.frames.length>=90)stopCine()}
     // coverage: any segment that filled with contrast counts towards a complete study
     if(lastProj){for(const Pv of lastProj.projV){for(let i=0;i<Pv.v.n;i+=2)if(Pv.cs[i]>0.45)S.mapped.add(mapKey(Pv.v,Pv.v.ld[i]))}}
@@ -760,7 +767,7 @@ function updateUI(){
   const R=S.review;
   hudTL.textContent=`${caseName(S).toUpperCase()} · ${S.c.pt}\n${R?angLabel(R.run.a,R.run.b):angLabel(S.a,S.b)}`;
   hudTR.innerHTML=R?`<span class="act">REVIEW · RUN ${R.run.id}</span>\nfr ${R.idx+1}/${R.run.frames.length}`:cine?`<span class="act">● CINE 15 f/s</span>\n${(S.cine.frames.length/15).toFixed(1)} s`:fl?'<span class="act">FLUORO 15 p/s</span>':(S.frame?'LIH':'NO IMAGE');
-  hudBL.textContent=R?'Click a narrowing to mark it':(S.frame?'':'Hold Space for fluoro');
+  hudBL.textContent=R?'Click a narrowing to mark it':(S.frame?'':TOUCH?'Hold Fluoro for X-ray':'Hold Space for fluoro');
   hudBR.textContent=`AK ${Math.round(S.ak)} mGy\n${Math.round(S.contrast)} mL`;
   uiAcc++;if(uiAcc%6)return;
   $('rdFT').querySelector('b').textContent=fmtT(S.ftime);
@@ -931,7 +938,7 @@ function finish(){
   ${flowReport()}
   <div class="notes">${notes.map(n=>`<div class="${n.c}">${n.t}</div>`).join('')}</div>
   <div class="row"><button class="btn primary" id="rNew">New random patient</button><button class="btn" id="r3d">View in 3D</button><button class="btn" id="rAgain">Repeat this patient</button><button class="btn" id="rCases">Change difficulty</button><button class="btn" id="rMenu">Main menu</button></div>`;
-  ov.hidden=false;
+  ov.hidden=false;document.body.classList.add('inreport');window.scrollTo(0,Math.max(0,$('monitor').offsetTop-8));
   $('rAgain').onclick=()=>startCase(S.ci,{daily:S.daily});
   if($('rNew'))$('rNew').onclick=()=>startCase(randomCode());
   $('r3d').onclick=()=>open3D(true);

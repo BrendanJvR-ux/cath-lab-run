@@ -76,7 +76,8 @@ function renderCoach(){
   if(!S||!S.tut){el.hidden=true;return}
   const steps=tutSteps(S.tut.exp),st=steps[S.tut.i];
   if(!st){el.hidden=true;return}
-  const txt=st.text[Math.min(S.tut.exp,st.text.length-1)];
+  let txt=st.text[Math.min(S.tut.exp,st.text.length-1)];
+  if(typeof TOUCH!=='undefined'&&TOUCH){txt=txt.replace('<kbd>Space</kbd> (or the Fluoro pedal)','the <b>Fluoro</b> button').replace('<kbd>↑</kbd> (Advance)','<b>Advance</b>').replace('<kbd>B</kbd> (Inflate)','<b>Inflate</b>').replace('<kbd>Space</kbd> (Fluoro pedal)','the <b>Fluoro</b> button');for(const [k,b] of [['Space','Fluoro'],['↑','Advance'],['↓','Withdraw'],['←','CCW'],['→','CW'],['C','Cine'],['J','Inject'],['B','Inflate'],['X','the catheter toggle']])txt=txt.split(`<kbd>${k}</kbd>`).join(`<b>${b}</b>`)}
   el.hidden=false;
   el.innerHTML=`<div class="coachhead"><b>Step ${S.tut.i+1} of ${steps.length} · ${st.title}</b><button class="btn" data-coach="skip">Skip tutorial</button></div><p>${typeof glossLink==='function'?glossLink(txt):txt}</p>
     <div class="coachdots">${steps.map((_,i)=>`<i class="${i<S.tut.i?'done':i===S.tut.i?'now':''}"></i>`).join('')}</div>`;

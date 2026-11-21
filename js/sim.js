@@ -273,7 +273,7 @@ const noise=[];for(let n=0;n<4;n++){const c=document.createElement('canvas');c.w
 const vign=document.createElement('canvas');vign.width=vign.height=W;{const g=vign.getContext('2d');const rg=g.createRadialGradient(W/2,W/2,W*0.32,W/2,W/2,W*0.74);rg.addColorStop(0,'rgba(120,90,50,0)');rg.addColorStop(1,'rgba(120,90,50,0.32)');g.fillStyle=rg;g.fillRect(0,0,W,W)}
 /* The image is drawn at RES× the 512-unit drawing space, so it stays sharp on high-density screens.
    hiCanvas() gives a RES× canvas whose context already draws in 512-unit coordinates. */
-const RES=2;
+let RES=2;
 const hiCanvas=()=>{const c=document.createElement('canvas');c.width=c.height=W*RES;const g=c.getContext('2d');g.setTransform(RES,0,0,RES,0,0);return c};
 const bgCache=new Map();
 const PAPER='#f3ead4';
@@ -478,11 +478,13 @@ function getBg(a,b){
 
 /* ---------- rendering ---------- */
 let ictx=null; // set by js/game.js (or a test) to the 2D context the image is drawn into
-const dcan=hiCanvas(),dctx=dcan.getContext('2d');
+let dcan=hiCanvas(),dctx=dcan.getContext('2d');
 /* Each vessel is drawn on its own layer (the lumen never darkens itself where its strokes overlap), then MULTIPLIED
    into the image: transmissions multiply, so attenuation adds, exactly as X-rays do (Beer–Lambert). Where two
    vessels cross, or a branch runs over its parent, the image is darker. */
-const vcan=hiCanvas(),vctx=vcan.getContext('2d');
+let vcan=hiCanvas(),vctx=vcan.getContext('2d');
+/* drop to a lighter resolution (for slow devices): rebuilds the working canvases and the background cache */
+function setResolution(r){if(r===RES)return;RES=r;dcan=hiCanvas();dctx=dcan.getContext('2d');vcan=hiCanvas();vctx=vcan.getContext('2d');bgCache.clear()}
 /* ink: v = 1 is bare paper (white in the multiply layer), v = 0 is full blue-black ink */
 const INK=[34,33,56];
 const grey=v=>{v=clamp(v,0,1);return 'rgb('+Math.round(INK[0]+(255-INK[0])*v)+','+Math.round(INK[1]+(255-INK[1])*v)+','+Math.round(INK[2]+(255-INK[2])*v)+')'};
