@@ -55,7 +55,6 @@ button:focus-visible,input:focus-visible{outline:2px dashed var(--blue);outline-
 .case b{font-family:var(--f-display);font-size:22px;font-weight:700;line-height:1.05}
 .case span{font-size:14px;color:var(--muted)}
 .case em{font-style:normal;font-size:15px;color:var(--fg)}
-.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:4px 16px;font-size:15px;color:var(--fg)}
 kbd{font-family:var(--f-mono);font-size:14px;border:1.5px solid var(--line);border-bottom-width:3px;border-radius:var(--wob-s);padding:0 6px;color:var(--fg);background:var(--panel)}
 .fine{font-size:14px;color:var(--muted)}
 .reviewbar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;align-items:center;padding:8px 12px;background:linear-gradient(transparent,rgba(239,230,210,.95) 35%)}

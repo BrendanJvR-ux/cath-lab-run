@@ -131,12 +131,6 @@ function renderMenu(){
     <div class="opcard">${avatarSVG(profile.avatar,64)}<div><b>${esc(profile.name)}</b><span>${CUP} ${profile.tokens} coffee tokens · ${DIFFICULTY[profile.diff].label}</span></div><button class="btn" data-act="editop">Change operator</button></div>
     ${dailyCard()}
     <div class="menubtns"><button class="btn primary big" data-act="play">Start a case</button><button class="btn big" data-act="shop">${CUP} Coffee cart</button></div>
-    <div class="keys">
-      <div><kbd>Space</kbd> hold for fluoro (live X-ray)</div><div><kbd>X</kbd> switch catheter (JL4 / JR4)</div><div><kbd>C</kbd> start / stop a cine run</div>
-      <div><kbd>J</kbd> hold to inject contrast</div><div><kbd>↑</kbd><kbd>↓</kbd> advance / withdraw</div>
-      <div><kbd>←</kbd><kbd>→</kbd> torque counter-clockwise / clockwise</div><div><kbd>B</kbd> hold to inflate a balloon or stent</div>
-      <div><kbd>1</kbd>–<kbd>7</kbd> C-arm presets</div>
-    </div>
     <p class="fine">Teaching game with simplified anatomy and physics. Not a clinical training device.</p>`;
 }
 $('startOv').addEventListener('click',e=>{
