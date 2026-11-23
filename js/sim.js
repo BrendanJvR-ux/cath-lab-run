@@ -266,7 +266,13 @@ function vesselFlow(vid,lesions,events,after){
   return {f,timi,worst};
 }
 
-function segLabel(v,ld){if(v.id==='LM')return 'left main';const f=ld/v.len;return (f<0.33?'proximal ':f<0.66?'mid ':'distal ')+v.name}
+const PLAIN_VESSEL={LM:'main left trunk (left main)',LAD:'front artery (LAD)',LCx:'side artery (circumflex)',RCA:'right artery (RCA)',D1:'first diagonal branch',D2:'second diagonal branch',
+  OM1:'first side-wall branch',OM2:'second side-wall branch',RI:'middle branch (ramus)',PDA:'underside branch (PDA)',LPDA:'underside branch (PDA)',PLV:'back-wall branch',LPL:'back-wall branch',
+  AM:'right-edge branch',S1:'first septal branch',S2:'second septal branch',CON:'conus branch'};
+const vesselName=id=>(PLAIN&&PLAIN_VESSEL[id])||(VBY[id]?VBY[id].name:id);
+function segLabel(v,ld){
+  if(PLAIN){const n=PLAIN_VESSEL[v.id]||v.name;if(v.id==='LM')return n;const f=ld/v.len;return (f<0.33?'start of the ':f<0.66?'middle of the ':'far end of the ')+n}
+  if(v.id==='LM')return 'left main';const f=ld/v.len;return (f<0.33?'proximal ':f<0.66?'mid ':'distal ')+v.name}
 
 /* ---------- static image layers ---------- */
 const noise=[];for(let n=0;n<4;n++){const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');const id=g.createImageData(256,256);for(let i=0;i<id.data.length;i+=4){const v=128+(Math.random()+Math.random()-1)*46;id.data[i]=id.data[i+1]=id.data[i+2]=v;id.data[i+3]=255}g.putImageData(id,0,0);noise.push(c)}

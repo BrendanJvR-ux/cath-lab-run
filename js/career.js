@@ -8,9 +8,9 @@ const lc1=t=>t[0].toLowerCase()+t.slice(1);
 const CAREER=[
   {rank:'Medical student',goal:'Finish 2 Easy cases scoring 60 or more',need:2,diff:'easy',test:r=>r.diff==='easy'&&r.score>=60},
   {rank:'Junior fellow',goal:'Finish 3 Easy cases scoring 75 or more',need:3,diff:'easy',test:r=>r.diff==='easy'&&r.score>=75},
-  {rank:'Fellow',goal:'Finish 2 Medium cases scoring 65 or more',need:2,diff:'medium',test:r=>r.diff!=='easy'&&r.score>=65},
-  {rank:'Senior fellow',goal:'Open a STEMI on Medium or Hard within 90 minutes',need:1,diff:'medium',kind:'stemi',test:r=>r.diff!=='easy'&&r.stemi&&r.d2b!=null&&r.d2b<=90},
-  {rank:'Interventional fellow',goal:'Manage a complication on Medium or Hard and still score 55 or more',need:1,diff:'medium',kind:'comp',test:r=>r.diff!=='easy'&&r.hadComp&&r.managed&&r.score>=55},
+  {rank:'Fellow',goal:'Finish 2 Medium cases scoring 65 or more',need:2,diff:'medium',test:r=>(r.diff==='medium'||r.diff==='hard')&&r.score>=65},
+  {rank:'Senior fellow',goal:'Open a STEMI on Medium or Hard within 90 minutes',need:1,diff:'medium',kind:'stemi',test:r=>(r.diff==='medium'||r.diff==='hard')&&r.stemi&&r.d2b!=null&&r.d2b<=90},
+  {rank:'Interventional fellow',goal:'Manage a complication on Medium or Hard and still score 55 or more',need:1,diff:'medium',kind:'comp',test:r=>(r.diff==='medium'||r.diff==='hard')&&r.hadComp&&r.managed&&r.score>=55},
   {rank:'Consultant cardiologist',goal:'Finish 2 Hard cases scoring 60 or more',need:2,diff:'hard',test:r=>r.diff==='hard'&&r.score>=60},
   {rank:'Interventional consultant',goal:'Open a Hard STEMI within 90 minutes and score 60 or more',need:1,diff:'hard',kind:'stemi',test:r=>r.diff==='hard'&&r.stemi&&r.d2b!=null&&r.d2b<=90&&r.score>=60},
 ];

@@ -60,6 +60,10 @@ const CATH={JL:{label:'JL4',home:-45,tol:45,sys:'L'},JR:{label:'JR4',home:100,to
 
 /* Stenosis grading buckets offered in the report. */
 const BUCKETS=[{k:'<50%',lo:0,hi:0.5},{k:'50–69%',lo:0.5,hi:0.7},{k:'70–89%',lo:0.7,hi:0.9},{k:'≥90%',lo:0.9,hi:1.01}];
+/* plain language: everyday words for players outside medicine (js/game.js switches it per operator) */
+let PLAIN=false;
+const GRADE_PLAIN=['Mild','Moderate','Severe','Near-blocked'];
+const gradeName=i=>PLAIN?`${GRADE_PLAIN[i]} (${BUCKETS[i].k})`:BUCKETS[i].k;
 
 /* C-arm presets on keys 1–7: [label, LAO(+)/RAO(-), CRA(+)/CAU(-)]. */
 const PRESETS=[['RAO 30 CAU 25',-30,-25],['RAO 30 CRA 30',-30,30],['AP CRA 35',0,35],['LAO 45 CRA 25',45,25],['LAO 45 CAU 30',45,-30],['LAO 40',40,0],['RAO 30',-30,0]];
@@ -79,6 +83,7 @@ const BALLOON_LENS=[12,15,20];
    dyn = how much grip is left once it slips (low = a big whip), damp = how quickly the tip settles. Complications are set per case (caseChallenge in js/gen.js): none on Easy, some cases on
    Medium, most cases on Hard (or a severe contrast restriction), tokenX scales coffee tokens. */
 const DIFFICULTY={
+  story:{label:'Story',blurb:'For anyone new to this: one narrowing, the catheter slides into the arteries almost by itself, step-by-step guidance, no limits and no complications.',story:true,tol:{L:70,R:80},seek:130,seekSpeed:150,deep:1.6,budgetX:null,dissectT:120,torque:{fric:0,dyn:0.5,damp:8},tokenX:0.5,level:1},
   easy:{label:'Easy',blurb:'Wide engagement windows, the tip drops into the ostia, no contrast limit and no complications.',tol:{L:45,R:55},seek:70,seekSpeed:90,deep:1.5,budgetX:null,dissectT:80,torque:{fric:0,dyn:0.5,damp:8},tokenX:1,level:1},
   medium:{label:'Medium',blurb:'Standard engagement with a gentle pull into the ostia. Standard contrast budget. Some cases have complications. Tokens ×1.5.',tol:{L:28,R:32},seek:30,seekSpeed:45,deep:1.42,budgetX:1,dissectT:55,torque:{fric:10,dyn:0.45,damp:7},tokenX:1.5,level:2},
   hard:{label:'Hard',blurb:'Tight engagement windows, no help finding the ostia, 25% less contrast. Most cases bring a complication or a severe contrast restriction. Tokens ×2.',tol:{L:16,R:18},seek:0,seekSpeed:0,deep:1.32,budgetX:0.75,dissectT:35,torque:{fric:26,dyn:0.12,damp:3.2},tokenX:2,level:3},

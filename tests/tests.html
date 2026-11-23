@@ -292,6 +292,19 @@ test('A posteriorly placed RCA origin needs more clockwise torque than usual',()
 });
 test('The default anatomy can be restored after random patients',()=>{buildAnatomy();ok(VBY.PLV&&VBY.PDA&&!VBY.RI&&!VBY.LPDA);ok(fx('rca').label==='mid RCA')});
 
+test('Every game script parses (a stray quote anywhere breaks the whole game)',()=>{
+  const files=['config/config.js','js/sim.js','js/gen.js','js/game.js','js/controls.js','js/heart3d.js','js/career.js','js/tutorial.js','js/glossary.js','js/intro.js'];
+  for(const f of files){const x=new XMLHttpRequest();x.open('GET','../'+f+'?'+Date.now(),false);x.send();ok(x.status===200,f+' not found');try{new Function(x.responseText)}catch(e){throw new Error(f+': '+e.message)}}
+  return files.length+' files';
+});
+test('Plain words: vessel names and grades in everyday language, medical terms in brackets',()=>{
+  buildAnatomy();PLAIN=true;const a=segLabel(VBY.LAD,2),b=gradeName(2);PLAIN=false;const c=segLabel(VBY.LAD,2),d=gradeName(2);
+  ok(a==='start of the front artery (LAD)',a);ok(b==='Severe (70–89%)',b);ok(c==='proximal LAD',c);ok(d==='70–89%',d);return `${a} · ${b}`;
+});
+test('Story difficulty: no complications, no contrast limit, the most help finding the ostia',()=>{
+  const S=DIFFICULTY.story,E=DIFFICULTY.easy;ok(S.story&&S.level===1&&S.budgetX==null);ok(S.tol.L>E.tol.L&&S.tol.R>E.tol.R&&S.seek>E.seek);
+  for(let i=0;i<20;i++){const ch=caseChallenge(randomCode(),'story');ok(!ch.forced&&ch.randomX===0&&ch.contrastX===1)}
+});
 const bad=results.filter(r=>!r.ok).length,sum=document.getElementById('sum');
 sum.textContent=bad?`${bad} of ${results.length} failed`:`All ${results.length} passed`;sum.className=bad?'bad':'ok';
 document.getElementById('out').innerHTML=results.map(r=>`<li class="${r.ok?'ok':'bad'}">${r.ok?'Pass':'FAIL'}: ${r.name}${r.note?` <small>· ${r.note}</small>`:''}</li>`).join('');

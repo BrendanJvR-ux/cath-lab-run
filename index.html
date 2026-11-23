@@ -16,7 +16,7 @@
 
 <header class="top">
   <div class="brand">Cath Lab Run<small>Diagnostic coronary angiography simulator · femoral access · 6F</small></div>
-  <div class="topright"><button class="btn glbtn" data-ctrl="" title="Choose your keys and mouse buttons">⌨ Controls</button><button class="btn glbtn" data-gl="" title="Glossary of terms">? Glossary</button><button class="who" id="who" hidden title="Main menu (a case in progress is saved)"></button><div class="lamp" id="lamp"><i></i>X-RAY</div></div>
+  <div class="topright"><button class="btn glbtn" id="plainBtn" aria-pressed="false" title="Plain words: everyday language instead of medical terms">Plain words</button><button class="btn glbtn" data-ctrl="" title="Choose your keys and mouse buttons">⌨ Controls</button><button class="btn glbtn" data-gl="" title="Glossary of terms">? Glossary</button><button class="who" id="who" hidden title="Main menu (a case in progress is saved)"></button><div class="lamp" id="lamp"><i></i>X-RAY</div></div>
 </header>
 
 <main class="lab">
@@ -50,16 +50,17 @@
       <div class="overlay" id="resultOv" hidden></div>
     </div>
     <div class="coach" id="coach" hidden aria-live="polite"></div>
+    <div class="guide" id="guide" hidden aria-live="polite"><span id="guideTxt"></span><i class="gmeter" aria-hidden="true"><b id="guideBar"></b></i></div>
     <canvas class="hemo" id="hemo" aria-label="ECG and aortic pressure"></canvas>
     <div class="pad strip" role="group" aria-label="Catheter and X-ray controls">
-      <div class="sgroup"><span class="slabel">Turn catheter</span>
+      <div class="sgroup"><span class="slabel" data-plain="Turn the tube">Turn catheter</span>
         <div class="pair"><button class="hold sbtn arrow" data-k="ArrowLeft" aria-label="Turn anticlockwise"><span class="ico" aria-hidden="true">⟲</span><kbd>←</kbd></button><button class="hold sbtn arrow" data-k="ArrowRight" aria-label="Turn clockwise"><span class="ico" aria-hidden="true">⟳</span><kbd>→</kbd></button></div></div>
-      <div class="sgroup"><span class="slabel">Move catheter</span>
+      <div class="sgroup"><span class="slabel" data-plain="Move the tube">Move catheter</span>
         <div class="pair"><button class="hold sbtn" data-k="ArrowUp"><span class="ico" aria-hidden="true">▲</span><span>Advance</span><kbd>↑</kbd></button><button class="hold sbtn" data-k="ArrowDown"><span class="ico" aria-hidden="true">▼</span><span>Withdraw</span><kbd>↓</kbd></button></div></div>
       <div class="sgroup"><span class="slabel">X-ray</span>
-        <div class="pair"><button class="hold sbtn" data-k="Space" id="bFluoro"><span class="ico round" aria-hidden="true"></span><span>Fluoro</span><kbd>Space</kbd></button><button class="hold sbtn cine" id="bCine"><span class="ico rec" aria-hidden="true"></span><span>Record</span><kbd>C</kbd></button></div></div>
-      <div class="sgroup grow"><span class="slabel">Contrast</span>
-        <button class="hold sbtn inj" data-k="KeyJ" id="bInj"><span class="ico syringe" aria-hidden="true">⟰</span><span>Hold to inject</span><kbd>J</kbd></button></div>
+        <div class="pair"><button class="hold sbtn" data-k="Space" id="bFluoro"><span class="ico round" aria-hidden="true"></span><span data-plain="X-ray">Fluoro</span><kbd>Space</kbd></button><button class="hold sbtn cine" id="bCine"><span class="ico rec" aria-hidden="true"></span><span>Record</span><kbd>C</kbd></button></div></div>
+      <div class="sgroup grow"><span class="slabel" data-plain="Dye">Contrast</span>
+        <button class="hold sbtn inj" data-k="KeyJ" id="bInj"><span class="ico syringe" aria-hidden="true">⟰</span><span data-plain="Hold to inject dye">Hold to inject</span><kbd>J</kbd></button></div>
     </div>
   </section>
 
@@ -70,32 +71,32 @@
       <p>Pick a case on the monitor to begin.</p>
     </div>
     <div class="sec">
-      <h2>Exposure</h2>
+      <h2 data-plain="Used so far">Exposure</h2>
       <div class="reads">
-        <div class="read" id="rdFT"><span>Fluoro time</span><b>0:00</b></div>
-        <div class="read" id="rdAK"><span>Air kerma</span><b>0<small>mGy</small></b></div>
-        <div class="read" id="rdCM"><span>Contrast</span><b>0<small>mL</small></b></div>
-        <div class="read" id="rdHD"><span>HR · AO</span><b>72<small>bpm</small></b></div>
+        <div class="read" id="rdFT"><span data-plain="X-ray time">Fluoro time</span><b>0:00</b></div>
+        <div class="read" id="rdAK"><span data-plain="Radiation">Air kerma</span><b>0<small>mGy</small></b></div>
+        <div class="read" id="rdCM"><span data-plain="Dye used">Contrast</span><b>0<small>mL</small></b></div>
+        <div class="read" id="rdHD"><span data-plain="Heart rate · BP">HR · AO</span><b>72<small>bpm</small></b></div>
       </div>
     </div>
     <div class="sec">
-      <h2>Catheter</h2>
+      <h2 data-plain="Catheter (the tube)">Catheter</h2>
       <div class="cath"><div class="cathtoggle" id="cathToggle" role="group" aria-label="Catheter (X to switch)"><button data-cath="JL" aria-pressed="true">JL4<small>left</small></button><button data-cath="JR" aria-pressed="false">JR4<small>right</small></button></div><span class="chip" id="cathType">6F</span></div>
       <div class="status" id="status">Catheter in the femoral sheath.</div>
     </div>
     <div class="sec">
-      <h2>C-arm</h2>
-      <div class="slider"><label for="sA">LAO/RAO</label><input type="range" id="sA" min="-60" max="60" step="1" value="0"><output id="oA">AP</output></div>
-      <div class="slider"><label for="sB">CRA/CAU</label><input type="range" id="sB" min="-40" max="40" step="1" value="0"><output id="oB">0°</output></div>
+      <h2 data-plain="X-ray camera angle">C-arm</h2>
+      <div class="slider"><label for="sA" data-plain="Left / right">LAO/RAO</label><input type="range" id="sA" min="-60" max="60" step="1" value="0"><output id="oA">AP</output></div>
+      <div class="slider"><label for="sB" data-plain="Head / feet">CRA/CAU</label><input type="range" id="sB" min="-40" max="40" step="1" value="0"><output id="oB">0°</output></div>
       <div class="presets" id="presets"></div>
       <button class="btn" id="b3d" title="An orbitable 3D model of this patient's heart and coronaries (anatomy only during the case; Easy and Medium)">3D heart</button>
     </div>
     <div class="sec">
-      <h2>Cine runs</h2>
+      <h2 data-plain="Recorded films">Cine runs</h2>
       <div class="runs" id="runs"><div class="empty">No runs yet. Engage an ostium, press Cine, then inject.</div></div>
     </div>
     <div class="sec">
-      <h2>Findings</h2>
+      <h2 data-plain="Narrowings found">Findings</h2>
       <div id="pending"></div>
       <div class="marks" id="marks"><div class="empty">Open a cine run and click on a narrowing to mark it.</div></div>
     </div>
@@ -116,5 +117,6 @@
 <script src="js/career.js"></script>
 <script src="js/tutorial.js"></script>
 <script src="js/glossary.js"></script>
+<script src="js/intro.js"></script>
 </body>
 </html>

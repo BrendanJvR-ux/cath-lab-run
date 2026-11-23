@@ -99,7 +99,7 @@ const CHALLENGE_KINDS=['dissection','noreflow','perforation','spasm','dissection
 function caseChallenge(code,diffKey){
   const seed=codeToSeed(code)||0,R=mulberry32((seed*31+({easy:1,medium:2,hard:3}[diffKey]||2)*7919)>>>0);R();R();
   const pick=()=>CHALLENGE_KINDS[Math.floor(R()*CHALLENGE_KINDS.length)];
-  if(diffKey==='easy')return {randomX:0,errX:0,forced:null,contrastX:1,label:'no complications'};
+  if(diffKey==='easy'||diffKey==='story')return {randomX:0,errX:0,forced:null,contrastX:1,label:'no complications'};
   if(diffKey==='medium'){const prone=R()<0.35,forced=prone&&R()<0.6?pick():null;
     return {randomX:prone?1.4:0,errX:1,forced,contrastX:1,label:prone?'complication-prone':'straightforward'}}
   const r=R(),comp=r<0.7,severe=r<0.15||(r>=0.7&&r<0.92);
@@ -111,6 +111,6 @@ function caseChallenge(code,diffKey){
 const dateKey=(d=new Date())=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function dailyCode(key=dateKey()){let h=2166136261;for(const ch of 'cathlab:'+key){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0}return seedToCode(h%CODE_SPACE)}
 /* medal thresholds by difficulty (score out of 100) and the tokens each medal pays */
-const MEDALS={easy:{gold:92,silver:80,bronze:65},medium:{gold:85,silver:72,bronze:58},hard:{gold:78,silver:65,bronze:50}};
+const MEDALS={story:{gold:94,silver:82,bronze:68},easy:{gold:92,silver:80,bronze:65},medium:{gold:85,silver:72,bronze:58},hard:{gold:78,silver:65,bronze:50}};
 const MEDAL_TOKENS={gold:20,silver:10,bronze:5},MEDAL_RANK={none:0,bronze:1,silver:2,gold:3};
 function medalFor(score,diffKey){const m=MEDALS[diffKey]||MEDALS.medium;return score>=m.gold?'gold':score>=m.silver?'silver':score>=m.bronze?'bronze':'none'}

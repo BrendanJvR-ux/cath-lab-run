@@ -4,7 +4,7 @@
    0 = new to angiography, 1 = some experience, 2 = experienced (only this game's controls). Needs game.js. */
 "use strict";
 const EXPERIENCE=[
-  {k:0,name:'New to angiography',desc:'I have not seen or done a coronary angiogram. Show me everything.',diff:'easy'},
+  {k:0,name:'New to angiography',desc:'I have not seen or done a coronary angiogram. Show me everything.',diff:'story'},
   {k:1,name:'Some experience',desc:'I have watched or assisted with angiograms. Show me how the game works.',diff:'easy'},
   {k:2,name:'Experienced',desc:'I do angiograms or PCI. Just show me the controls.',diff:'medium'},
 ];
@@ -42,7 +42,7 @@ const TUT_STEPS=[
          'Pick another C-arm preset and record a second run: eccentric narrowings can look mild in one view and tight in another.'],
    done:S=>lViews(S)>=2},
   {id:'mark',who:[0,1,2],hl:'#runs',title:'Find and grade the narrowing',
-   text:['Open a run from Cine runs: it replays on the monitor. Scrub to a frame where the arteries are full of contrast. The LAD runs down the front of the heart; near its start there is a "waist" where the contrast column narrows. Click on it, then choose how severe it looks in the pop-up that opens beside it. Grade it carefully: you can't change it afterwards. If it is a real narrowing, the treatment options then open in a second pop-up.',
+   text:['Open a run from Cine runs: it replays on the monitor. Scrub to a frame where the arteries are full of contrast. The LAD runs down the front of the heart; near its start there is a "waist" where the contrast column narrows. Click on it, then choose how severe it looks in the pop-up that opens beside it. Grade it carefully: you cannot change it afterwards. If it is a real narrowing, the treatment options then open in a second pop-up.',
          'Open a run, scrub to a well-filled frame, click the narrowing in the proximal LAD and grade it in the pop-up.',
          'Open a run in Cine runs, click the stenosis on the frame and grade it. Marks score for detection and grading.'],
    done:S=>S.marks.length>0},

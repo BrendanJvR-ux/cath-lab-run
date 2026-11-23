@@ -45,7 +45,7 @@ function avatarSVG(i,size){
 }
 const DICE='<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="vertical-align:-3px"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5" cy="5" r="1.3" fill="currentColor"/><circle cx="11" cy="11" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/></svg>';
 const CUP='<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h9v5a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3Z" fill="currentColor"/><path d="M11 6h1.5a2 2 0 0 1 0 4H11" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 1.5q1 1 0 2M8 1.5q1 1 0 2" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>';
-function renderWho(){const w=$('who');if(!profile){w.hidden=true;return}w.hidden=false;w.innerHTML=`${avatarSVG(profile.avatar,26)}<span>${esc(profile.name)}</span><b>${CUP}${profile.tokens}</b>`}
+function renderWho(){const w=$('who');syncPlain();applyPlain();if(!profile){w.hidden=true;return}w.hidden=false;w.innerHTML=`${avatarSVG(profile.avatar,26)}<span>${esc(profile.name)}</span><b>${CUP}${profile.tokens}</b>`}
 
 /* ---------- menu ---------- */
 let menuView='home',draft=null;
@@ -87,6 +87,7 @@ function saveCase(){
 function loadSave(){try{const sv=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');return sv&&sv.v===1&&sv.ci?sv:null}catch(e){return null}}
 function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
 function resumeCase(){
+  syncPlain();
   const sv=loadSave();if(!sv)return;
   if(sv.ci!=='TUTORIAL'){profile.diff=sv.diff;saveProfile()}
   startCase(sv.ci,{daily:sv.daily});
@@ -245,7 +246,7 @@ function renderMenu(){
         <div class="mm-secondary"><button class="btn" data-act="play">Case select</button></div>
       </div>
       ${sv?`<div class="mm-strip resume"><div><b>Unfinished case</b><span>${sv.ci==='TUTORIAL'?'The tutorial':'Patient '+sv.ci} · ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:''} · ${fmtT(sv.clock)} in</span></div><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="discard">Discard</button></div>`:''}
-      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button><button class="lnk" data-act="career">Career</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Controls</button><button class="lnk" data-gl="">Glossary</button></div>
+      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button><button class="lnk" data-act="career">Career</button><button class="lnk" data-act="intro">How it works (1 min)</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Controls</button><button class="lnk" data-gl="">Glossary</button></div>
       <div class="mm-op">${avatarSVG(profile.avatar,32)}<span><b>${esc(profile.name)}</b> · ${typeof rankName==='function'?rankName()+' · ':''}${profile.tokens} tokens · ${DIFFICULTY[profile.diff].label}</span><button class="lnk" data-act="editop" style="background:none;border:0;padding:0;font:inherit;text-decoration:underline;cursor:pointer;color:inherit">Change</button></div>
     </div>
     <div class="mm-art" aria-hidden="true">${CARM_SVG}</div></div>
@@ -254,11 +255,12 @@ function renderMenu(){
 $('startOv').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const d=b.dataset;
   if(d.av!=null){draft.name=($('opName')||{}).value||draft.name;draft.avatar=+d.av;renderMenu();return}
-  if(d.exp!=null){profile.exp=+d.exp;profile.diff=EXPERIENCE[+d.exp].diff;saveProfile();renderWho();menuView='tutoffer';renderMenu();return}
+  if(d.exp!=null){profile.exp=+d.exp;profile.diff=EXPERIENCE[+d.exp].diff;saveProfile();syncPlain();applyPlain();renderWho();menuView='tutoffer';renderMenu();if(+d.exp<2&&!profile.introSeen&&typeof openIntro==='function')openIntro();return}
   if(d.diff){profile.diff=d.diff;saveProfile();renderMenu();renderWho();return}
   if(d.up){const u=UPGRADES.find(x=>x.id===d.up),t=tierOf(d.up),next=u&&u.tiers[t];if(!next||profile.tokens<next.price)return;profile.tokens-=next.price;profile.tiers={...(profile.tiers||{}),[u.id]:t+1};saveProfile();renderWho();renderMenu();toast(`${u.name} tier ${['I','II','III'][t]}: ${u.what(next.val)}.`);return}
   if(d.buy){const it=SHOP.find(x=>x.id===d.buy);if(!it||owns(it.id)||profile.tokens<it.price)return;profile.tokens-=it.price;profile.owned=[...(profile.owned||[]),it.id];saveProfile();renderWho();renderMenu();toast(`Bought: ${it.name}.`);return}
   if(d.act==='saveop'){const n=($('opName').value||'').trim().slice(0,24);if(!n)return;profile=profile?{...profile,name:n,avatar:draft.avatar}:{name:n,avatar:draft.avatar,tokens:0,best:{},diff:'easy',owned:[],tiers:{}};const isNew=profile.exp==null;draft=null;saveProfile();renderWho();menuView=isNew?'exp':'home';renderMenu()}
+  else if(d.act==='intro'){if(typeof openIntro==='function')openIntro()}
   else if(d.act==='editop'){draft=null;menuView='profile';renderMenu()}
   else if(d.act==='play'){menuView=profile.exp==null&&!returning()?'exp':'play';renderMenu()}
   else if(d.act==='exp'){menuView='exp';renderMenu()}
@@ -289,6 +291,7 @@ const d2bNow=()=>S&&S.d2b?Math.round(S.d2b.start+S.clock*S.d2b.rate):0;
 const stemiCulprit=()=>S&&S.stemi?S.lesions.find(L=>L.sev>=0.98):null;
 const caseName=S=>S.c.tutorial?'the tutorial patient':'patient '+S.c.code;
 function newState(ci){
+  syncPlain();
   const tut=ci==='TUTORIAL',dk=tut?'easy':profile.diff,base=DIFFICULTY[dk]||DIFFICULTY.easy,ch=caseChallenge(ci,dk),c=tut?tutorialCase():{...generatePatient(ci)};
   // a severe contrast restriction halves the budget and joins the story
   if(ch.contrastX<1&&base.budgetX!=null){c.budget=Math.round(c.budget*ch.contrastX);c.budgetInTask=true;c.hx+=` Severe chronic kidney disease (eGFR ${12+(codeToSeed(ci)%14)}): every millilitre of contrast counts.`}
@@ -298,6 +301,7 @@ function newState(ci){
   const d2b=stemi&&base.level>=2?{start:34+cseed%12+(base.level===3?6:0),rate:base.level===3?1/3:1/4,target:90}:null;
   if(stemi&&!d2b)c.task='Find the blocked artery and open it: wire, balloon, stent.';
   if(d2b)c.task+=` Door-to-balloon target 90 minutes: ${d2b.start} minutes have already gone.`;
+  if(base.story&&!tut&&c.lesions.length>1){const top=c.lesions.reduce((a,b)=>b.sev>a.sev?b:a);c.lesions=[top]} // Story: just the one narrowing
   buildAnatomy(c.anatomy);
   HEART_MODE=['chambers','outline','none'][base.level-1]||'outline'; // the heart sketch: labelled chambers on Easy, outline on Medium, none on Hard
   // shop perks adjust a copy of the difficulty settings
@@ -420,7 +424,7 @@ function renderMarks(){
   const el=$('marks');
   $('bFinish').disabled=!S||S.done||(!S.runs.length&&!S.complication);
   if(!S||!S.marks.length){el.innerHTML='<div class="empty">Open a cine run and click on a narrowing to mark it.</div>';return}
-  el.innerHTML=S.marks.map((m,i)=>`<div class="mark"><span>${i+1}. ${m.label} · ${BUCKETS[m.bucket].k}</span></div>`).join('');
+  el.innerHTML=S.marks.map((m,i)=>`<div class="mark"><span>${i+1}. ${m.label} · ${gradeName(m.bucket)}</span></div>`).join('');
 }
 function renderRuns(){
   const el=$('runs');
@@ -603,7 +607,7 @@ function renderPCI(force){
   const log=[...S.balloons.map(b=>`Balloon ${b.diam.toFixed(1)} × ${b.len} mm · ${b.label} · ${b.atm} atm`),...S.stents.map(s=>`Stent ${s.diam.toFixed(1)} × ${s.len} mm · ${s.label} · ${s.atm} atm`)].map(t=>`<div class="mark"><span>${t}</span></div>`).join('');
   if(!P){
     const tg=txTargets();
-    if(tg.length){h=tg.map(m=>[m,S.marks.indexOf(m)]).map(([m,i])=>`<div class="mark"><span>${i+1}. ${m.label} · ${BUCKETS[m.bucket].k}</span><span class="row"><button class="btn" data-ffr="${i}" ${canTreat(m)?'':'disabled'} title="Measure the pressure drop across it (FFR)">FFR</button><button class="btn" data-treat="${i}" ${canTreat(m)?'':'disabled'}>Wire it</button></span></div>`).join('');
+    if(tg.length){h=tg.map(m=>[m,S.marks.indexOf(m)]).map(([m,i])=>`<div class="mark"><span>${i+1}. ${m.label} · ${gradeName(m.bucket)}</span><span class="row"><button class="btn" data-ffr="${i}" ${canTreat(m)?'':'disabled'} title="Measure the pressure drop across it (FFR)">${PLAIN?'Pressure test (FFR)':'FFR'}</button><button class="btn" data-treat="${i}" ${canTreat(m)?'':'disabled'}>Wire it</button></span></div>`).join('');
       if(!tg.some(canTreat))h+='<div class="empty">Engage the matching coronary to treat it.</div>'}
   }else if(P.stage==='wire'){
     h=`<div class="pending"><div>Crossing the ${P.label} with a 0.014" ${P.ffr?'pressure ':''}wire. Hold fluoro. <b id="pciWire" class="pci-read">0%</b></div><div class="row"><button class="btn" data-cancel="1">Cancel</button></div></div>`;
@@ -653,7 +657,7 @@ let txGen=0,txLastN=0,txLastT=0;
 function renderGrade(){
   const g=S&&S.pending;if(!g){$('gradeBody').innerHTML='';return}
   $('gradeTitle').textContent=`Grade the ${g.label}`;
-  $('gradeBody').innerHTML=`<div class="pending"><div>How narrow is the <b>${g.label}</b>? Estimate the diameter stenosis. You can't change it afterwards.</div><div class="sev">${BUCKETS.map((b,i)=>`<button data-b="${i}">${b.k}</button>`).join('')}</div><div class="row"><button class="btn" data-x="1">Discard mark</button></div></div>`;
+  $('gradeBody').innerHTML=`<div class="pending"><div>How narrow is the <b>${g.label}</b>? Estimate the diameter stenosis. You can't change it afterwards.</div><div class="sev">${BUCKETS.map((b,i)=>`<button data-b="${i}">${gradeName(i)}</button>`).join('')}</div><div class="row"><button class="btn" data-x="1">Discard mark</button></div></div>`;
 }
 $('gradeBody').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b||!S||!S.pending||S.done)return;
@@ -928,6 +932,9 @@ function updateUI(){
   $('rdFT').querySelector('b').textContent=fmtT(S.ftime);
   $('rdAK').querySelector('b').innerHTML=`${Math.round(S.ak)}<small>mGy</small>`;$('rdAK').classList.toggle('hot',S.ak>800);
   $('rdCM').querySelector('b').innerHTML=`${Math.round(S.contrast)}<small>${S.budget==null?'mL':'/ '+S.budget+' mL'}</small>`;$('rdCM').classList.toggle('hot',S.budget!=null&&S.contrast>S.budget);
+  if(PLAIN){const lv=f=>`<i class="lvl"><b style="width:${Math.round(Math.min(1,f)*100)}%"></b></i><em>${f<0.4?'low':f<0.8?'medium':'high'}</em>`;
+    $('rdAK').querySelector('b').innerHTML+=lv(S.ak/upgradeVal('fluoro'));$('rdCM').querySelector('b').innerHTML+=lv(S.contrast/(S.budget||120))}
+  updateGuide();
   $('rdHD').querySelector('b').innerHTML=`${Math.round(S.hr)}<small>${Math.round(S.sysP)}/${Math.round(S.diaP)}</small>`;$('rdHD').classList.toggle('hot',S.hr<55||(S.cs&&S.cs.deep));
   {const b=$('b3d'),off=!S||S.done||S.D.level>=3;if(b.disabled!==off){b.disabled=off;b.title=S&&S.D.level>=3?'No 3D help on Hard':'An orbitable 3D model of this patient\'s heart and coronaries (anatomy only during the case)'}}
   $('cathType').textContent=S.exch>0?'Exchanging…':(S.pci?'6F guide':'6F');
@@ -966,7 +973,7 @@ function flowReport(){
   const rows=ids.map(id=>{
     const pre=vesselFlow(id,S.lesions.map(L=>({...L,cur:null})),null,false),post=vesselFlow(id,S.lesions,S.events,true),d=pct(post.f)-pct(pre.f);
     const verdict=d>=15?`up ${d} points`:d<=-5?`down ${-d} points`:'no real change';
-    return `<div class="flow"><b>${VBY[id].name}</b><span class="bar" role="img" aria-label="${pct(pre.f)}% before, ${pct(post.f)}% after"><i class="pre" style="width:${pct(pre.f)}%"></i><i class="post" style="width:${pct(post.f)}%"></i></span>
+    return `<div class="flow"><b>${vesselName(id)}</b><span class="bar" role="img" aria-label="${pct(pre.f)}% before, ${pct(post.f)}% after"><i class="pre" style="width:${pct(pre.f)}%"></i><i class="post" style="width:${pct(post.f)}%"></i></span>
       <span class="fx">${pct(pre.f)}% → <strong>${pct(post.f)}%</strong> of normal · FFR ≈ ${ffr(pre.f)} → ${ffr(post.f)} · TIMI ${pre.timi} → ${post.timi} · ${verdict}</span></div>`}).join('');
   return `<div class="flows"><div class="grouplabel">Flow in each diseased vessel (estimates)</div>${rows}
     <div class="fine">Maximal flow as a share of a normal vessel, estimated from the remaining narrowing (about what an FFR wire would read; ischaemic below 0.80), with any complication left at the end. Pale bar: before, ink bar: after. Teaching model.</div></div>`;
@@ -1092,6 +1099,7 @@ function finish(){
   const ov=$('resultOv');
   ov.innerHTML=`<div class="rephead">${avatarSVG(profile.avatar,48)}<div><h1>Report · ${caseName(S)}</h1><span class="fine">${esc(profile.name)} · ${S.D.label}</span></div></div>
   <div class="score"><b>${total}</b><span>${grade}</span></div>
+  ${PLAIN?plainSummary():''}
   <div class="tokens">${CUP} +${earned} coffee token${earned===1?'':'s'}${S.D.tokenX>1?` (×${S.D.tokenX} for ${S.D.label})`:''} · ${profile.tokens} banked${prev!=null&&total>prev?' · new best':''}</div>
   ${daily?`<div class="medalrow">${medalBadge(daily.medal)}<span><b>Today's case: ${MEDAL_NAME[daily.medal]}</b>${daily.bonus?` · +${daily.bonus} medal tokens`:''} · bronze ${MEDALS[S.diff].bronze}, silver ${MEDALS[S.diff].silver}, gold ${MEDALS[S.diff].gold} on ${S.D.label}${profile.streak&&profile.streak.n>1?` · 🔥 ${profile.streak.n}-day streak`:''}</span></div>`:''}
   <div class="rows">${rows.map(r=>`<span>${r[0]}</span><span class="v">${Math.round(r[1])} / ${r[2]}</span>`).join('')}</div>
@@ -1111,3 +1119,56 @@ function finish(){
 sizeHemo();showMenu();
 if(profile&&profile.refunded){toast(`The monitor colour filters are gone: ${profile.refunded} coffee tokens refunded.`);delete profile.refunded;saveProfile();renderWho()}
 requestAnimationFrame(loop);
+
+/* ---------- plain language ----------
+   Everyday words for players outside medicine: on by default for anyone new or with some experience, switched with
+   "Plain words" in the header. Vessel names, grades, panel labels and the report summary change; medical terms stay
+   in brackets so players pick them up. */
+function plainOn(){return !!profile&&(profile.plain!=null?profile.plain:(profile.exp??2)<2)}
+function syncPlain(){PLAIN=plainOn()}
+function applyPlain(){
+  document.querySelectorAll('[data-plain]').forEach(el=>{if(el.dataset.med==null)el.dataset.med=el.textContent;el.textContent=PLAIN?el.dataset.plain:el.dataset.med});
+  const b=$('plainBtn');b.setAttribute('aria-pressed',String(PLAIN));b.textContent=PLAIN?'Plain words: on':'Plain words: off';b.hidden=!profile;
+}
+function relabel(){
+  if(!S)return;const L=o=>{if(o&&VBY[o.vid])o.label=segLabel(VBY[o.vid],o.ld!=null?o.ld:o.at)};
+  S.lesions.forEach(L);S.marks.forEach(L);S.events.forEach(L);S.stents.forEach(L);S.balloons.forEach(L);S.ffr.forEach(L);
+  if(S.pci&&VBY[S.pci.vid])S.pci.label=segLabel(VBY[S.pci.vid],S.pci.mark);if(S.pending)L(S.pending);
+}
+$('plainBtn').addEventListener('click',()=>{
+  if(!profile)return;profile.plain=!plainOn();saveProfile();syncPlain();relabel();applyPlain();
+  if(S){renderMarks();renderPCI(true);renderGrade();renderPending()}
+  if(document.body.classList.contains('inmenu'))renderMenu();
+  toast(PLAIN?'Plain words on: everyday language, with the medical terms in brackets.':'Plain words off: medical terms.');
+});
+function plainSummary(){
+  const sig=S.lesions.filter(L=>L.sev>=0.7),opened=sig.filter(L=>L.stented);
+  const lines=opened.map(L=>{const pre=vesselFlow(L.vid,S.lesions.map(x=>({...x,cur:null})),null,false),post=vesselFlow(L.vid,S.lesions,S.events,true);
+    return `<li>Blood flow in the ${vesselName(L.vid)} went from about <b>${Math.round(pre.f*100)}%</b> to <b>${Math.round(Math.min(1,post.f)*100)}%</b> of normal.</li>`}).join('');
+  const head=S.complication?'The case ended early because of a complication.':!sig.length?'There was no badly narrowed artery to open in this patient.':
+    opened.length===sig.length?`You opened ${sig.length===1?'the badly narrowed artery':'all '+sig.length+' badly narrowed arteries'}.`:!opened.length?(sig.length===1?'The badly narrowed artery was not opened this time.':`None of the ${sig.length} badly narrowed arteries were opened this time.`):`You opened ${opened.length} of ${sig.length} badly narrowed arteries.`;
+  return `<div class="plainsum"><b>${head}</b>${lines?`<ul>${lines}</ul>`:''}<span class="fine">The score below explains every point. Medical terms are in brackets.</span></div>`;
+}
+/* ---------- steering guide (Easy and Story): which way to turn and push to get into an artery ---------- */
+function updateGuide(){
+  const el=$('guide');
+  if(!S||S.done||S.D.level!==1||S.review||S.complication){el.hidden=true;return}
+  const c=S.cath,cs=S.cs||cst(c),sys=CATH[c.type].sys,side=sys==='L'?'left':'right',k=id=>`<kbd>${shortKey(id)}</kbd>`;
+  const imaging=down('Space','KeyF')||!!S.cine,xr=imaging?'':`Hold ${k('Space')} for X-ray, then `;
+  let t='',m=null;
+  if(S.pci){el.hidden=true;return}
+  if(S.exch>0)t='Swapping catheters…';
+  else if(cs.deep)t=`Too deep: pull back a little ${k('ArrowDown')}`;
+  else if(cs.eng){const filmed=S.runs.some(r=>r.sys===sys);
+    t=filmed?`In the ${side} artery ✓ Open a film under ${PLAIN?'Recorded films':'Cine runs'} and click the narrowing, or switch catheter ${k('KeyX')} to film the other side.`
+      :`In the ${side} artery ✓ Press ${k('KeyC')} to record, then hold ${k('KeyJ')} to inject dye.`;m=1}
+  else if(c.s<S_ROOT-8){t=`${xr}push the catheter up to the heart ${k('ArrowUp')}`;m=Math.max(0,c.s/S_ROOT)}
+  else{const diff=((OSTANG[sys]-c.th+540)%360)-180,near=Math.abs(diff)<=S.D.tol[sys]*0.6;
+    m=Math.max(0,1-Math.abs(diff)/150);
+    if(cs.buckle>0.35)t='The tip is folding over: pull back a little '+k('ArrowDown');
+    else if(near&&(cs.u||0)<0.55)t=`${xr}almost there: push in a little ${k('ArrowUp')}`;
+    else if(near)t='Almost in… hold still a moment';
+    else t=`${xr}turn ${diff>0?'clockwise '+k('ArrowRight'):'anticlockwise '+k('ArrowLeft')} towards the ${side} artery · ${Math.abs(diff)>60?'cold':Math.abs(diff)>25?'warmer':'hot'}`}
+  el.hidden=false;if(el.dataset.t!==t){$('guideTxt').innerHTML=t;el.dataset.t=t}
+  $('guideBar').parentElement.hidden=m==null;if(m!=null)$('guideBar').style.width=Math.round(m*100)+'%';
+}
