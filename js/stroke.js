@@ -41,16 +41,16 @@ function skBg(){
   F({path:cranAP,ink:0.65,w:1.3});F({path:innerAP,ink:0.42,w:0.9});
   F({path:Q([[ax,36],[ax+3,52],[ax-2,66],[ax+2,82]]),ink:0.25,w:0.7});                         // sagittal suture
   for(const sx of [-1,1])F({path:Q([[ax+sx*40,46],[ax+sx*74,92],[ax+sx*78,150]]),ink:0.16,w:0.7,dash:[2,3]}); // temporal lines
-  F({path:Q([[ax-70,196],[ax-40,188],[ax,192],[ax+40,188],[ax+70,196]]),stroke:9,fill:0.3});        // skull base behind the face
+  F({path:Q([[ax-66,194],[ax-40,188],[ax,191],[ax+40,188],[ax+66,194]]),stroke:6,fill:0.2});        // skull base behind the face
   for(const sx of [-1,1]){
-    F({path:Q([[ax+sx*8,186],[ax+sx*36,166],[ax+sx*76,180]]),stroke:7,fill:0.5,ink:0.42,w:0.9});   // petrous ridges
+    F({path:Q([[ax+sx*8,186],[ax+sx*36,168],[ax+sx*72,180]]),stroke:5,fill:0.45,ink:0.4,w:0.8});   // petrous ridges
     const orb=R(sx<0?ax-50:ax+14,161,36,32,9);
     F({path:orb,lucent:0.2});F({path:orb,stroke:3.2,fill:0.5,ink:0.62,w:1.1});                     // orbits
     F({path:Q([[ax+sx*14,160],[ax+sx*32,154],[ax+sx*52,162]]),stroke:4,fill:0.45,ink:0.5,w:1});    // brow (supraorbital margin)
     F({path:Q([[ax+sx*22,184],[ax+sx*30,178],[ax+sx*40,188]]),ink:0.32,w:0.7});                     // superior orbital fissure
-    F({path:B([['M',ax+sx*50,170],['Q',ax+sx*60,186,ax+sx*62,200],['Q',ax+sx*74,196,ax+sx*84,200],['Q',ax+sx*72,206,ax+sx*58,212],['Q',ax+sx*46,206,ax+sx*42,196],['Z']]),fill:0.42,ink:0.45,w:0.9}); // cheekbone and zygomatic arch
+    F({path:B([['M',ax+sx*48,172],['Q',ax+sx*58,184,ax+sx*60,198],['Q',ax+sx*70,197,ax+sx*76,202],['Q',ax+sx*68,210,ax+sx*56,210],['Q',ax+sx*46,204,ax+sx*42,196],['Z']]),fill:0.38,ink:0.42,w:0.8}); // cheekbone and zygomatic arch
     F({path:E(ax+sx*30,210,13,14,sx*-0.2),lucent:0.24,ink:0.38,w:0.8});                             // maxillary sinuses
-    F({path:B([['M',ax+sx*62,198],['L',ax+sx*70,216],['L',ax+sx*60,212],['Z']]),fill:0.42,ink:0.35,w:0.8}); // mastoid processes
+    F({path:E(ax+sx*64,208,4.5,7,sx*-0.2),fill:0.38,ink:0.35,w:0.7}); // mastoid processes
     F({path:E(ax+sx*17,240,7,6),fill:0.35,ink:0.3,w:0.7});                                          // lateral masses of C1
     F({path:E(ax+sx*60,204,5,4),fill:0.45,ink:0.4,w:0.7});                                          // jaw joints (condyles)
   }
@@ -129,8 +129,77 @@ function skBg(){
     F({path:B([['M',sx0,sy0],['Q',sx0+L2*0.5,sy0+2+i,sx0+L2,sy0+8+i*1.5],['Q',sx0+L2+4,sy0+12+i*1.5,sx0+L2-2,sy0+15+i*1.5],['Q',sx0+L2*0.5,sy0+14,sx0,sy0+11],['Z']]),fill:0.4,ink:0.5,w:0.8})} // lamina and spinous process (C7 the longest)
   F({path:B([['M',404,380],['L',430,378],['L',432,396],['Q',418,399,402,396],['Z']]),fill:0.42,ink:0.5,w:0.8}); // T1
   F({path:E(440,486,52,46),fill:0.16,ink:0.18,w:0.7});                                              // the shoulders over the lower neck
+  /* ---------- more skull detail: front view ---------- */
+  {const rnd=(()=>{let a=987654;return()=>{a=(a*16807)%2147483647;return a/2147483647}})();
+  // vault: a speckled diploe between the tables, vessel channels and granulation pits near the top
+  F({speckle:520,path:cranAP,hole:innerAP,seed:3});
+  for(const [x0,y0,dx] of [[ax-60,70,22],[ax+38,62,24],[ax-30,44,18],[ax+60,120,-10]])F({path:Q([[x0,y0],[x0+dx*0.4,y0+3],[x0+dx*0.7,y0-2],[x0+dx,y0+2]]),stroke:1.4,lucent:0.35,ink:0.18,w:0.5}); // diploic channels
+  for(const [x,y] of [[ax-14,46],[ax+16,48],[ax-24,54],[ax+26,57]])F({path:E(x,y,2.2,1.6),lucent:0.35,ink:0.25,w:0.5});            // arachnoid granulation pits
+  for(const sx of [-1,1])F({path:L([[ax+sx*4,40],[ax+sx*12,46],[ax+sx*16,42],[ax+sx*24,52],[ax+sx*30,50],[ax+sx*38,62],[ax+sx*44,60],[ax+sx*52,74],[ax+sx*58,72],[ax+sx*64,88]]),ink:0.28,w:0.6}); // lambdoid suture seen through the vault
+  // midline of the face: nasion, crista galli, the ethmoid air cells between the orbits
+  F({path:E(ax,166,5,3),fill:0.4,ink:0.35,w:0.6});
+  F({path:B([['M',ax-2,170],['L',ax,156],['L',ax+2,170],['Z']]),fill:0.45,ink:0.45,w:0.6});
+  for(let i=0;i<12;i++){const x=ax+(i%2?1:-1)*(3+((i*7)%4)*2.4),y=168+Math.floor(i/2)*3.6;F({path:E(x,y,2.6,1.9),lucent:0.25,ink:0.32,w:0.45})}
+  F({path:L([[ax-30,171],[ax-14,169],[ax+14,169],[ax+30,171]]),ink:0.38,w:0.7});                    // lesser wings and planum sphenoidale
+  for(const sx of [-1,1]){
+    F({path:Q([[ax+sx*44,164],[ax+sx*41,178],[ax+sx*43,192]]),ink:0.42,w:0.8});                     // innominate line (greater wing of the sphenoid)
+    F({path:E(ax+sx*22,161,2.4,1.6),lucent:0.4,ink:0.4,w:0.5});                                     // supraorbital notch
+    F({path:E(ax+sx*28,199,1.8,1.8),lucent:0.4,ink:0.4,w:0.5});                                     // infraorbital foramen
+    F({path:Q([[ax+sx*16,193],[ax+sx*32,196],[ax+sx*48,190]]),stroke:2.4,fill:0.42,ink:0.45,w:0.7});// infraorbital rim
+    F({path:L([[ax+sx*49,164],[ax+sx*52,168]]),ink:0.35,w:0.6});                                    // frontozygomatic suture
+    F({path:E(ax+sx*40,177,4,1.6),lucent:0.4,ink:0.45,w:0.5});                                      // internal auditory canal
+    for(let k=0;k<7;k++)F({path:E(ax+sx*(58+(k%3)*3),194+Math.floor(k/3)*4+(k%2),1.6,1.4),lucent:0.3,ink:0.25,w:0.4}); // mastoid air cells
+    F({path:B([['M',ax+sx*38,206],['L',ax+sx*44,214],['L',ax+sx*36,216],['Z']]),fill:0.35,ink:0.35,w:0.5}); // coronoid tip seen through the sinus
+    F({path:Q([[ax+sx*20,210],[ax+sx*30,206],[ax+sx*40,212]]),ink:0.28,w:0.5});                     // septum in the maxillary sinus
+    for(const y of [205,217])F({path:E(ax+sx*9,y,5,2.2,sx*0.2),fill:0.3,ink:0.4,w:0.6});            // middle and inferior turbinates
+    F({path:E(ax+sx*22,258,1.8,1.8),lucent:0.4,ink:0.4,w:0.5});                                     // mental foramen
+    F({path:Q([[ax+sx*54,232],[ax+sx*40,250],[ax+sx*22,257]]),stroke:1.3,lucent:0.3,ink:0.18,w:0.4}); // mandibular canal
+    F({path:Q([[ax+sx*13,236],[ax+sx*17,232],[ax+sx*22,237]]),ink:0.4,w:0.6});                       // atlanto-axial joints
+  }
+  F({path:L([[ax,248],[ax,270]]),ink:0.25,w:0.5});                                                    // symphysis of the chin
+  // tooth roots in the jaws, and the pulp in each crown
+  for(let i=-6;i<=6;i++){const x=ax+i*6.1,w=Math.abs(i)>3?6.8:Math.abs(i)>1?5.6:5,yU=227+Math.abs(i)*0.5,yL=239+Math.abs(i)*0.3,rt=Math.abs(i)>3?2:1;
+    for(let r=0;r<rt;r++){const ox=rt===2?(r?1.6:-1.6):0;F({path:L([[x+ox,yU],[x+ox*0.8,yU-11+Math.abs(i)*0.4]]),stroke:2.2,fill:0.35,ink:0.22,w:0.4});F({path:L([[x+ox,yL+8.5],[x+ox*0.8,yL+19-Math.abs(i)*0.3]]),stroke:2.2,fill:0.35,ink:0.22,w:0.4})}
+    F({path:E(x,yU+4.5,w*0.18,2.2),lucent:0.3});F({path:E(x,yL+4,w*0.18,2),lucent:0.3})}
+  /* ---------- more skull detail: side view ---------- */
+  const cranLatIn=B(scaleAbout(cranLat,392,118,0.91));
+  F({speckle:620,path:B(cranLat),hole:cranLatIn,seed:7});
+  for(const [x0,y0,dx,dy] of [[360,64,30,-6],[420,50,26,8],[456,96,10,26],[330,96,-8,30]])F({path:Q([[x0,y0],[x0+dx*0.4,y0+dy*0.4+3],[x0+dx*0.7,y0+dy*0.7-2],[x0+dx,y0+dy]]),stroke:1.4,lucent:0.35,ink:0.18,w:0.5}); // diploic channels
+  for(const [x,y] of [[372,40],[396,38],[420,42]])F({path:E(x,y,2.2,1.5),lucent:0.35,ink:0.25,w:0.5});                       // granulation pits
+  F({path:Q([[360,170],[364,140],[378,112],[392,86]]),ink:0.22,w:0.6});F({path:Q([[372,128],[400,120],[428,100]]),ink:0.18,w:0.5});F({path:Q([[366,150],[392,150],[420,138]]),ink:0.18,w:0.5}); // middle meningeal grooves
+  F({path:L([[352,146],[360,152],[352,158]]),ink:0.35,w:0.7});F({path:L([[364,146],[358,152],[364,158]]),ink:0.35,w:0.7}); // pterion
+  F({path:E(478,150,5,6),fill:0.5,ink:0.4,w:0.6});F({path:Q([[476,150],[460,160],[440,170]]),stroke:2,lucent:0.25,ink:0.22,w:0.5}); // internal occipital protuberance, transverse sinus groove
+  F({path:E(486,168,4,3),fill:0.55,ink:0.5,w:0.7});                                                     // external occipital protuberance (inion)
+  F({path:E(440,220,7,4,0.3),fill:0.5,ink:0.45,w:0.7});                                                 // occipital condyle
+  F({path:Q([[306,160],[336,158],[366,166]]),ink:0.42,w:0.8});F({path:Q([[308,166],[338,164],[366,170]]),ink:0.3,w:0.6}); // the two orbital roofs
+  F({path:L([[332,168],[350,168]]),stroke:2,fill:0.45,ink:0.5,w:0.6});                                  // cribriform plate
+  F({path:B([['M',362,164],['L',370,166],['L',366,172],['Z']]),fill:0.5,ink:0.5,w:0.6});               // anterior clinoid process
+  F({path:B([['M',388,170],['L',392,164],['L',396,168],['L',392,174],['Z']]),fill:0.5,ink:0.5,w:0.6}); // dorsum sellae and posterior clinoid
+  F({path:B([['M',360,180],['Q',374,176,388,182],['Q',392,192,386,202],['Q',372,206,360,200],['Q',354,190,360,180],['Z']]),lucent:0.3,ink:0.42,w:0.7}); // sphenoid sinus
+  F({path:L([[374,180],[372,200]]),ink:0.3,w:0.5});F({path:L([[380,182],[382,198]]),ink:0.25,w:0.5});    // its septa
+  F({path:B([['M',356,192],['Q',362,198,358,212],['Q',354,200,356,192],['Z']]),lucent:0.35,ink:0.4,w:0.6}); // pterygopalatine fossa
+  F({path:L([[366,204],[370,228]]),stroke:1.6,fill:0.4,ink:0.42,w:0.6});F({path:L([[372,204],[378,226]]),stroke:1.6,fill:0.4,ink:0.42,w:0.6}); // pterygoid plates
+  for(const [y,x1] of [[200,340],[207,346],[214,350]])F({path:Q([[292,y+1],[318,y-3],[x1,y]]),stroke:2,fill:0.3,ink:0.35,w:0.6}); // turbinates
+  for(let i=0;i<9;i++)F({path:E(318+(i%3)*8,174+Math.floor(i/3)*5,3,2.2),lucent:0.25,ink:0.3,w:0.45});   // ethmoid air cells
+  F({path:L([[300,140],[302,158]]),ink:0.3,w:0.5});                                                      // septum of the frontal sinus
+  F({path:Q([[366,220],[376,226],[384,234]]),stroke:4,fill:0.14,ink:0.2,w:0.6});                         // soft palate
+  F({path:B([['M',296,248],['Q',320,232,352,236],['Q',372,244,368,262],['Q',340,268,300,262],['Z']]),fill:0.08,ink:0.12,w:0.5,dash:[2,3]}); // tongue
+  F({path:Q([[372,262],[368,272],[374,282]]),stroke:2,fill:0.2,ink:0.28,w:0.5});                         // epiglottis
+  F({path:Q([[398,198],[406,192],[416,198]]),stroke:2,fill:0.42,ink:0.45,w:0.6});                        // articular eminence and glenoid fossa
+  F({path:Q([[390,226],[350,250],[308,262]]),stroke:1.4,lucent:0.3,ink:0.2,w:0.4});                      // mandibular canal
+  F({path:E(306,262,1.6,1.6),lucent:0.4,ink:0.4,w:0.5});                                                 // mental foramen
+  // tooth roots: incisors single, molars double; the pulp in each crown
+  for(let i=0;i<8;i++){const x=282+i*6.4,w=i<2?4.6:i<4?5.4:6.4,lean=i<2?-2:0,rt=i>4?2:1;
+    for(let r=0;r<rt;r++){const ox=x+w*(rt===2?(r?0.75:0.25):0.5);
+      F({path:L([[ox,224],[ox+lean*1.8+(rt===2?(r?1:-1):0),212]]),stroke:2,fill:0.35,ink:0.2,w:0.4});
+      F({path:L([[ox+1+lean,245],[ox+1+lean*0.5+(rt===2?(r?1:-1):0),258]]),stroke:2,fill:0.35,ink:0.2,w:0.4})}
+    F({path:E(x+w/2,229,w*0.16,2.4),lucent:0.3});F({path:E(x+1+w/2+lean,240,w*0.16,2.2),lucent:0.3})}
+  }
   // build the density layer
   for(const f of P){
+    if(f.speckle){let a=f.seed*7919+1;const r=()=>{a=(a*16807)%2147483647;return a/2147483647};D.save();f.path(D);D.clip();D.globalCompositeOperation='destination-out';
+      for(let i=0;i<f.speckle;i++){const x=r()*512,y=r()*300;if(f.hole){f.hole(D);if(D.isPointInPath(x*S,y*S))continue}D.fillStyle=`rgba(0,0,0,${0.15+r()*0.25})`;D.beginPath();D.ellipse(x,y,0.6+r()*1.1,0.5+r()*0.8,r()*3,0,7);D.fill()}
+      D.restore();continue}
     if(f.fill!=null||f.lucent!=null){D.save();
       if(f.lucent!=null){D.globalCompositeOperation='destination-out';D.fillStyle=D.strokeStyle=`rgba(0,0,0,${f.lucent})`;f.path(D);D.fill()}
       else if(f.stroke){D.strokeStyle=`rgba(0,0,0,${f.fill})`;f.path(D);D.lineWidth=f.stroke;D.stroke()}
