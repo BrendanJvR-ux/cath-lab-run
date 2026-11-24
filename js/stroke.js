@@ -13,61 +13,143 @@ for(const k of SK_RARE)RARE_BY[k.id]=k; // so the casebook can record stroke rar
 
 /* ---------- drawing: two views side by side, in ink ---------- */
 const skProj=(p,pane)=>pane===0?[128+p[0],400-p[1]]:[384-p[2]*1.05,400-p[1]];
+/* the head and neck on X-ray, in both views. Bone is drawn as density (dark = dense) on its own layer; the layer is
+   laid on paper as graphite, engraved with hatching where it is darkest (as the heart room's X-ray), then the edges
+   are inked. Air spaces (sinuses, nose, airway, ear canal) are cut out of the density so they read lighter. */
 let skBgCanvas=null;
 function skBg(){
   if(skBgCanvas)return skBgCanvas;
-  const c=document.createElement('canvas');c.width=c.height=1024;const g=c.getContext('2d');g.scale(2,2);
-  g.fillStyle='#EFE9DC';g.fillRect(0,0,512,512);
-  const ink=a=>`rgba(29,27,25,${a})`,ell=(x,y,rx,ry,a=0)=>{g.beginPath();g.ellipse(x,y,rx,ry,a,0,7)};
-  const hatchIn=(clip,gap,ang,a)=>{g.save();g.beginPath();clip();g.clip();g.strokeStyle=ink(a);g.lineWidth=0.5;const cs=Math.cos(ang),sn=Math.sin(ang);for(let k=-700;k<700;k+=gap){g.beginPath();g.moveTo(256+cs*-700-sn*k,256+sn*-700+cs*k);g.lineTo(256+cs*700-sn*k,256+sn*700+cs*k);g.stroke()}g.restore()};
-  for(const pane of [0,1]){const ox=pane*256,cx=ox+128;
-    g.save();g.beginPath();g.rect(ox,0,256,512);g.clip();
-    // skull: an engraved rim, darker at the edge like bone on X-ray
-    if(pane===0){ell(cx,128,84,96);}else{g.beginPath();g.ellipse(cx+8,126,96,92,0,0,7)}
-    g.lineWidth=7;g.strokeStyle=ink(0.12);g.stroke();g.lineWidth=1.2;g.strokeStyle=ink(0.45);g.stroke();
-    hatchIn(()=>{if(pane===0)g.ellipse(cx,128,84,96,0,0,7);else g.ellipse(cx+8,126,96,92,0,0,7)},4.2,-0.7,0.06);
-    if(pane===0){for(const sx of [-1,1]){ell(cx+sx*30,172,15,11);g.lineWidth=1;g.strokeStyle=ink(0.4);g.stroke()} // orbits
-      g.beginPath();g.moveTo(cx-56,214);g.quadraticCurveTo(cx,262,cx+56,214);g.lineWidth=1.4;g.strokeStyle=ink(0.4);g.stroke(); // jaw
-      for(let i=0;i<9;i++){const y=226+i*21;g.strokeStyle=ink(0.38);g.lineWidth=0.9;g.strokeRect(cx-11,y,22,17);hatchIn(()=>g.rect(cx-11,y,22,17),3,0.3,0.12)} // spine
-      for(const sx of [-1,1]){g.beginPath();g.moveTo(cx+sx*14,404);g.quadraticCurveTo(cx+sx*50,392,cx+sx*96,398);g.lineWidth=3;g.strokeStyle=ink(0.25);g.stroke()} // collarbones
-      for(let k=0;k<3;k++)for(const sx of [-1,1]){g.beginPath();g.moveTo(cx+sx*12,430+k*26);g.quadraticCurveTo(cx+sx*70,410+k*26,cx+sx*110,450+k*26);g.lineWidth=1;g.strokeStyle=ink(0.2);g.stroke()}}
-    else{g.beginPath();g.moveTo(cx-88,140);g.quadraticCurveTo(cx-100,190,cx-84,215);g.quadraticCurveTo(cx-60,250,cx-20,248);g.lineWidth=1.3;g.strokeStyle=ink(0.4);g.stroke(); // face and jaw
-      ell(cx-70,170,14,11);g.lineWidth=1;g.strokeStyle=ink(0.35);g.stroke();
-      for(let i=0;i<9;i++){const y=226+i*21,x=cx+30+Math.sin(i*0.35)*6;g.strokeStyle=ink(0.38);g.lineWidth=0.9;g.strokeRect(x-12,y,24,17);hatchIn(()=>g.rect(x-12,y,24,17),3,0.3,0.12)}}
-    // a soft dark rim, like the edge of the X-ray field
-    const gr=g.createRadialGradient(cx,256,150,cx,256,300);gr.addColorStop(0,'rgba(60,45,25,0)');gr.addColorStop(1,'rgba(60,45,25,0.22)');g.fillStyle=gr;g.fillRect(ox,0,256,512);
-    g.restore()}
+  const S=2,mk=()=>{const c=document.createElement('canvas');c.width=c.height=512*S;const x=c.getContext('2d');x.scale(S,S);x.lineCap='round';x.lineJoin='round';return [c,x]};
+  const [dc,D]=mk(),[c,g]=mk();
+  const P=[]; // features: {path, fill, stroke(width), lucent, ink(outline alpha), dash}
+  const F=(o)=>P.push(o);
+  const E=(x,y,rx,ry,r=0)=>k=>{k.beginPath();k.ellipse(x,y,rx,ry,r,0,7)};
+  const L=(pts)=>k=>{k.beginPath();pts.forEach((p,i)=>i?k.lineTo(p[0],p[1]):k.moveTo(p[0],p[1]))};
+  const Q=(pts)=>k=>{k.beginPath();k.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length-1;i++){const m=[(pts[i][0]+pts[i+1][0])/2,(pts[i][1]+pts[i+1][1])/2];k.quadraticCurveTo(pts[i][0],pts[i][1],m[0],m[1])}const l=pts[pts.length-1];k.lineTo(l[0],l[1])};
+  const R=(x,y,w,h,r=2)=>k=>{k.beginPath();k.roundRect?k.roundRect(x,y,w,h,r):k.rect(x,y,w,h)};
+  /* ---------- front view (AP), centre x 128 ---------- */
+  const ax=128;
+  F({path:E(ax,124,92,104),fill:0.07,ink:0.22,dash:[3,4]});                       // scalp and soft tissue
+  F({path:E(ax,128,82,94),fill:0.55});F({path:E(ax,131,75,87),lucent:0.9});F({path:E(ax,131,75,87),fill:0.03});         // skull vault: outer and inner table
+  F({path:E(ax,128,82,94),ink:0.65,w:1.3});F({path:E(ax,131,75,87),ink:0.45,w:0.9});
+  F({path:L([[ax,36],[ax+2,60],[ax-1,84]]),ink:0.25,w:0.7});                           // sagittal suture
+  for(const sx of [-1,1]){
+    F({path:Q([[ax+sx*8,186],[ax+sx*36,166],[ax+sx*76,180]]),stroke:7,fill:0.5,ink:0.45,w:1}); // petrous ridges
+    F({path:E(ax+sx*32,177,18,16,sx*0.1),lucent:0.18});F({path:E(ax+sx*32,177,18,16,sx*0.1),stroke:3.2,fill:0.5,ink:0.6,w:1.1}); // orbits
+    F({path:Q([[ax+sx*22,182],[ax+sx*30,176],[ax+sx*38,186]]),ink:0.35,w:0.7});          // superior orbital fissure
+    F({path:E(ax+sx*31,210,13,15,sx*-0.2),lucent:0.24,ink:0.4,w:0.9});                 // maxillary sinuses
+    F({path:Q([[ax+sx*50,190],[ax+sx*70,186],[ax+sx*82,196]]),stroke:4,fill:0.35,ink:0.35,w:0.8}); // zygomatic arches
+    F({path:L([[ax+sx*62,198],[ax+sx*70,214],[ax+sx*60,212]]),fill:0.4,ink:0.35,w:0.8}); // mastoid processes
+    F({path:E(ax+sx*17,240,7,6),fill:0.35,ink:0.3,w:0.7});                              // lateral masses of C1
+  }
+  F({path:Q([[ax-70,196],[ax-40,188],[ax,192],[ax+40,188],[ax+70,196]]),stroke:9,fill:0.3});   // skull base behind the face
+  for(const [x,y,rx,ry] of [[ax-9,158,9,7],[ax,153,8,9],[ax+9,158,9,7]])F({path:E(x,y,rx,ry),lucent:0.26,ink:0.38,w:0.8}); // frontal sinus
+  F({path:Q([[ax,190],[ax-14,206],[ax-15,224],[ax,229],[ax+15,224],[ax+14,206],[ax,190]]),lucent:0.3,ink:0.45,w:0.9});        // nasal cavity
+  F({path:L([[ax,192],[ax+1,212],[ax-1,228]]),ink:0.4,w:0.8});                          // nasal septum
+  for(let i=-6;i<=6;i++){F({path:R(ax+i*6.4-2.8,227,5.6,8.5,1.5),fill:0.62,ink:0.32,w:0.5});F({path:R(ax+i*6.2-2.7,237,5.4,8,1.5),fill:0.6,ink:0.32,w:0.5})} // teeth
+  F({path:Q([[ax-62,200],[ax-60,232],[ax-54,250],[ax-30,262],[ax,267],[ax+30,262],[ax+54,250],[ax+60,232],[ax+62,200]]),stroke:6,fill:0.45,ink:0.55,w:1.1}); // mandible
+  F({path:E(ax,239,5,9),fill:0.3,ink:0.3,w:0.6});                                       // the dens through the mouth
+  for(let i=0;i<8;i++){const y=252+i*20.5,w=22+i*0.8;F({path:R(ax-w/2,y,w,15.5,3),fill:0.42,ink:0.45,w:0.9}); // C2 to T2 bodies
+    for(const sx of [-1,1]){F({path:E(ax+sx*(w/2-3),y+7,2.6,3.8),fill:0.3,ink:0.35,w:0.6});F({path:R(sx>0?ax+w/2:ax-w/2-8,y+4,8,6,2),fill:0.25,ink:0.3,w:0.5})} // pedicles, transverse processes
+    F({path:E(ax,y+11,3,4.5),fill:0.4,ink:0.35,w:0.6})}                                   // spinous processes, end on
+  F({path:R(ax-8,262,16,250,6),lucent:0.22,ink:0.22,w:0.6,dash:[2,3]});                 // trachea (air)
+  for(const sx of [-1,1]){
+    F({path:Q([[ax+sx*12,404],[ax+sx*40,394],[ax+sx*70,400],[ax+sx*100,390]]),stroke:8,fill:0.38,ink:0.4,w:0.9}); // clavicles
+    for(let k=0;k<3;k++)F({path:Q([[ax+sx*14,420+k*28],[ax+sx*60,404+k*28],[ax+sx*112,446+k*28]]),stroke:5,fill:0.26,ink:0.3,w:0.7}); // ribs
+    F({path:Q([[ax+sx*44,262],[ax+sx*48,320],[ax+sx*56,372],[ax+sx*118,396]]),ink:0.2,w:0.8,dash:[3,4]}); // neck and shoulder skin line
+  }
+  /* ---------- side view (lateral), face to the left ---------- */
+  F({path:Q([[300,112],[288,150],[282,166],[264,200],[284,212],[279,222],[282,236],[288,262],[312,282],[338,300],[348,400],[346,512]]),ink:0.24,w:0.9,dash:[3,4]}); // the face in profile
+  F({path:Q([[488,140],[482,210],[470,300],[476,512]]),ink:0.2,w:0.8,dash:[3,4]});      // back of the head and neck
+  F({path:E(392,124,98,92,-0.08),fill:0.55});F({path:E(393,127,91,85,-0.08),lucent:0.9});F({path:E(393,127,91,85,-0.08),fill:0.03});
+  F({path:E(392,124,98,92,-0.08),ink:0.65,w:1.3});F({path:E(393,127,91,85,-0.08),ink:0.45,w:0.9});
+  F({path:Q([[352,48],[372,52],[392,50]]),ink:0.25,w:0.7});F({path:Q([[440,60],[452,80],[470,96]]),ink:0.25,w:0.7}); // coronal and lambdoid sutures
+  F({path:E(300,150,8,13,0.2),lucent:0.3,ink:0.4,w:0.8});                               // frontal sinus
+  F({path:E(308,174,14,13),stroke:3,fill:0.4,ink:0.5,w:1});                              // orbit rim
+  F({path:Q([[302,165],[340,164],[372,170]]),stroke:3,fill:0.42,ink:0.45,w:0.9});         // floor of the front of the skull
+  F({path:Q([[366,168],[372,186],[384,188],[392,170]]),stroke:3,fill:0.5,ink:0.6,w:1.1});  // sella turcica
+  F({path:L([[392,172],[400,188],[414,214]]),stroke:9,fill:0.45,ink:0.4,w:0.9});           // clivus
+  F({path:L([[406,180],[440,174],[432,204],[406,198]]),fill:0.55,ink:0.4,w:0.8});           // petrous bone
+  F({path:E(422,198,5.5,5.5),lucent:0.4,ink:0.55,w:0.9});                                   // ear canal
+  for(const [x,y,r] of [[440,204,3],[446,212,2.6],[438,214,2.4],[450,203,2.2],[444,220,2]])F({path:E(x,y,r,r),lucent:0.25,ink:0.3,w:0.5}); // mastoid air cells
+  F({path:Q([[476,166],[470,196],[454,212],[438,216]]),stroke:6,fill:0.45,ink:0.5,w:1});   // occipital bone to the foramen magnum
+  F({path:L([[298,168],[282,198]]),stroke:3,fill:0.4,ink:0.45,w:0.8});                      // nasal bones
+  F({path:E(322,198,17,12,-0.1),lucent:0.24,ink:0.38,w:0.8});                               // maxillary sinus
+  F({path:L([[288,214],[368,219]]),stroke:4,fill:0.45,ink:0.45,w:0.9});                     // hard palate
+  F({path:E(368,204,10,8),lucent:0.22});                                                    // nasopharynx
+  for(let i=0;i<6;i++){F({path:R(284+i*6.3,220,5.6,9,1.5),fill:0.62,ink:0.3,w:0.5});F({path:R(286+i*6.2,232,5.5,8.5,1.5),fill:0.6,ink:0.3,w:0.5})} // teeth
+  F({path:Q([[288,262],[300,266],[340,262],[380,256],[386,236],[398,214],[404,206]]),stroke:6,fill:0.45,ink:0.55,w:1.1}); // mandible body, angle and ramus
+  F({path:L([[382,238],[372,214]]),stroke:3,fill:0.35,ink:0.4,w:0.8});                      // coronoid process
+  F({path:E(404,204,5,4),fill:0.45,ink:0.45,w:0.8});                                         // condyle
+  F({path:Q([[344,276],[352,272],[360,276]]),stroke:3,fill:0.4,ink:0.4,w:0.8});               // hyoid
+  F({path:Q([[366,206],[378,240],[382,280],[386,340],[388,512]]),stroke:13,lucent:0.25});    // pharynx and trachea (air)
+  F({path:E(398,226,4,5),fill:0.45,ink:0.45,w:0.8});F({path:R(410,212,7,22,3),fill:0.42,ink:0.45,w:0.8}); // C1 anterior arch, dens
+  for(let i=0;i<8;i++){const y=236+i*21.5,x=414-Math.sin(i*0.42)*9,h=i===0?24:17;           // C2 to T1, with the neck's curve
+    F({path:R(x,y,24,h,3),fill:0.42,ink:0.5,w:0.9});
+    F({path:L([[x+24,y+4],[x+32,y+6],[x+48+(i===0?8:0),y+14+i*0.6],[x+44,y+18],[x+28,y+h-2]]),fill:0.35,ink:0.4,w:0.7})} // pedicles, laminae and spinous processes
+  F({path:E(440,486,52,46),fill:0.16,ink:0.18,w:0.7});                                      // the shoulders over the lower neck
+  // build the density layer
+  for(const f of P){
+    if(f.fill!=null||f.lucent!=null){D.save();
+      if(f.lucent!=null){D.globalCompositeOperation='destination-out';D.fillStyle=D.strokeStyle=`rgba(0,0,0,${f.lucent})`}else{D.fillStyle=D.strokeStyle=`rgba(0,0,0,${f.fill})`}
+      f.path(D);if(f.stroke){D.lineWidth=f.stroke;D.stroke()}else D.fill();D.restore()}}
+  // paper, then the density as graphite
+  g.fillStyle='#EFE9DC';g.fillRect(0,0,512,512);g.globalAlpha=0.5;g.drawImage(dc,0,0,512,512);g.globalAlpha=1;
+  // engraving where it is dense: hatching, cross-hatched where darker (as the heart room)
+  {const N=256,sm=document.createElement('canvas');sm.width=sm.height=N;const sg=sm.getContext('2d');sg.drawImage(dc,0,0,N,N);const I=sg.getImageData(0,0,N,N).data;
+   const dark=(x,y)=>{if(x<0||y<0||x>=N||y>=N)return 0;return I[(((y|0)*N+(x|0))*4)+3]/255};
+   g.strokeStyle='rgba(29,27,25,0.72)';g.lineWidth=0.5;
+   const pass=(ang,gap,th)=>{const cs=Math.cos(ang),sn=Math.sin(ang),Ln=730;g.beginPath();for(let k=-Ln/2;k<Ln/2;k+=gap){let on=false;for(let t=-Ln/2;t<Ln/2;t+=2.5){const x=256+cs*t-sn*k,y=256+sn*t+cs*k,d=dark(x/2,y/2);
+     if(d>th){if(!on){g.moveTo(x,y);on=true}else g.lineTo(x,y)}else on=false}}g.stroke()};
+   pass(0.12,3,0.1);pass(-0.9,3.4,0.22);pass(0.9,3.6,0.34);pass(1.6,3.1,0.46)}
+  // ink the edges
+  for(const f of P){if(f.ink==null)continue;g.save();g.strokeStyle=`rgba(29,27,25,${f.ink})`;g.lineWidth=f.w||1;if(f.dash)g.setLineDash(f.dash);f.path(g);
+    if(f.stroke){g.lineWidth=(f.w||1);g.stroke()}else g.stroke();g.restore()}
+  // the X-ray field's dark rim, then the divider and labels
+  for(const ox of [0,256]){const gr=g.createRadialGradient(ox+128,256,150,ox+128,256,300);gr.addColorStop(0,'rgba(60,45,25,0)');gr.addColorStop(1,'rgba(60,45,25,0.22)');g.fillStyle=gr;g.fillRect(ox,0,256,512)}
   g.strokeStyle='#1d1b19';g.lineWidth=1.4;g.beginPath();g.moveTo(256,0);g.lineTo(256,512);g.stroke();
-  g.font='italic 14px "IM Fell English", Georgia, serif';g.fillStyle=ink(0.7);g.textAlign='right';g.fillText('front (AP)',250,16);g.textAlign='left';g.fillText('side (lateral)',262,16);
+  g.font='italic 14px "IM Fell English", Georgia, serif';g.fillStyle='rgba(29,27,25,0.7)';g.textAlign='right';g.fillText('front (AP)',250,16);g.textAlign='left';g.fillText('side (lateral)',262,16);
   return skBgCanvas=c;
 }
 /* draw the scene into any canvas: dye from a distance map up to a front, a faint roadmap, the catheter and devices */
+let skVL=null;
 function skRender(ctx,o){
   const sc=ctx.canvas.width/512;ctx.setTransform(sc,0,0,sc,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   ctx.drawImage(skBg(),0,0,512,512);
   if(!o.image){ctx.fillStyle='rgba(239,233,220,0.55)';ctx.fillRect(0,0,512,512);return}
-  const A=o.A,lineFor=v=>Math.max(1.5,v.r*2.6);
-  const drawVessels=(dist,front,alpha,wk)=>{if(!dist)return;for(const pane of [0,1]){ctx.save();ctx.beginPath();ctx.rect(pane*256,0,256,512);ctx.clip();
-    for(const id of A.order){const v=A.V[id],D=dist[id];let pen=false;ctx.beginPath();
-      for(let i=0;i<v.n;i++){if(D[i]<=front){const q=skProj(v.pts[i],pane);pen?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]);pen=true}else if(pen)break}
-      if(pen){ctx.strokeStyle=`rgba(29,27,25,${alpha})`;ctx.lineWidth=lineFor(v)*wk;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();
-        if(alpha>0.5&&v.r>1.5){ctx.strokeStyle=`rgba(239,233,220,${alpha*0.7})`;ctx.lineWidth=0.7;ctx.stroke()}}}
-    ctx.restore()}};
-  if(o.road)drawVessels(o.road.dist,o.road.front,0.16,1);
-  if(o.dist&&o.fade>0.02)drawVessels(o.dist,o.front,0.9*o.fade,1);
-  // a bleed from a perforation: a cloud of dye outside the artery
-  if(o.perf)for(const pane of [0,1]){const q=skProj(o.perf,pane);const gr=ctx.createRadialGradient(q[0],q[1],2,q[0],q[1],26);gr.addColorStop(0,'rgba(29,27,25,0.55)');gr.addColorStop(1,'rgba(29,27,25,0)');ctx.fillStyle=gr;ctx.beginPath();ctx.arc(q[0],q[1],26,0,7);ctx.fill()}
+  const A=o.A,lineFor=v=>Math.max(1.4,v.r*2.4);
+  // vessels, catheter and any bleed go on their own layer, then multiply over the bone (as on the heart room's X-ray)
+  if(!skVL||skVL.width!==ctx.canvas.width){skVL=document.createElement('canvas');skVL.width=skVL.height=ctx.canvas.width}
+  const L=skVL.getContext('2d');L.setTransform(1,0,0,1,0,0);L.globalAlpha=1;L.fillStyle='#fff';L.fillRect(0,0,skVL.width,skVL.height);L.setTransform(sc,0,0,sc,0,0);L.lineCap='round';L.lineJoin='round';
+  const clip=(pane,fn)=>{L.save();L.beginPath();L.rect(pane*256,0,256,512);L.clip();fn();L.restore()};
+  const drawVessels=(dist,front,alpha,road)=>{if(!dist)return;for(const pane of [0,1])clip(pane,()=>{
+    for(const id of A.order){const v=A.V[id],D=dist[id];let pen=false;L.beginPath();
+      for(let i=0;i<v.n;i++){if(D[i]<=front){const q=skProj(v.pts[i],pane);pen?L.lineTo(q[0],q[1]):L.moveTo(q[0],q[1]);pen=true}else if(pen)break}
+      if(!pen)continue;const w=lineFor(v);L.globalAlpha=alpha;
+      if(road){L.strokeStyle='rgb(222,215,201)';L.lineWidth=w;L.stroke();continue}
+      // pen edges, the lumen, and a darker core (more contrast where the X-ray crosses the middle of the artery)
+      L.strokeStyle='rgb(58,52,46)';L.lineWidth=w+1.3;L.stroke();
+      L.strokeStyle='rgb(150,140,126)';L.lineWidth=w;L.stroke();
+      L.strokeStyle='rgb(96,88,78)';L.lineWidth=Math.max(0.8,w*0.5);L.stroke()}
+    L.globalAlpha=1})};
+  if(o.road)drawVessels(o.road.dist,o.road.front,0.9,true);
+  if(o.dist&&o.fade>0.02)drawVessels(o.dist,o.front,Math.min(1,o.fade),false);
+  if(o.perf)for(const pane of [0,1])clip(pane,()=>{const q=skProj(o.perf,pane);const gr=L.createRadialGradient(q[0],q[1],2,q[0],q[1],28);gr.addColorStop(0,'rgba(70,62,54,0.75)');gr.addColorStop(1,'rgba(70,62,54,0)');L.fillStyle=gr;L.beginPath();L.arc(q[0],q[1],28,0,7);L.fill()});
   // the catheter: the guide thick, the microcatheter thin beyond it
-  const drawPath=(pts,w,a)=>{for(const pane of [0,1]){ctx.save();ctx.beginPath();ctx.rect(pane*256,0,256,512);ctx.clip();ctx.beginPath();pts.forEach((p,i)=>{const q=skProj(p,pane);i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1])});ctx.strokeStyle=`rgba(29,27,25,${a})`;ctx.lineWidth=w;ctx.lineCap='round';ctx.stroke();ctx.restore()}};
+  const drawPath=(pts,w,col)=>{for(const pane of [0,1])clip(pane,()=>{L.beginPath();pts.forEach((p,i)=>{const q=skProj(p,pane);i?L.lineTo(q[0],q[1]):L.moveTo(q[0],q[1])});L.strokeStyle=col;L.lineWidth=w;L.stroke()})};
   if(o.cath){const path=skCathPath(A,o.cath);
-    if(o.cath.deep&&o.guide){drawPath(o.guide,2.8,0.85);drawPath(path,1.1,0.9)}else drawPath(path,2.8,0.85);
+    if(o.cath.deep&&o.guide){drawPath(o.guide,3,'rgb(70,64,58)');drawPath(o.guide,1.1,'rgb(150,142,130)');drawPath(path,1.2,'rgb(40,36,32)')}else{drawPath(path,3,'rgb(70,64,58)');drawPath(path,1.1,'rgb(150,142,130)')}
     const tip=path[path.length-1],r=o.cath.rot*Math.PI/180;
-    for(const pane of [0,1]){const q=skProj(tip,pane),dx=pane===0?Math.sin(r):Math.sin(r)*0.45,dy=-Math.cos(r);ctx.save();ctx.beginPath();ctx.rect(pane*256,0,256,512);ctx.clip();
-      ctx.beginPath();ctx.moveTo(q[0],q[1]);ctx.quadraticCurveTo(q[0]+dx*4,q[1]+dy*4-2,q[0]+dx*8,q[1]+dy*8);ctx.strokeStyle='rgba(29,27,25,0.95)';ctx.lineWidth=o.cath.deep?1.4:2.6;ctx.stroke();ctx.restore()}}
-  // devices at the clot
-  if(o.device&&o.clot){const v=A.V[o.clot.vid];for(const pane of [0,1]){ctx.save();ctx.beginPath();ctx.rect(pane*256,0,256,512);ctx.clip();
-    if(o.device==='sr'){ctx.strokeStyle='rgba(29,27,25,0.9)';ctx.lineWidth=0.7;ctx.beginPath();for(let s=o.clot.s-o.clot.len/2-3,k=0;s<=o.clot.s+o.clot.len/2+4;s+=1.5,k++){const p=skPt(v,s),q=skProj(p,pane);ctx.lineTo(q[0]+(k%2?2.4:-2.4),q[1]+(k%2?-1.2:1.2))}ctx.stroke()}
-    ctx.restore()}}
+    for(const pane of [0,1])clip(pane,()=>{const q=skProj(tip,pane),dx=pane===0?Math.sin(r):Math.sin(r)*0.45,dy=-Math.cos(r);
+      L.beginPath();L.moveTo(q[0],q[1]);L.quadraticCurveTo(q[0]+dx*4,q[1]+dy*4-2,q[0]+dx*8,q[1]+dy*8);L.strokeStyle='rgb(30,27,24)';L.lineWidth=o.cath.deep?1.5:2.8;L.stroke();
+      L.fillStyle='rgb(30,27,24)';L.beginPath();L.arc(q[0]+dx*8,q[1]+dy*8,o.cath.deep?1.1:1.6,0,7);L.fill()})}  // radio-opaque tip marker
+  if(o.device==='sr'&&o.clot){const v=A.V[o.clot.vid];for(const pane of [0,1])clip(pane,()=>{L.strokeStyle='rgb(40,36,32)';L.lineWidth=0.8;L.beginPath();for(let s=o.clot.s-o.clot.len/2-3,k=0;s<=o.clot.s+o.clot.len/2+4;s+=1.5,k++){const p=skPt(v,s),q=skProj(p,pane);L.lineTo(q[0]+(k%2?2.4:-2.4),q[1]+(k%2?-1.2:1.2))}L.stroke();
+    for(const e of [o.clot.s-o.clot.len/2-3,o.clot.s+o.clot.len/2+4]){const q=skProj(skPt(v,e),pane);L.fillStyle='rgb(30,27,24)';L.beginPath();L.arc(q[0],q[1],1.4,0,7);L.fill()}})} // stent end markers
+  ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation='multiply';ctx.drawImage(skVL,0,0);ctx.setTransform(sc,0,0,sc,0,0);
+  // film grain and the dark rim of the image intensifier, as on the heart room's monitor
+  if(typeof noise!=='undefined'&&noise.length){ctx.globalCompositeOperation='overlay';ctx.globalAlpha=o.cine?0.07:0.15;ctx.drawImage(noise[Math.floor(performance.now()/66)%noise.length],0,0,512,512);ctx.globalAlpha=1}
+  ctx.globalCompositeOperation='source-over';
+  if(typeof vign!=='undefined'){ctx.drawImage(vign,0,0,256,512);ctx.drawImage(vign,256,0,256,512)}
   // the clot, once marked: a double ring in oxblood ink
   if(o.mark&&o.clot){const v=A.V[o.clot.vid],p=skPt(v,o.clot.s-o.clot.len/2);for(const pane of [0,1]){const q=skProj(p,pane);ctx.strokeStyle='#8A2D1F';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(q[0],q[1],10,0,7);ctx.stroke();ctx.lineWidth=0.6;ctx.beginPath();ctx.arc(q[0],q[1],13,0,7);ctx.stroke()}}
 }
@@ -161,7 +243,7 @@ function skTick(dt){
 function skDraw(){
   const s=SK,ctx=img.getContext('2d'),fl=down('Space','KeyF')||s.cine||s.ctrlT>0;
   if(s.review){skRender(ctx,{A:s.A,image:true,dist:s.review.dist,front:s.review.front,fade:1,cath:s.review.cath,guide:s.review.guide,clot:s.clot,mark:s.found});}
-  else skRender(ctx,{A:s.A,image:fl,dist:s.inj&&s.inj.dist,front:s.inj?s.inj.front:0,fade:s.inj?s.inj.fade:0,road:s.roadOn&&s.road?s.road:null,cath:s.cat,guide:s.guide,clot:s.clot,mark:s.found,device:s.tx&&s.tx.type==='sr'&&s.tx.stage!=='deploy'&&s.tx.stage!=='choose'?'sr':null,perf:s.sah});
+  else skRender(ctx,{A:s.A,image:fl,cine:s.cine,dist:s.inj&&s.inj.dist,front:s.inj?s.inj.front:0,fade:s.inj?s.inj.fade:0,road:s.roadOn&&s.road?s.road:null,cath:s.cat,guide:s.guide,clot:s.clot,mark:s.found,device:s.tx&&s.tx.type==='sr'&&s.tx.stage!=='deploy'&&s.tx.stage!=='choose'?'sr':null,perf:s.sah});
   // the text on the image
   const m=skMinutes(),hh=Math.floor(m/60),mm=String(Math.floor(m%60)).padStart(2,'0');
   hudTL.textContent=`${s.pat.code} · ${s.pat.pt}\nNIHSS ${skNihss()}`;
