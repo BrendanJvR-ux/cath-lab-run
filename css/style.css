@@ -683,3 +683,15 @@ body.inmenu #toast[hidden],body.inreport #toast[hidden]{display:none!important}
 .cbpage.locked{opacity:.75}.cbpage.locked h3{color:var(--muted)}
 .cbseen{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:16px;color:var(--muted)}.cbseen .got{color:var(--fg)}.cbseen small{color:var(--muted)}
 #startOv .folder.rare::after{content:'✎';position:absolute;right:8px;bottom:6px;font-family:var(--f-display);color:var(--danger)}
+/* ===== Stroke room ===== */
+#skPanel{display:none}
+body.stroke .console>.sec{display:none}
+body.stroke .console>#caseHead,body.stroke .console>#skPanel{display:flex}
+body.stroke #guide,body.stroke .reviewbar,body.stroke #txPop,body.stroke #gradePop,body.stroke #txDot{display:none!important}
+body.inmenu #skGuide,body.inreport #skGuide,body.inmenu #skPop,body.inreport #skPop{display:none!important}
+.skpop{left:8px!important;right:8px;bottom:8px;top:auto!important;width:auto;max-height:46%;transform:none!important}
+.sksites{grid-template-columns:1fr 1fr!important}
+.skwait b{background:linear-gradient(90deg,var(--ink) 0 100%)}
+.skwait{background:linear-gradient(90deg,var(--faint) 0 33%,#cfdcc4 33% 67%,var(--faint) 67% 100%)!important}
+#startOv .folder.stroke{background:#eee6d6!important}
+#startOv .folder.stroke::after{content:'✦';position:absolute;right:8px;bottom:6px;font-family:var(--f-display);color:var(--danger)}

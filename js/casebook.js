@@ -8,7 +8,7 @@ function casebookOf(p=profile){p.casebook=p.casebook||{rare:{},seen:{}};p.casebo
 /* record a completed case; returns the new rare page, if this is the first time */
 function recordCasebook(c,score){
   const cb=casebookOf(),today=dateKey();let fresh=null;
-  if(c.rare&&RARE_BY[c.rare]){const e=cb.rare[c.rare];if(!e){cb.rare[c.rare]={first:today,code:c.code,n:1,best:score};fresh=RARE_BY[c.rare]}else{e.n++;e.best=Math.max(e.best,score)}}
+  if(c.rare&&RARE_BY[c.rare]){const e=cb.rare[c.rare];if(!e){cb.rare[c.rare]={first:today,code:c.code,seed:c.seed,n:1,best:score};fresh=RARE_BY[c.rare]}else{e.n++;e.best=Math.max(e.best,score)}}
   if(c.title){const e=cb.seen[c.title]||{n:0,best:0};e.n++;e.best=Math.max(e.best,score);cb.seen[c.title]=e}
   saveProfile();return fresh;
 }
@@ -16,20 +16,24 @@ function casebookReportHTML(fresh){
   return fresh?`<div class="medalrow casenew"><span class="medal none" aria-hidden="true">✎</span><span><b>New casebook page: ${fresh.name}</b> · ${fresh.short}. Read it under Casebook on the main menu.</span></div>`:'';
 }
 function casebookView(){
-  const cb=casebookOf(),met=RARE_KINDS.filter(k=>cb.rare[k.id]).length,seen=PRESENTATIONS.filter(t=>cb.seen[t]).length;
+  const cb=casebookOf(),met=RARE_KINDS.filter(k=>cb.rare[k.id]).length+(typeof SK_RARE!=='undefined'?SK_RARE.filter(k=>cb.rare[k.id]).length:0),seen=PRESENTATIONS.filter(t=>cb.seen[t]).length;
   return `<h1>Casebook</h1>
-    <p class="fine">Rare patients turn up about once in every thirteen cases, in any mode. Treat one to add its page. ${met} of ${RARE_KINDS.length} rare patients and ${seen} of ${PRESENTATIONS.length} presentations so far.</p>
+    <p class="fine">Rare patients turn up about once in every thirteen cases, in any mode. Treat one to add its page. ${met} of ${RARE_KINDS.length+(typeof SK_RARE!=='undefined'?SK_RARE.length:0)} rare patients and ${seen} of ${PRESENTATIONS.length} presentations so far.</p>
     <div class="cbpages">${RARE_KINDS.map(k=>{const e=cb.rare[k.id];
       return e?`<article class="cbpage"><canvas class="cbimg" width="320" height="320" data-code="${e.code}" data-kind="${k.id}" aria-label="Angiogram of your first ${k.name.toLowerCase()} patient"></canvas>
         <div><h3>${k.name}</h3><p class="cbshort">${k.short}</p><p>${k.blurb}</p><p class="cbtip"><b>Tip.</b> ${k.tip}</p>
         <span class="fine">First met ${e.first} · patient ${e.code} · treated ${e.n} time${e.n===1?'':'s'} · best ${e.best}</span></div></article>`
         :`<article class="cbpage locked"><div class="cbimg blank" aria-hidden="true">?</div><div><h3>${k.name}</h3><p class="cbshort">${k.short}</p><span class="fine">Not met yet. Keep taking new patients.</span></div></article>`}).join('')}</div>
+    ${typeof SK_RARE!=='undefined'?`<div class="grouplabel">Stroke room</div><div class="cbpages">${SK_RARE.map(k=>{const e=cb.rare[k.id];
+      return e?`<article class="cbpage"><canvas class="cbimg" width="320" height="320" data-skseed="${e.seed??''}" aria-label="Angiogram of your first ${k.name.toLowerCase()} patient"></canvas><div><h3>${k.name}</h3><p class="cbshort">${k.short}</p><p>${k.blurb}</p><p class="cbtip"><b>Tip.</b> ${k.tip}</p><span class="fine">First met ${e.first} · patient ${e.code} · treated ${e.n} time${e.n===1?'':'s'} · best ${e.best}</span></div></article>`
+        :`<article class="cbpage locked"><div class="cbimg blank" aria-hidden="true">?</div><div><h3>${k.name}</h3><p class="cbshort">${k.short}</p><span class="fine">Not met yet. Keep taking stroke patients.</span></div></article>`}).join('')}</div>`:''}
     <div class="grouplabel">Presentations</div>
     <div class="cbseen">${PRESENTATIONS.map(t=>{const e=cb.seen[t];return `<span class="${e?'got':''}">${e?'✓ ':''}${t}${e?` <small>×${e.n} · best ${e.best}</small>`:''}</span>`}).join('')}</div>
     <div class="row"><button class="btn" data-act="home">Back</button></div>`;
 }
 /* draw the first patient of each kind with the game's renderer, in the view that shows its feature best */
 function drawCasebookImages(){
+  document.querySelectorAll('canvas.cbimg[data-skseed]').forEach(cv=>{if(cv.dataset.skseed!==''&&typeof skThumb==='function')skThumb(cv,+cv.dataset.skseed)});
   const cans=[...document.querySelectorAll('canvas.cbimg[data-code]')];if(!cans.length)return;
   const keepCtx=ictx,keepMode=HEART_MODE,tmp=document.createElement('canvas');tmp.width=tmp.height=W*2;
   const VIEW={anomrca:[45,0],leftdom:[-30,-25],tortuous:[-30,30],leftmain:[45,-30],long:[-30,30],kidney:[-30,-25]};

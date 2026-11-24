@@ -59,7 +59,7 @@ window.addEventListener('keydown',e=>{
   if(e.target&&e.target.type==='range'&&e.code.startsWith('Arrow'))return;
   const id=INPUT_MAP.get(e.code),preset=/^Digit[1-7]$/.test(e.code);
   if(!id&&!preset)return;
-  if(S&&!S.done)e.preventDefault();
+  if((S&&!S.done)||(typeof SK!=='undefined'&&SK&&!SK.done))e.preventDefault();
   if(e.repeat)return;
   if(preset){setPreset(+e.code.slice(5)-1);return}
   actPress(id,e.code);

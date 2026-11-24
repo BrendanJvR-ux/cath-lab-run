@@ -76,8 +76,9 @@ function soundFrame(){
   requestAnimationFrame(soundFrame);
   if(!AC)return;
   const on=typeof S!=='undefined'&&S&&!S.done&&!document.body.classList.contains('inmenu');
-  const fl=on&&typeof down==='function'&&down('Space','KeyF')&&!S.complication,cine=on&&!!S.cine;
-  const inj=on&&down('KeyJ')&&!S.complication&&S.exch<=0;
+  const skOn=typeof SK!=='undefined'&&SK&&!SK.done&&!document.body.classList.contains('inmenu');
+  const fl=(on&&typeof down==='function'&&down('Space','KeyF')&&!S.complication)||(skOn&&down('Space','KeyF')),cine=(on&&!!S.cine)||(skOn&&!!SK.cine);
+  const inj=(on&&down('KeyJ')&&!S.complication&&S.exch<=0)||(skOn&&down('KeyJ'));
   loopLevel('fluoro',live()&&(fl||cine)?0.09:0);loopLevel('cine',live()&&cine?0.07:0);loopLevel('inject',live()&&inj?0.06:0);
   if(!on){prev.case=null;return}
   if(prev.case!==S){Object.assign(prev,{case:S,fl,cine,eng:S.cs&&S.cs.eng,phase:S.phase,whips:S.whips||0,stents:S.stents.length,stage:S.pci&&S.pci.stage,atm:0,alarmT:0});return}

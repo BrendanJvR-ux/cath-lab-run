@@ -129,6 +129,7 @@ function caseFolders(){
   if(sv)F.push({id:'resume',cls:'inprogress',tab:'In progress',title:sv.ci==='TUTORIAL'?'The tutorial':patientOf(sv.ci).title,sub:`${fmtT(sv.clock)} in · ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:''}`,tag:'Resume'});
   const tp=patientOf(today);F.push({id:'today',cls:'today',tab:"Today's case",title:tp.title,sub:tp.pt,tag:dd?MEDAL_NAME[dd.medal]:'Medals',code:today});
   if(typeof weeklyInfo==='function'){const wi=weeklyInfo(),w=weeklyRec();F.push({id:'weekly',cls:'weekly',tab:'This week',title:wi.mod.name,sub:patientOf(wi.code).title,tag:w.best!=null?'Best '+w.best:'Challenge'})}
+  if(typeof skChart==='function')F.push({id:'stroke',cls:'stroke',tab:'Stroke room',title:pw('Clear a clot from a brain artery','Pull a clot out of a brain artery'),sub:pw('Stroke thrombectomy','A new procedure'),tag:'New'});
   for(const code of waitingList()){const p=patientOf(code);F.push({id:'w:'+code,cls:p.rare?'rare':'',tab:code,title:p.title,sub:p.pt,tag:p.rare?'Rare':p.ecg&&p.ecg.stemi?'Emergency':'',code})}
   if(typeof careerOf==='function'){const c=careerOf();if(c.lvl<CAREER.length)F.push({id:'career',tab:'Career',title:CAREER[c.lvl].rank,sub:`${c.prog} of ${CAREER[c.lvl].need}`,tag:'Next goal'})}
   F.push({id:'tutorial',cls:'tutorial',tab:'Tutorial',title:'Learn the ropes',sub:'One patient, step by step',tag:profile.tutDone?'Done':''});
@@ -139,6 +140,7 @@ function folderChart(f,D){
   if(f.id==='resume'){const sv=loadSave();return `<div class="chead"><h2>${f.title}</h2><span class="meta">${sv?sv.ci:''}</span></div><p>Pick up where you left off: same patient, your runs, marks, devices and any complications.</p>
     <div class="row"><button class="btn primary go" data-act="resume">Resume case</button><button class="btn" data-act="discard">Discard</button></div>`}
   if(f.id==='weekly')return weeklyChart();
+  if(f.id==='stroke')return skChart(D);
   if(f.id==='tutorial')return `<div class="chead"><h2>Tutorial</h2><span class="meta">Easy · about 5–10 minutes</span></div><p>One patient from start to finish. A coach under the monitor explains each step and waits for you to do it.</p><button class="btn primary go" data-act="exp">Start tutorial</button>`;
   if(f.id==='career'){const c=careerOf(),g=CAREER[c.lvl];return `<div class="chead"><h2>${g.rank}</h2><span class="meta">${c.prog} of ${g.need}</span></div><dl><dt>Goal</dt><dd>${g.goal}</dd><dt>Plays on</dt><dd>${DIFFICULTY[g.diff].label}${g.kind==='stemi'?' · a STEMI':g.kind==='comp'?' · with a complication':''}</dd></dl><button class="btn primary go" data-act="careercase">Start case</button>`}
   const p=patientOf(f.code),today=f.id==='today',th=MEDALS[profile.diff];
@@ -249,7 +251,7 @@ function renderMenu(){
         <div class="mm-secondary"><button class="btn" data-act="play">Case select</button></div>
       </div>
       ${sv?`<div class="mm-strip resume"><div><b>Unfinished case</b><span>${sv.ci==='TUTORIAL'?'The tutorial':'Patient '+sv.ci} · ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:''} · ${fmtT(sv.clock)} in</span></div><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="discard">Discard</button></div>`:''}
-      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button>${typeof weeklyInfo==='function'?`<button class="lnk" data-act="weeklysel">This week: ${weeklyInfo().mod.name}</button>`:''}<button class="lnk" data-act="career">Career</button>${typeof casebookOf==='function'?`<button class="lnk" data-act="casebook">Casebook (${RARE_KINDS.filter(k=>casebookOf().rare[k.id]).length}/${RARE_KINDS.length})</button>`:''}<button class="lnk" data-act="awards">Achievements${typeof ACHIEVEMENTS!=='undefined'?` (${ACHIEVEMENTS.filter(a=>profile.ach&&profile.ach.got&&profile.ach.got[a.id]).length}/${ACHIEVEMENTS.length})`:''}</button><button class="lnk" data-act="intro">How it works (1 min)</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Settings</button><button class="lnk" data-gl="">Glossary</button></div>
+      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button>${typeof weeklyInfo==='function'?`<button class="lnk" data-act="weeklysel">This week: ${weeklyInfo().mod.name}</button>`:''}${typeof skChart==='function'?`<button class="lnk" data-act="strokesel">${pw('Stroke room','Stroke room')}</button>`:''}<button class="lnk" data-act="career">Career</button>${typeof casebookOf==='function'?`<button class="lnk" data-act="casebook">Casebook (${RARE_KINDS.filter(k=>casebookOf().rare[k.id]).length}/${RARE_KINDS.length})</button>`:''}<button class="lnk" data-act="awards">Achievements${typeof ACHIEVEMENTS!=='undefined'?` (${ACHIEVEMENTS.filter(a=>profile.ach&&profile.ach.got&&profile.ach.got[a.id]).length}/${ACHIEVEMENTS.length})`:''}</button><button class="lnk" data-act="intro">How it works (1 min)</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Settings</button><button class="lnk" data-gl="">Glossary</button></div>
       <div class="mm-op">${avatarSVG(profile.avatar,32)}<span><b>${esc(profile.name)}</b> · ${typeof rankName==='function'?rankName()+' · ':''}${profile.tokens} tokens · ${DIFFICULTY[profile.diff].label}${typeof gradeOf==='function'?(()=>{const g=gradeOf(profile),n=streakNow(profile);return ` · grade ${g.ok?g.letter+' '+g.title.toLowerCase():'pending'}${n?` · 🔥 ${n}-day streak`:''}`})():''}</span><button class="lnk" data-act="editop" style="background:none;border:0;padding:0;font:inherit;text-decoration:underline;cursor:pointer;color:inherit">Change</button></div>
     </div>
     <div class="mm-art" aria-hidden="true"><img src="assets/heart-tree.png" alt="" width="500" height="512"></div></div>
@@ -281,6 +283,8 @@ $('startOv').addEventListener('click',e=>{
   else if(d.act==='resume'){resumeCase()}
   else if(d.act==='discard'){clearSave();renderMenu();toast('Unfinished case discarded.')}
   else if(d.act==='daily'){startCase(dailyCode(),{daily:true})}
+  else if(d.act==='stroke'){if(typeof skStart==='function')skStart(null)}
+  else if(d.act==='strokesel'){menuSel='stroke';menuView='play';renderMenu()}
   else if(d.act==='weekly'){startCase(weeklyInfo().code,{weekly:weekKey()})}
   else if(d.act==='weeklysel'){menuSel='weekly';menuView='play';renderMenu()}
   else if(d.act==='code'){const v=($('codeIn').value||'').trim(),n=codeToSeed(v);if(n==null){toast('That is not a case code. Codes look like CLR-7KQ2M.',true);return}startCase(seedToCode(n))}

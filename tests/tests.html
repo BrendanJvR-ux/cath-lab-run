@@ -25,6 +25,7 @@ canvas{display:none}
 <script src="../js/sim.js"></script>
 <script src="../js/gen.js"></script>
 <script src="../js/career.js"></script>
+<script src="../js/stroke-sim.js"></script>
 <script>
 "use strict";
 const results=[];
@@ -293,7 +294,7 @@ test('A posteriorly placed RCA origin needs more clockwise torque than usual',()
 test('The default anatomy can be restored after random patients',()=>{buildAnatomy();ok(VBY.PLV&&VBY.PDA&&!VBY.RI&&!VBY.LPDA);ok(fx('rca').label==='mid RCA')});
 
 test('Every game script parses (a stray quote anywhere breaks the whole game)',()=>{
-  const files=['config/config.js','js/sim.js','js/gen.js','js/game.js','js/controls.js','js/heart3d.js','js/career.js','js/tutorial.js','js/glossary.js','js/intro.js','js/achievements.js','js/weekly.js','js/sound.js','js/casebook.js'];
+  const files=['config/config.js','js/sim.js','js/gen.js','js/game.js','js/controls.js','js/heart3d.js','js/career.js','js/tutorial.js','js/glossary.js','js/intro.js','js/achievements.js','js/weekly.js','js/sound.js','js/casebook.js','js/stroke-sim.js','js/stroke.js'];
   for(const f of files){const x=new XMLHttpRequest();x.open('GET','../'+f+'?'+Date.now(),false);x.send();ok(x.status===200,f+' not found');try{new Function(x.responseText)}catch(e){throw new Error(f+': '+e.message)}}
   return files.length+' files';
 });
@@ -340,6 +341,27 @@ test('Rare patients: about one in thirteen, every kind turns up, each is set up 
   // the anomalous RCA can still be engaged with a JR4 pointed at it
   buildAnatomy(generatePatient(seen.anomrca).anatomy);const cs=cathState({type:'JR',th:OSTANG.R,hub:OSTANG.R,s:S_ROOT+16},DIFFICULTY.medium);ok(cs.eng==='R','anomalous RCA engages');
   buildAnatomy();return `${(f*100).toFixed(1)}% rare · `+RARE_KINDS.map(k=>k.id+' '+count[k.id]).join(', ');
+});
+test('Stroke room: every arch builds; turning up at the left carotid opening gets you into the left ICA, not the face',()=>{
+  for(const arch of ['I','II','III'])for(const bovine of [false,true]){const A=skAnatomy({arch,bovine});ok(A.V.LICA&&A.V.RM1&&A.V.BA&&A.V.LPCA,'vessels '+arch+bovine)}
+  const A=skAnatomy({arch:'I'}),c=skNewCath(),o=A.V.LCCA.os;
+  while(c.vid==='AO'&&c.s<o-6)skMove(A,c,1,'medium',null);ok(c.vid==='AO','stays in the arch with the tip down');
+  c.rot=0;for(let i=0;i<12&&c.vid==='AO';i++)skMove(A,c,1,'medium',null);ok(c.vid==='LCCA','enters the left carotid: '+c.vid);
+  for(let i=0;i<200&&c.vid==='LCCA';i++)skMove(A,c,1,'medium',null);ok(c.vid==='LICA','on into the ICA: '+c.vid);
+  const c2=skNewCath();c2.vid='LCCA';c2.s=A.V.LCCA.len-2;c2.rot=305;skMove(A,c2,3,'medium',null);ok(c2.vid==='LECA','a medial turn at the bifurcation goes to the external carotid');
+  // the guide cannot go into the head; the microcatheter can
+  const c3=skNewCath();c3.vid='LICA';c3.s=10;c3.rot=0;for(let i=0;i<300;i++)skMove(A,c3,1,'medium',null);ok(c3.vid==='LICA'&&skPt(A.V.LICA,c3.s)[1]<=205,'guide stops at the skull base');
+  c3.deep=true;c3.rot=90;for(let i=0;i<120&&c3.vid==='LICA';i++)skMove(A,c3,1,'medium',null);ok(c3.vid==='LM1','microcatheter turns into the M1: '+c3.vid);
+  // a bovine arch: the left carotid comes off the first branch
+  const B=skAnatomy({arch:'I',bovine:true});ok(B.V.LCCA.parent==='BCT','bovine origin');
+});
+test('Stroke room: dye stops at the clot, flows again once it is gone, and each patient is set up as described',()=>{
+  const A=skAnatomy({arch:'I'}),pat={side:'L',site:'M1',m2:'s'},cl=skClot(A,pat),c=skNewCath();c.vid='LICA';c.s=20;
+  const D=skDyeDist(A,c,cl),v=A.V.LM1,before=D.LM1.findIndex(x=>x===Infinity);ok(before>0&&v.cum[before]>=cl.s-cl.len/2-2,'cut-off at the clot');ok(D.LM2s.every(x=>x===Infinity),'nothing beyond');ok(D.LA1.some(x=>x<Infinity),'the other branch fills');
+  const D2=skDyeDist(A,c,null);ok(D2.LM2s.some(x=>x<Infinity),'flows after the clot is out');
+  const cnt={};for(let i=0;i<3000;i++){const p=skPatient(i*7919%CODE_SPACE);cnt[p.site]=(cnt[p.site]||0)+1;if(p.rare)cnt['r:'+p.rare]=(cnt['r:'+p.rare]||0)+1;ok(p.code.startsWith('STK-')&&p.nihss>0,'patient')}
+  ok(cnt.M1>1200&&cnt.BA>150&&cnt['ICA-T']>300&&cnt.M2>500,'sites '+JSON.stringify(cnt));ok(cnt['r:bovine']>200&&cnt['r:basilar']>100&&cnt['r:type3']>100,'rare kinds');
+  return JSON.stringify(cnt);
 });
 const bad=results.filter(r=>!r.ok).length,sum=document.getElementById('sum');
 sum.textContent=bad?`${bad} of ${results.length} failed`:`All ${results.length} passed`;sum.className=bad?'bad':'ok';
