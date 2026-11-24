@@ -13,217 +13,46 @@ for(const k of SK_RARE)RARE_BY[k.id]=k; // so the casebook can record stroke rar
 
 /* ---------- drawing: two views side by side, in ink ---------- */
 const skProj=(p,pane)=>pane===0?[128+p[0],400-p[1]]:[384-p[2]*1.05,400-p[1]];
-/* the head and neck on X-ray, in both views. Bone is drawn as density (dark = dense) on its own layer; the layer is
-   laid on paper as graphite, engraved with hatching where it is darkest (as the heart room's X-ray), then the edges
-   are inked. Air spaces (sinuses, nose, airway, ear canal) are cut out of the density so they read lighter. */
-let skBgCanvas=null;const skBgCache={};
+/* the head and neck on X-ray, in both views. The bone comes from assets/skull-xray.png, an X-ray passed through a 3D
+   model of the skull, face, spine and upper chest (tools/skull-model.js, made with tools/render_skull.html): red is
+   how much bone each ray crossed, green the ink contours (cortex seen edge-on), blue the soft tissue. Here it is
+   laid on paper as a graphite wash and engraved: line screens whose lines thicken with density, crossed where it
+   is denser, as the heart room's X-ray. */
+let skBgCanvas=null;const skBgCache={};let skSkullData=null;
+const skSkull=new Image();
+skSkull.onload=()=>{try{const c=document.createElement('canvas');c.width=c.height=1024;const x=c.getContext('2d');x.drawImage(skSkull,0,0);skSkullData=x.getImageData(0,0,1024,1024).data}catch(e){skSkullData='img'}
+  for(const k in skBgCache)delete skBgCache[k];skBgCanvas=null};
+skSkull.src='assets/skull-xray.png?v=1';
 function skBg(S=2){
   if(skBgCache[S])return skBgCache[S];
-  const mk=()=>{const c=document.createElement('canvas');c.width=c.height=512*S;const x=c.getContext('2d');x.scale(S,S);x.lineCap='round';x.lineJoin='round';return [c,x]};
-  const [dc,D]=mk(),[c,g]=mk();
-  const P=[]; // features: {path, fill, stroke(width), lucent, ink(outline alpha), dash}
-  const F=(o)=>P.push(o);
-  const E=(x,y,rx,ry,r=0)=>k=>{k.beginPath();k.ellipse(x,y,rx,ry,r,0,7)};
-  const L=(pts)=>k=>{k.beginPath();pts.forEach((p,i)=>i?k.lineTo(p[0],p[1]):k.moveTo(p[0],p[1]))};
-  const Q=(pts)=>k=>{k.beginPath();k.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length-1;i++){const m=[(pts[i][0]+pts[i+1][0])/2,(pts[i][1]+pts[i+1][1])/2];k.quadraticCurveTo(pts[i][0],pts[i][1],m[0],m[1])}const l=pts[pts.length-1];k.lineTo(l[0],l[1])};
-  const R=(x,y,w,h,r=2)=>k=>{k.beginPath();k.roundRect?k.roundRect(x,y,w,h,r):k.rect(x,y,w,h)};
-  // free-form shapes: ['M',x,y], ['L',x,y], ['Q',cx,cy,x,y], ['C',c1x,c1y,c2x,c2y,x,y], ['Z']
-  const B=(cmds)=>k=>{k.beginPath();for(const c of cmds){const [o,...a]=c;if(o==='M')k.moveTo(...a);else if(o==='L')k.lineTo(...a);else if(o==='Q')k.quadraticCurveTo(...a);else if(o==='C')k.bezierCurveTo(...a);else k.closePath()}};
-  const mirror=(cmds,cx)=>cmds.map(c=>c[0]==='Z'?c:[c[0],...c.slice(1).map((v,i)=>i%2===0?2*cx-v:v)]);
-  const scaleAbout=(cmds,cx,cy,f)=>cmds.map(c=>c[0]==='Z'?c:[c[0],...c.slice(1).map((v,i)=>i%2===0?cx+(v-cx)*f:cy+(v-cy)*f)]);
-  /* ---------- front view (AP), centre x 128 ---------- */
-  const ax=128;
-  F({path:E(ax,124,94,106),fill:0.06,ink:0.2,dash:[3,4]});                              // scalp and soft tissue
-  // the cranium: a dome that narrows at the temples down to the skull base
-  const cranAP=B([['M',ax,32],['C',ax+50,32,ax+84,62,ax+86,112],['C',ax+88,150,ax+80,178,ax+70,196],['Q',ax+60,202,ax+44,200],['Q',ax+20,194,ax,196],['Q',ax-20,194,ax-44,200],['Q',ax-60,202,ax-70,196],['C',ax-80,178,ax-88,150,ax-86,112],['C',ax-84,62,ax-50,32,ax,32],['Z']]);
-  const innerAP=B(scaleAbout([['M',ax,32],['C',ax+50,32,ax+84,62,ax+86,112],['C',ax+88,150,ax+80,178,ax+70,196],['Q',ax,190,ax-70,196],['C',ax-80,178,ax-88,150,ax-86,112],['C',ax-84,62,ax-50,32,ax,32],['Z']],ax,122,0.91));
-  F({path:cranAP,fill:0.55,cortex:false});F({path:innerAP,lucent:0.9});F({path:innerAP,fill:0.03});
-  F({path:cranAP,ink:0.65,w:1.3});F({path:innerAP,ink:0.42,w:0.9});
-  F({path:Q([[ax,36],[ax+3,52],[ax-2,66],[ax+2,82]]),ink:0.25,w:0.7});                         // sagittal suture
-  for(const sx of [-1,1])F({path:Q([[ax+sx*40,46],[ax+sx*74,92],[ax+sx*78,150]]),ink:0.16,w:0.7,dash:[2,3]}); // temporal lines
-  F({path:Q([[ax-66,194],[ax-40,188],[ax,191],[ax+40,188],[ax+66,194]]),stroke:6,fill:0.2});        // skull base behind the face
-  for(const sx of [-1,1]){
-    F({path:Q([[ax+sx*8,186],[ax+sx*36,168],[ax+sx*72,180]]),stroke:5,fill:0.45,ink:0.4,w:0.8});   // petrous ridges
-    const orb=R(sx<0?ax-50:ax+14,161,36,32,9);
-    F({path:orb,lucent:0.2});F({path:orb,stroke:3.2,fill:0.5,ink:0.62,w:1.1});                     // orbits
-    F({path:Q([[ax+sx*14,160],[ax+sx*32,154],[ax+sx*52,162]]),stroke:4,fill:0.45,ink:0.5,w:1});    // brow (supraorbital margin)
-    F({path:Q([[ax+sx*22,184],[ax+sx*30,178],[ax+sx*40,188]]),ink:0.32,w:0.7});                     // superior orbital fissure
-    F({path:B([['M',ax+sx*48,172],['Q',ax+sx*58,184,ax+sx*60,198],['Q',ax+sx*70,197,ax+sx*76,202],['Q',ax+sx*68,210,ax+sx*56,210],['Q',ax+sx*46,204,ax+sx*42,196],['Z']]),fill:0.38,ink:0.42,w:0.8}); // cheekbone and zygomatic arch
-    F({path:E(ax+sx*30,210,13,14,sx*-0.2),lucent:0.24,ink:0.38,w:0.8});                             // maxillary sinuses
-    F({path:E(ax+sx*64,208,4.5,7,sx*-0.2),fill:0.38,ink:0.35,w:0.7}); // mastoid processes
-    F({path:E(ax+sx*17,240,7,6),fill:0.35,ink:0.3,w:0.7});                                          // lateral masses of C1
-    F({path:E(ax+sx*60,204,5,4),fill:0.45,ink:0.4,w:0.7});                                          // jaw joints (condyles)
+  const N=512*S,c=document.createElement('canvas');c.width=c.height=N;const g=c.getContext('2d');g.scale(S,S);
+  g.fillStyle='#EFE9DC';g.fillRect(0,0,512,512);
+  if(skSkullData==='img'){g.globalAlpha=0.55;g.globalCompositeOperation='multiply';g.drawImage(skSkull,0,0,512,512);g.globalAlpha=1;g.globalCompositeOperation='source-over'} // opened from disk: no pixel access
+  else if(skSkullData){
+    const D=skSkullData,im=g.getImageData(0,0,N,N),o=im.data,k=1024/N;
+    const smp=(fx,fy,ch)=>{fx=Math.max(0,Math.min(1023,fx));fy=Math.max(0,Math.min(1023,fy));const x0=fx|0,y0=fy|0,x1=Math.min(1023,x0+1),y1=Math.min(1023,y0+1),tx=fx-x0,ty=fy-y0;
+      return ((D[(y0*1024+x0)*4+ch]*(1-tx)+D[(y0*1024+x1)*4+ch]*tx)*(1-ty)+(D[(y1*1024+x0)*4+ch]*(1-tx)+D[(y1*1024+x1)*4+ch]*tx)*ty)/255};
+    const cl=v=>v<0?0:v>1?1:v;
+    // a line screen at angle a: coverage of a line of the given width (in units of 1/512) at this point
+    const ang=[0.55,-0.75,1.45].map(a=>[Math.cos(a),Math.sin(a)]);
+    const screen=(ux,uy,k,per,w)=>{if(w<=0)return 0;const t=(ux*ang[k][0]+uy*ang[k][1])/per,d=Math.abs(t-Math.round(t))*per;return cl((w*0.5-d)*S+0.5)};
+    const c1=ang[0][0],s1=ang[0][1];
+    for(let py=0;py<N;py++){const uy=(py+0.5)/S;
+      for(let px=0;px<N;px++){const ux=(px+0.5)/S,fx=(px+0.5)*k-0.5,fy=(py+0.5)*k-0.5,R=smp(fx,fy,0),G=smp(fx,fy,1),B=smp(fx,fy,2);
+        const wob=0.45*Math.sin(ux*0.051+uy*0.033)+0.35*Math.sin(uy*0.071-ux*0.023),vx=ux+wob*s1,vy=uy-wob*c1;
+        const h1=screen(vx,vy,0,2.4,2.4*Math.pow(cl((R-0.14)/0.8),1.1)*0.6),
+              h2=screen(vx,vy,1,2.6,2.6*cl((R-0.55)/0.4)*0.5),
+              h3=screen(vx,vy,2,2.3,2.3*cl((R-0.78)/0.22)*0.45);
+        const a=1-(1-0.3*R-0.12*B)*(1-h1*0.78)*(1-h2*0.72)*(1-h3*0.66)*(1-cl(G)*0.85),i=(py*N+px)*4;
+        o[i]=239+(29-239)*a;o[i+1]=233+(27-233)*a;o[i+2]=220+(25-220)*a;o[i+3]=255}}
+    g.putImageData(im,0,0);
   }
-  for(const [x,y,rx,ry] of [[ax-9,152,9,7],[ax,147,8,9],[ax+9,152,9,7]])F({path:E(x,y,rx,ry),lucent:0.26,ink:0.38,w:0.8}); // frontal sinus
-  F({path:B([['M',ax,190],['C',ax-14,198,ax-17,214,ax-12,226],['Q',ax,232,ax+12,226],['C',ax+17,214,ax+14,198,ax,190],['Z']]),lucent:0.32,ink:0.5,w:1}); // nasal aperture
-  F({path:L([[ax-4,180],[ax,190],[ax+4,180]]),stroke:2.5,fill:0.4,ink:0.45,w:0.8});                   // nasal bones
-  F({path:L([[ax,194],[ax+1,212],[ax-1,226]]),ink:0.4,w:0.8});                                       // nasal septum
-  // teeth: a curved row each, broader molars at the sides
-  for(let i=-6;i<=6;i++){const w=Math.abs(i)>3?6.8:Math.abs(i)>1?5.6:5,x=ax+i*6.1,yU=227+Math.abs(i)*0.5,yL=239+Math.abs(i)*0.3;
-    F({path:R(x-w/2,yU,w,9,2),fill:0.62,ink:0.32,w:0.5});F({path:R(x-w/2,yL,w,8.5,2),fill:0.6,ink:0.32,w:0.5})}
-  F({path:B([['M',ax-44,212],['Q',ax-40,224,ax-38,228],['L',ax+38,228],['Q',ax+40,224,ax+44,212]]),stroke:3,fill:0.35,ink:0.35,w:0.7}); // upper jaw (maxilla)
-  F({path:B([['M',ax-60,204],['C',ax-62,226,ax-60,246,ax-54,252],['C',ax-40,262,ax-20,270,ax,271],['C',ax+20,270,ax+40,262,ax+54,252],['C',ax+60,246,ax+62,226,ax+60,204]]),stroke:6,fill:0.45,ink:0.55,w:1.1}); // mandible
-  F({path:E(ax,266,9,4),fill:0.3});                                                                    // chin
-  F({path:R(ax-5,228,10,20,4),fill:0.3,ink:0.32,w:0.6});                                              // dens (through the open mouth)
-  // neck vertebrae, front view: bodies with uncinate hooks, pedicles, transverse processes, spinous process end on
-  for(let i=0;i<8;i++){const y=252+i*20.5,w=22+i*0.9,l=ax-w/2,r=ax+w/2;
-    F({path:B([['M',l,y+2],['L',l-1.5,y-2],['L',l+3,y+1],['L',r-3,y+1],['L',r+1.5,y-2],['L',r,y+2],['L',r,y+15],['Q',ax,y+16.5,l,y+15],['Z']]),fill:0.42,ink:0.48,w:0.9});
-    for(const sx of [-1,1]){F({path:E(ax+sx*(w/2-3.5),y+7,2.6,3.8),fill:0.3,ink:0.35,w:0.6});F({path:R(sx>0?r:l-8,y+4,8,6,2),fill:0.25,ink:0.3,w:0.5})}
-    F({path:B([['M',ax,y+6],['Q',ax+4,y+12,ax,y+17],['Q',ax-4,y+12,ax,y+6],['Z']]),fill:0.42,ink:0.38,w:0.6})}
-  F({path:R(ax-8,262,16,250,6),lucent:0.22,ink:0.2,w:0.6,dash:[2,3]});                                 // trachea (air)
-  for(const sx of [-1,1]){
-    F({path:Q([[ax+sx*12,404],[ax+sx*40,394],[ax+sx*70,400],[ax+sx*100,390]]),stroke:8,fill:0.38,ink:0.4,w:0.9}); // clavicles
-    for(let k=0;k<3;k++)F({path:Q([[ax+sx*14,420+k*28],[ax+sx*60,404+k*28],[ax+sx*112,446+k*28]]),stroke:5,fill:0.26,ink:0.3,w:0.7}); // ribs
-    F({path:Q([[ax+sx*44,262],[ax+sx*48,320],[ax+sx*56,372],[ax+sx*118,396]]),ink:0.2,w:0.8,dash:[3,4]}); // skin of neck and shoulders
-  }
-  /* ---------- side view (lateral), face to the left ---------- */
-  F({path:Q([[296,112],[286,150],[282,168],[262,200],[284,212],[279,222],[282,236],[286,262],[312,284],[338,300],[348,400],[346,512]]),ink:0.24,w:0.9,dash:[3,4]}); // the face in profile
-  F({path:Q([[494,140],[488,210],[472,300],[478,512]]),ink:0.2,w:0.8,dash:[3,4]});            // back of the head and neck
-  const cranLat=[['M',298,166],['Q',290,158,290,146],['C',288,112,300,70,330,48],['C',360,26,420,22,456,44],['C',486,64,498,108,492,140],['Q',490,160,482,170],['Q',476,176,470,180],['C',462,196,448,210,432,214],['L',412,206],['Q',392,196,372,190],['Q',334,172,298,166],['Z']];
-  F({path:B(cranLat),fill:0.55,cortex:false});F({path:B(scaleAbout(cranLat,392,118,0.91)),lucent:0.9});F({path:B(scaleAbout(cranLat,392,118,0.91)),fill:0.03});
-  F({path:B(cranLat),ink:0.65,w:1.3});F({path:B(scaleAbout(cranLat,392,118,0.91)),ink:0.42,w:0.9});
-  F({path:L([[346,36],[349,52],[345,66],[350,82],[347,98],[351,112]]),ink:0.3,w:0.7});           // coronal suture
-  F({path:L([[456,46],[462,64],[458,80],[468,98],[464,116],[474,134],[470,150]]),ink:0.3,w:0.7}); // lambdoid suture
-  F({path:Q([[360,176],[384,150],[414,148],[440,170]]),ink:0.3,w:0.7});                          // squamosal suture
-  F({path:Q([[312,118],[360,66],[430,64],[470,104]]),ink:0.16,w:0.7,dash:[2,3]});                // temporal line
-  F({path:E(300,148,8,13,0.2),lucent:0.3,ink:0.4,w:0.8});                                       // frontal sinus
-  F({path:Q([[296,160],[310,152],[324,158]]),stroke:4,fill:0.45,ink:0.5,w:1});                  // brow ridge
-  F({path:E(312,175,15,14),lucent:0.18});F({path:Q([[324,160],[326,176],[318,192]]),stroke:3,fill:0.45,ink:0.55,w:1}); // orbit and its rim
-  F({path:Q([[302,164],[340,163],[372,170]]),stroke:3,fill:0.42,ink:0.42,w:0.9});                // floor of the front of the skull
-  F({path:Q([[366,168],[372,186],[384,188],[392,170]]),stroke:3,fill:0.5,ink:0.6,w:1.1});         // sella turcica
-  F({path:L([[392,172],[400,188],[414,214]]),stroke:9,fill:0.45,ink:0.4,w:0.9});                  // clivus
-  F({path:L([[406,180],[440,174],[432,204],[406,198]]),fill:0.55,ink:0.4,w:0.8});                 // petrous bone
-  F({path:E(422,198,5.5,5.5),lucent:0.4,ink:0.55,w:0.9});                                         // ear canal
-  for(const [x,y,r] of [[440,204,3],[446,212,2.6],[438,214,2.4],[450,203,2.2],[444,220,2]])F({path:E(x,y,r,r),lucent:0.25,ink:0.3,w:0.5}); // mastoid air cells
-  F({path:B([['M',436,206],['L',446,228],['L',454,208],['Z']]),fill:0.42,ink:0.4,w:0.8});         // mastoid process
-  F({path:L([[420,208],[408,238]]),stroke:2,fill:0.4,ink:0.4,w:0.6});                              // styloid process
-  F({path:L([[298,168],[284,196]]),stroke:3,fill:0.42,ink:0.5,w:0.9});                             // nasal bone
-  F({path:B([['M',318,188],['Q',334,186,340,200],['Q',332,212,320,210],['Q',312,200,318,188],['Z']]),fill:0.42,ink:0.42,w:0.8}); // cheekbone
-  F({path:L([[336,197],[372,199],[412,198]]),stroke:4,fill:0.42,ink:0.42,w:0.8});                  // zygomatic arch
-  F({path:B([['M',284,196],['Q',278,206,276,212],['L',284,214],['Q',282,220,284,224],['L',366,220],['L',370,204],['Q',350,194,330,192],['Z']]),fill:0.38,ink:0.42,w:0.9}); // maxilla
-  F({path:E(326,202,16,10,-0.1),lucent:0.26,ink:0.38,w:0.8});                                      // maxillary sinus
-  F({path:L([[284,216],[368,220]]),stroke:3,fill:0.45,ink:0.42,w:0.8});                             // hard palate
-  F({path:E(370,206,10,8),lucent:0.22});                                                            // nasopharynx
-  // teeth: incisors leaning forwards at the front, molars behind
-  for(let i=0;i<8;i++){const x=282+i*6.4,w=i<2?4.6:i<4?5.4:6.4,lean=i<2?-2:0;
-    F({path:B([['M',x,224],['L',x+w,224],['L',x+w+lean,233],['Q',x+w/2+lean,235,x+lean,233],['Z']]),fill:0.62,ink:0.32,w:0.5});
-    F({path:B([['M',x+1+lean,236],['Q',x+1+w/2+lean,234,x+1+w+lean,236],['L',x+1+w,245],['L',x+1,245],['Z']]),fill:0.6,ink:0.32,w:0.5})}
-  // the mandible: chin, lower border, angle, ramus up to the condyle; the coronoid in front of the notch
-  const jaw=[['M',288,244],['Q',282,256,286,266],['Q',292,274,306,272],['Q',340,268,374,262],['Q',386,258,388,248],['L',396,224],['Q',400,212,402,208],['Q',408,200,410,206],['Q',408,212,400,216],['Q',392,222,386,218],['L',378,206],['Q',372,212,370,224],['L',366,240],['Q',340,246,300,246],['Z']];
-  F({path:B(jaw),fill:0.45,ink:0.55,w:1.1});F({path:E(306,262,1.6,1.6),lucent:0.3});              // mandible and mental foramen
-  F({path:Q([[344,276],[352,272],[360,276]]),stroke:3,fill:0.4,ink:0.4,w:0.8});                      // hyoid
-  F({path:Q([[368,206],[378,240],[382,280],[386,340],[388,512]]),stroke:13,lucent:0.25});           // pharynx and trachea (air)
-  // cervical spine, side view: C1 (atlas) arches, the dens, C2 (axis) with its big spinous process, then C3 to C7
-  F({path:E(402,222,4.5,5.5),fill:0.48,ink:0.5,w:0.8});                                            // C1 anterior arch
-  F({path:B([['M',408,236],['L',408,214],['Q',412,206,416,214],['L',418,236],['Z']]),fill:0.42,ink:0.5,w:0.8}); // the dens (odontoid peg)
-  F({path:E(424,220,8,6),fill:0.4,ink:0.42,w:0.7});                                                // C1 lateral mass
-  F({path:B([['M',430,216],['L',460,218],['Q',470,220,468,226],['Q',462,230,456,226],['L',430,226],['Z']]),fill:0.42,ink:0.5,w:0.8}); // C1 posterior arch and tubercle
-  F({path:B([['M',404,238],['L',430,236],['L',432,262],['Q',418,266,402,262],['Z']]),fill:0.44,ink:0.55,w:0.9}); // C2 body
-  F({path:B([['M',432,234],['L',446,238],['L',448,258],['L',434,262],['Z']]),fill:0.4,ink:0.45,w:0.7}); // C2 articular pillar
-  F({path:B([['M',446,242],['Q',466,240,478,250],['Q',482,258,474,262],['L',448,262],['Z']]),fill:0.42,ink:0.5,w:0.8}); // C2 spinous process
-  const lord=[2,5,7,5,2];const spl=[22,22,24,28,42];
-  for(let i=0;i<5;i++){const y=268+i*22,x=410-lord[i],h=17;
-    F({path:B([['M',x,y+1],['L',x+24,y],['L',x+25,y+h],['Q',x+12,y+h+1.5,x-1,y+h+0.5],['Q',x-3,y+h-2,x,y+h-3],['Z']]),fill:0.44,ink:0.55,w:0.9}); // body with its front lip
-    F({path:B([['M',x+26,y-3],['L',x+40,y+1],['L',x+42,y+17],['L',x+28,y+20],['Z']]),fill:0.38,ink:0.45,w:0.7}); // articular pillar
-    const sx0=x+40,sy0=y+5,L2=spl[i];
-    F({path:B([['M',sx0,sy0],['Q',sx0+L2*0.5,sy0+2+i,sx0+L2,sy0+8+i*1.5],['Q',sx0+L2+4,sy0+12+i*1.5,sx0+L2-2,sy0+15+i*1.5],['Q',sx0+L2*0.5,sy0+14,sx0,sy0+11],['Z']]),fill:0.4,ink:0.5,w:0.8})} // lamina and spinous process (C7 the longest)
-  F({path:B([['M',404,380],['L',430,378],['L',432,396],['Q',418,399,402,396],['Z']]),fill:0.42,ink:0.5,w:0.8}); // T1
-  F({path:E(440,486,52,46),fill:0.16,ink:0.18,w:0.7});                                              // the shoulders over the lower neck
-  /* ---------- more skull detail: front view ---------- */
-  {const rnd=(()=>{let a=987654;return()=>{a=(a*16807)%2147483647;return a/2147483647}})();
-  // vault: a speckled diploe between the tables, vessel channels and granulation pits near the top
-  F({speckle:520,path:cranAP,hole:innerAP,seed:3});
-  for(const [x0,y0,dx] of [[ax-60,70,22],[ax+38,62,24],[ax-30,44,18],[ax+60,120,-10]])F({path:Q([[x0,y0],[x0+dx*0.4,y0+3],[x0+dx*0.7,y0-2],[x0+dx,y0+2]]),stroke:1.4,lucent:0.35,ink:0.18,w:0.5}); // diploic channels
-  for(const [x,y] of [[ax-14,46],[ax+16,48],[ax-24,54],[ax+26,57]])F({path:E(x,y,2.2,1.6),lucent:0.35,ink:0.25,w:0.5});            // arachnoid granulation pits
-  for(const sx of [-1,1])F({path:L([[ax+sx*4,40],[ax+sx*12,46],[ax+sx*16,42],[ax+sx*24,52],[ax+sx*30,50],[ax+sx*38,62],[ax+sx*44,60],[ax+sx*52,74],[ax+sx*58,72],[ax+sx*64,88]]),ink:0.28,w:0.6}); // lambdoid suture seen through the vault
-  // midline of the face: nasion, crista galli, the ethmoid air cells between the orbits
-  F({path:E(ax,166,5,3),fill:0.4,ink:0.35,w:0.6});
-  F({path:B([['M',ax-2,170],['L',ax,156],['L',ax+2,170],['Z']]),fill:0.45,ink:0.45,w:0.6});
-  for(let i=0;i<12;i++){const x=ax+(i%2?1:-1)*(3+((i*7)%4)*2.4),y=168+Math.floor(i/2)*3.6;F({path:E(x,y,2.6,1.9),lucent:0.25,ink:0.32,w:0.45})}
-  F({path:L([[ax-30,171],[ax-14,169],[ax+14,169],[ax+30,171]]),ink:0.38,w:0.7});                    // lesser wings and planum sphenoidale
-  for(const sx of [-1,1]){
-    F({path:Q([[ax+sx*44,164],[ax+sx*41,178],[ax+sx*43,192]]),ink:0.42,w:0.8});                     // innominate line (greater wing of the sphenoid)
-    F({path:E(ax+sx*22,161,2.4,1.6),lucent:0.4,ink:0.4,w:0.5});                                     // supraorbital notch
-    F({path:E(ax+sx*28,199,1.8,1.8),lucent:0.4,ink:0.4,w:0.5});                                     // infraorbital foramen
-    F({path:Q([[ax+sx*16,193],[ax+sx*32,196],[ax+sx*48,190]]),stroke:2.4,fill:0.42,ink:0.45,w:0.7});// infraorbital rim
-    F({path:L([[ax+sx*49,164],[ax+sx*52,168]]),ink:0.35,w:0.6});                                    // frontozygomatic suture
-    F({path:E(ax+sx*40,177,4,1.6),lucent:0.4,ink:0.45,w:0.5});                                      // internal auditory canal
-    for(let k=0;k<7;k++)F({path:E(ax+sx*(58+(k%3)*3),194+Math.floor(k/3)*4+(k%2),1.6,1.4),lucent:0.3,ink:0.25,w:0.4}); // mastoid air cells
-    F({path:B([['M',ax+sx*38,206],['L',ax+sx*44,214],['L',ax+sx*36,216],['Z']]),fill:0.35,ink:0.35,w:0.5}); // coronoid tip seen through the sinus
-    F({path:Q([[ax+sx*20,210],[ax+sx*30,206],[ax+sx*40,212]]),ink:0.28,w:0.5});                     // septum in the maxillary sinus
-    for(const y of [205,217])F({path:E(ax+sx*9,y,5,2.2,sx*0.2),fill:0.3,ink:0.4,w:0.6});            // middle and inferior turbinates
-    F({path:E(ax+sx*22,258,1.8,1.8),lucent:0.4,ink:0.4,w:0.5});                                     // mental foramen
-    F({path:Q([[ax+sx*54,232],[ax+sx*40,250],[ax+sx*22,257]]),stroke:1.3,lucent:0.3,ink:0.18,w:0.4}); // mandibular canal
-    F({path:Q([[ax+sx*13,236],[ax+sx*17,232],[ax+sx*22,237]]),ink:0.4,w:0.6});                       // atlanto-axial joints
-  }
-  F({path:L([[ax,248],[ax,270]]),ink:0.25,w:0.5});                                                    // symphysis of the chin
-  // tooth roots in the jaws, and the pulp in each crown
-  for(let i=-6;i<=6;i++){const x=ax+i*6.1,w=Math.abs(i)>3?6.8:Math.abs(i)>1?5.6:5,yU=227+Math.abs(i)*0.5,yL=239+Math.abs(i)*0.3,rt=Math.abs(i)>3?2:1;
-    for(let r=0;r<rt;r++){const ox=rt===2?(r?1.6:-1.6):0;F({path:L([[x+ox,yU],[x+ox*0.8,yU-11+Math.abs(i)*0.4]]),stroke:2.2,fill:0.35,ink:0.22,w:0.4});F({path:L([[x+ox,yL+8.5],[x+ox*0.8,yL+19-Math.abs(i)*0.3]]),stroke:2.2,fill:0.35,ink:0.22,w:0.4})}
-    F({path:E(x,yU+4.5,w*0.18,2.2),lucent:0.3});F({path:E(x,yL+4,w*0.18,2),lucent:0.3})}
-  /* ---------- more skull detail: side view ---------- */
-  const cranLatIn=B(scaleAbout(cranLat,392,118,0.91));
-  F({speckle:620,path:B(cranLat),hole:cranLatIn,seed:7});
-  for(const [x0,y0,dx,dy] of [[360,64,30,-6],[420,50,26,8],[456,96,10,26],[330,96,-8,30]])F({path:Q([[x0,y0],[x0+dx*0.4,y0+dy*0.4+3],[x0+dx*0.7,y0+dy*0.7-2],[x0+dx,y0+dy]]),stroke:1.4,lucent:0.35,ink:0.18,w:0.5}); // diploic channels
-  for(const [x,y] of [[372,40],[396,38],[420,42]])F({path:E(x,y,2.2,1.5),lucent:0.35,ink:0.25,w:0.5});                       // granulation pits
-  F({path:Q([[360,170],[364,140],[378,112],[392,86]]),ink:0.22,w:0.6});F({path:Q([[372,128],[400,120],[428,100]]),ink:0.18,w:0.5});F({path:Q([[366,150],[392,150],[420,138]]),ink:0.18,w:0.5}); // middle meningeal grooves
-  F({path:L([[352,146],[360,152],[352,158]]),ink:0.35,w:0.7});F({path:L([[364,146],[358,152],[364,158]]),ink:0.35,w:0.7}); // pterion
-  F({path:E(478,150,5,6),fill:0.5,ink:0.4,w:0.6});F({path:Q([[476,150],[460,160],[440,170]]),stroke:2,lucent:0.25,ink:0.22,w:0.5}); // internal occipital protuberance, transverse sinus groove
-  F({path:E(486,168,4,3),fill:0.55,ink:0.5,w:0.7});                                                     // external occipital protuberance (inion)
-  F({path:E(440,220,7,4,0.3),fill:0.5,ink:0.45,w:0.7});                                                 // occipital condyle
-  F({path:Q([[306,160],[336,158],[366,166]]),ink:0.42,w:0.8});F({path:Q([[308,166],[338,164],[366,170]]),ink:0.3,w:0.6}); // the two orbital roofs
-  F({path:L([[332,168],[350,168]]),stroke:2,fill:0.45,ink:0.5,w:0.6});                                  // cribriform plate
-  F({path:B([['M',362,164],['L',370,166],['L',366,172],['Z']]),fill:0.5,ink:0.5,w:0.6});               // anterior clinoid process
-  F({path:B([['M',388,170],['L',392,164],['L',396,168],['L',392,174],['Z']]),fill:0.5,ink:0.5,w:0.6}); // dorsum sellae and posterior clinoid
-  F({path:B([['M',360,180],['Q',374,176,388,182],['Q',392,192,386,202],['Q',372,206,360,200],['Q',354,190,360,180],['Z']]),lucent:0.3,ink:0.42,w:0.7}); // sphenoid sinus
-  F({path:L([[374,180],[372,200]]),ink:0.3,w:0.5});F({path:L([[380,182],[382,198]]),ink:0.25,w:0.5});    // its septa
-  F({path:B([['M',356,192],['Q',362,198,358,212],['Q',354,200,356,192],['Z']]),lucent:0.35,ink:0.4,w:0.6}); // pterygopalatine fossa
-  F({path:L([[366,204],[370,228]]),stroke:1.6,fill:0.4,ink:0.42,w:0.6});F({path:L([[372,204],[378,226]]),stroke:1.6,fill:0.4,ink:0.42,w:0.6}); // pterygoid plates
-  for(const [y,x1] of [[200,340],[207,346],[214,350]])F({path:Q([[292,y+1],[318,y-3],[x1,y]]),stroke:2,fill:0.3,ink:0.35,w:0.6}); // turbinates
-  for(let i=0;i<9;i++)F({path:E(318+(i%3)*8,174+Math.floor(i/3)*5,3,2.2),lucent:0.25,ink:0.3,w:0.45});   // ethmoid air cells
-  F({path:L([[300,140],[302,158]]),ink:0.3,w:0.5});                                                      // septum of the frontal sinus
-  F({path:Q([[366,220],[376,226],[384,234]]),stroke:4,fill:0.14,ink:0.2,w:0.6});                         // soft palate
-  F({path:B([['M',296,248],['Q',320,232,352,236],['Q',372,244,368,262],['Q',340,268,300,262],['Z']]),fill:0.08,ink:0.12,w:0.5,dash:[2,3]}); // tongue
-  F({path:Q([[372,262],[368,272],[374,282]]),stroke:2,fill:0.2,ink:0.28,w:0.5});                         // epiglottis
-  F({path:Q([[398,198],[406,192],[416,198]]),stroke:2,fill:0.42,ink:0.45,w:0.6});                        // articular eminence and glenoid fossa
-  F({path:Q([[390,226],[350,250],[308,262]]),stroke:1.4,lucent:0.3,ink:0.2,w:0.4});                      // mandibular canal
-  F({path:E(306,262,1.6,1.6),lucent:0.4,ink:0.4,w:0.5});                                                 // mental foramen
-  // tooth roots: incisors single, molars double; the pulp in each crown
-  for(let i=0;i<8;i++){const x=282+i*6.4,w=i<2?4.6:i<4?5.4:6.4,lean=i<2?-2:0,rt=i>4?2:1;
-    for(let r=0;r<rt;r++){const ox=x+w*(rt===2?(r?0.75:0.25):0.5);
-      F({path:L([[ox,224],[ox+lean*1.8+(rt===2?(r?1:-1):0),212]]),stroke:2,fill:0.35,ink:0.2,w:0.4});
-      F({path:L([[ox+1+lean,245],[ox+1+lean*0.5+(rt===2?(r?1:-1):0),258]]),stroke:2,fill:0.35,ink:0.2,w:0.4})}
-    F({path:E(x+w/2,229,w*0.16,2.4),lucent:0.3});F({path:E(x+1+w/2+lean,240,w*0.16,2.2),lucent:0.3})}
-  }
-  // build the density layer
-  for(const f of P){
-    if(f.speckle){let a=f.seed*7919+1;const r=()=>{a=(a*16807)%2147483647;return a/2147483647};D.save();f.path(D);D.clip();D.globalCompositeOperation='destination-out';
-      for(let i=0;i<f.speckle;i++){const x=r()*512,y=r()*300;if(f.hole){f.hole(D);if(D.isPointInPath(x*S,y*S))continue}D.fillStyle=`rgba(0,0,0,${0.15+r()*0.25})`;D.beginPath();D.ellipse(x,y,0.6+r()*1.1,0.5+r()*0.8,r()*3,0,7);D.fill()}
-      D.restore();continue}
-    if(f.fill!=null||f.lucent!=null){D.save();
-      if(f.lucent!=null){D.globalCompositeOperation='destination-out';D.fillStyle=D.strokeStyle=`rgba(0,0,0,${f.lucent})`;f.path(D);D.fill()}
-      else if(f.stroke){D.strokeStyle=`rgba(0,0,0,${f.fill})`;f.path(D);D.lineWidth=f.stroke;D.stroke()}
-      else if(f.cortex===false||f.fill<0.2){D.fillStyle=`rgba(0,0,0,${f.fill})`;f.path(D);D.fill()}
-      // bone: a lighter inside with a dense rim of cortex, so shading gathers at the edges as on X-ray
-      else{D.fillStyle=`rgba(0,0,0,${f.fill*0.55})`;f.path(D);D.fill();D.save();f.path(D);D.clip();D.strokeStyle=`rgba(0,0,0,${Math.min(0.7,f.fill+0.12)})`;D.lineWidth=3.2;f.path(D);D.stroke();D.restore()}
-      D.restore()}}
-  // paper, then the density as graphite
-  g.fillStyle='#EFE9DC';g.fillRect(0,0,512,512);g.globalAlpha=0.5;g.drawImage(dc,0,0,512,512);g.globalAlpha=1;
-  // engraving where it is dense: hatching, cross-hatched where darker (as the heart room)
-  {const N=256,sm=document.createElement('canvas');sm.width=sm.height=N;const sg=sm.getContext('2d');sg.drawImage(dc,0,0,N,N);const I=sg.getImageData(0,0,N,N).data;
-   const dark=(x,y)=>{if(x<0||y<0||x>=N||y>=N)return 0;return I[(((y|0)*N+(x|0))*4)+3]/255};
-   g.strokeStyle='rgba(29,27,25,0.72)';g.lineWidth=0.5;
-   const pass=(ang,gap,th)=>{const cs=Math.cos(ang),sn=Math.sin(ang),Ln=730;g.beginPath();for(let k=-Ln/2;k<Ln/2;k+=gap){let on=false;for(let t=-Ln/2;t<Ln/2;t+=2.5){const x=256+cs*t-sn*k,y=256+sn*t+cs*k,d=dark(x/2,y/2);
-     if(d>th){if(!on){g.moveTo(x,y);on=true}else g.lineTo(x,y)}else on=false}}g.stroke()};
-   pass(0.12,3,0.3);pass(-0.9,3.4,0.4);pass(0.9,3.6,0.5);pass(1.6,3.1,0.6)}
-  // ink the edges
-  for(const f of P){if(f.ink==null)continue;g.save();g.strokeStyle=`rgba(29,27,25,${f.ink})`;g.lineWidth=f.w||1;if(f.dash)g.setLineDash(f.dash);f.path(g);
-    if(f.stroke){g.lineWidth=(f.w||1);g.stroke()}else g.stroke();g.restore()}
   // the X-ray field's dark rim, then the divider and labels
   for(const ox of [0,256]){const gr=g.createRadialGradient(ox+128,256,150,ox+128,256,300);gr.addColorStop(0,'rgba(60,45,25,0)');gr.addColorStop(1,'rgba(60,45,25,0.22)');g.fillStyle=gr;g.fillRect(ox,0,256,512)}
   g.strokeStyle='#1d1b19';g.lineWidth=1.4;g.beginPath();g.moveTo(256,0);g.lineTo(256,512);g.stroke();
   g.font='italic 14px "IM Fell English", Georgia, serif';g.fillStyle='rgba(29,27,25,0.7)';g.textAlign='right';g.fillText('front (AP)',250,16);g.textAlign='left';g.fillText('side (lateral)',262,16);
-  skBgCache[S]=c;if(S===2)skBgCanvas=c;return c;
+  if(skSkullData){skBgCache[S]=c;if(S===2)skBgCanvas=c}
+  return c;
 }
 const SK_FLOW=200,SK_VEIN_DELAY=3; // mm of artery per second of dye travel; seconds until the veins fill
 const skHist=(h,t)=>{if(t<0||!h.length)return 0;const i=Math.floor(t/0.02);return i<h.length?h[i]:h[h.length-1]};
@@ -523,7 +352,7 @@ function skGuide(){
     else if(dist<-4)t=`You passed it: pull back ${k('ArrowDown')} a little.`;
     else{const d=((next.rot-c.rot+540)%360)-180,pick=skPick(A,{...c,s:Math.max(c.s,next.os>=v.len-0.5?v.len:next.os)},s.dk);t=pick===next&&Math.abs(d)<=skWindow(A,next,s.dk)*0.7?`Lined up: push ${k('ArrowUp')} into the ${skName(next.id)}.`:`Turn ${d>0?'clockwise '+k('ArrowRight'):'anticlockwise '+k('ArrowLeft')} towards the ${skName(next.id)}${pick&&pick!==next?` (now it points into the ${skName(pick.id)})`:''}.`}}
   if(!(down('Space','KeyF')||s.cine)&&!/film|Film|Hold/.test(t))t=`Hold ${k('Space')} for X-ray, then: `+t.charAt(0).toLowerCase()+t.slice(1);
-  el.hidden=false;if(el.dataset.t!==t){el.innerHTML=t;el.dataset.t=t}
+  el.hidden=false;if(el.dataset.t!==t){el.innerHTML=`<span>${t}</span>`;el.dataset.t=t}
 }
 /* ---------- the report ---------- */
 function skFinish(){
