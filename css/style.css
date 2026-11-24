@@ -663,3 +663,9 @@ kbd{font-family:var(--f-body);font-style:normal;font-size:12.5px;border:1px soli
 input[type=range]{accent-color:var(--ink)}
 .ctrlcheck input{accent-color:var(--ink)}
 .overlay,.overlay[data-view="home"]{background:rgba(246,242,233,.97)}body.inmenu .monitor,body.inreport .monitor{background:var(--panel)}
+/* messages sit in their own bar just under the X-ray, never over the image; the bar keeps its space so nothing jumps */
+.stage>.toast{order:1;position:relative;left:auto;top:auto;transform:none;z-index:auto;width:100%;max-width:min(640px,calc(100vh - 250px));min-width:min(100%,300px);
+  min-height:42px;display:flex;align-items:center;justify-content:center;text-align:center;margin:0;line-height:1.25;transition:opacity .2s}
+@media (max-width:920px){.stage>.toast{max-width:640px}}
+#toast[hidden]{display:flex!important;visibility:hidden}
+body.inmenu #toast[hidden],body.inreport #toast[hidden]{display:none!important}

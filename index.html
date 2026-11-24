@@ -27,7 +27,6 @@
       <div class="hud tr" id="hudTR"></div>
       <div class="hud bl" id="hudBL"></div>
       <div class="hud br" id="hudBR"></div>
-      <div class="toast" id="toast" hidden></div>
       <div class="teachnote" id="teachNote" hidden></div>
       <div class="reviewbar" id="reviewbar" hidden>
         <button class="btn" id="rvPrev" title="Previous frame" aria-label="Previous frame">◀</button>
@@ -49,6 +48,7 @@
       <div class="overlay" id="startOv"></div>
       <div class="overlay" id="resultOv" hidden></div>
     </div>
+    <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
     <div class="coach" id="coach" hidden aria-live="polite"></div>
     <div class="guide" id="guide" hidden aria-live="polite"><span id="guideTxt"></span><i class="gmeter" aria-hidden="true"><b id="guideBar"></b></i></div>
     <canvas class="hemo" id="hemo" aria-label="ECG and aortic pressure"></canvas>
