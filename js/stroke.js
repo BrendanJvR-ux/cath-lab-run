@@ -22,7 +22,7 @@ let skBgCanvas=null;const skBgCache={};let skSkullData=null;
 const skSkull=new Image();
 skSkull.onload=()=>{try{const c=document.createElement('canvas');c.width=c.height=1024;const x=c.getContext('2d');x.drawImage(skSkull,0,0);skSkullData=x.getImageData(0,0,1024,1024).data}catch(e){skSkullData='img'}
   for(const k in skBgCache)delete skBgCache[k];skBgCanvas=null};
-skSkull.src='assets/skull-xray.png?v=1';
+skSkull.src='assets/skull-xray.png?v=2';
 function skBg(S=2){
   if(skBgCache[S])return skBgCache[S];
   const N=512*S,c=document.createElement('canvas');c.width=c.height=N;const g=c.getContext('2d');g.scale(S,S);

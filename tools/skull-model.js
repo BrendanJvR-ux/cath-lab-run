@@ -90,7 +90,7 @@ const SKM = (() => {
   /* ---------- the anatomy ---------- */
   const parts = [], soft = [], softAir = [];
   // part: shape, cortex thickness, cortex and inner density, texture, air cut out of it, special textures
-  const P = (s, o = {}) => { const p = Object.assign({ s, cort: 1.4, cd: 1, id: 0.42, tex: 0.6, air: [], cells: 0, honey: 0 }, o); parts.push(p); return p };
+  const P = (s, o = {}) => { const p = Object.assign({ s, cort: 1.4, cd: 1, id: 0.42, tex: 0.6, air: [], holes: [], cells: 0, honey: 0 }, o); parts.push(p); return p };
   const both = fn => { fn(-1); fn(1) };
   const m = (s, p) => [s * p[0], p[1], p[2]];
 
@@ -155,7 +155,8 @@ const SKM = (() => {
   }
   const faceShapes = [
     ell([0, 240, 94], [11, 7, 5]),
-    ell([0, 192, 70], [42, 24, 30]),
+    Shell(ell([-25, 193, 69], [16.5, 16.5, 22.5]), 1.3), Shell(ell([25, 193, 69], [16.5, 16.5, 22.5]), 1.3),
+    tube(Array.from({ length: 17 }, (_, i) => { const a = i / 16 * Math.PI * 2; return [12.5 * Math.sin(a), 204 + 21 * Math.cos(a) - 3 * Math.cos(2 * a), 99 + 2 * Math.cos(a)] }), 2.2, 2.6, [0, 0, 1]), // rim of the nose opening
     tube(arcPts(174, 1.0, 0, -88, 88, 9), 5.5, 6.5),
     ell([0, 177, 64], [21, 3, 30])
   ];
@@ -163,8 +164,8 @@ const SKM = (() => {
     faceShapes.push(
       orbitRim(s),
       ell(m(s, [18, 245, 91]), [13, 5, 5]),                                            // brow ridge
-      ell(m(s, [50, 204, 64]), [11, 11, 13]),                                          // cheekbone
-      tube([m(s, [13, 236, 95]), m(s, [15, 206, 98])], 4, 3, [0, 0, 1]),
+      tube([m(s, [44, 212, 74]), m(s, [50, 205, 70]), m(s, [54, 200, 62]), m(s, [56, 201, 52])], [3, 3.4, 3.2, 2.6], [5, 7, 6.5, 4.5], [0, 0, 1]), // cheekbone
+      tube([m(s, [12, 236, 94]), m(s, [14, 222, 97]), m(s, [16, 206, 102])], 3.6, 2.8, [0, 0, 1]),
       tube([m(s, [54, 205, 56]), m(s, [64, 205, 32]), m(s, [67, 207, 10]), m(s, [64, 204, -10]), m(s, [60, 200, -20])], 2.1, [4.2, 4.2, 3.8, 3.8, 3.4]),
       cone(m(s, [15, 206, 30]), m(s, [17, 176, 32]), 3.5, 2),
       cone(m(s, [23, 204, 28]), m(s, [25, 178, 30]), 3, 1.6),
@@ -189,15 +190,24 @@ const SKM = (() => {
   P(ell([0, 236, -103], [7, 5, 4]), { cort: 3, cd: 0.6 }); P(ell([0, 230, -111], [5, 4, 2.5]), { cort: 3, cd: 0.6 });                // occipital protuberances
 
   // mandible
-  const jawPath = [[0, 141, 93], [17, 142, 88], [31, 143, 74], [40, 145, 55], [46, 147, 32], [49, 149, 12], [50, 151, 0]];
-  const jawShapes = [tube([...jawPath.slice(1).reverse().map(p => m(-1, p)), ...jawPath], 4.8, [9, 10, 11, 12, 13, 13.5, 13, 12, 11, 10, 9, 9, 9].slice(0, 13)), ell([0, 132, 95], [14, 6, 5])];
+  // body: centre line from the chin back to the angle, taller in front; the lower border rises towards the angle
+  const jawPath = [[0, 143, 94, 14.5, 5.5], [10, 143.5, 92, 14.5, 5.2], [20, 145, 86, 14, 5], [29, 146.5, 76, 13, 4.8], [37, 148, 62, 12.5, 4.6],
+    [43, 149.5, 46, 12, 4.6], [47, 151, 30, 11.5, 4.6], [49.5, 152.5, 14, 11.5, 4.5], [50.5, 154, 2, 11.5, 4.5]];
+  const jawFull = [...jawPath.slice(1).reverse().map(p => [-p[0], ...p.slice(1)]), ...jawPath];
+  const jawShapes = [
+    tube(jawFull.map(p => p.slice(0, 3)), jawFull.map(p => p[4]), jawFull.map(p => p[3])),
+    tube(jawFull.map(p => [p[0], p[1] - p[3] + 2.6, p[2]]), jawFull.map(p => p[4] - 0.3), 3),          // the thick lower border
+    ell([0, 131, 95], [13, 5, 5])];                                                                    // chin
   both(s => jawShapes.push(
-    tube([m(s, [50, 153, 2]), m(s, [51, 168, -4]), m(s, [51.5, 181, -8])], [13, 14, 12.5], 3.5, [1, 0, 0]),
-    tube([m(s, [51.5, 180, -9]), m(s, [53, 193, -18])], 3.4, 3.6, [1, 0, 0]),
-    ell(m(s, [54, 196, -19]), [9, 4.5, 5.5]),
-    cone(m(s, [48, 178, 7]), m(s, [47, 193, 12]), 4.5, 1.8)));
-  const canal = [-1, 1].map(s => tube([m(s, [50, 172, -3]), m(s, [48, 148, 10]), m(s, [40, 142, 50]), m(s, [24, 140, 78])], 1.6, 1.6));
-  P(SU(3, ...jawShapes), { cort: 1.7, id: 0.4, air: canal });
+    tube([m(s, [50.5, 157, -3]), m(s, [51, 171, -7]), m(s, [51.5, 182, -10])], [14, 14, 12], 4.2, [1, 0, 0]), // ramus, leaning back
+    tube([m(s, [50, 147, -10]), m(s, [51, 165, -16]), m(s, [52, 183, -19])], 3, 3),                     // its posterior border
+    tube([m(s, [48, 158, 16]), m(s, [48.5, 170, 10]), m(s, [48, 186, 12])], 2.6, 2.6),                   // anterior border up to the coronoid
+    ell(m(s, [50, 150, -6]), [4.2, 8, 9]),                                                             // rounded angle
+    tube([m(s, [51.5, 182, -12]), m(s, [53, 193, -18])], 3.2, 3.6, [1, 0, 0]),                          // condylar neck
+    ell(m(s, [54, 196, -19]), [9, 4.5, 5.5]),                                                          // condyle
+    cone(m(s, [48.5, 175, 7]), m(s, [47, 192, 13]), 5, 1.8)));                                          // coronoid
+  const canal = [-1, 1].map(s => tube([m(s, [50, 176, -6]), m(s, [49.5, 160, -1]), m(s, [47, 149, 18]), m(s, [41, 146, 48]), m(s, [28, 144, 74])], 1.2, 1.2));
+  P(SU(3, ...jawShapes), { cort: 1.5, id: 0.38, holes: canal });
   // teeth, upper and lower, along the dental arch
   function arcPts(y, sc, dz, a0, a1, n) { const out = []; for (let i = 0; i < n; i++) { const a = (a0 + (a1 - a0) * i / (n - 1)) * Math.PI / 180; out.push([38 * sc * Math.sin(a), y, 52 + dz + 42 * sc * Math.cos(a)]) } return out }
   const TA = [6, 17, 28, 39, 50, 61, 72, 83], TW = [2.5, 2.3, 2.8, 2.9, 3, 3.9, 4, 3.6], TL = [12, 11, 16, 12, 12, 11, 11, 10];
@@ -210,16 +220,16 @@ const SKM = (() => {
     const pulp = cone([x, yC0 + dir * 3, z], [x, yR - dir * 2, z - tilt], 0.9, 0.35);
     P(SU(1.5, ...shapes), { cort: 1.1, cd: 1.95, id: 1.15, tex: 0.15, air: [pulp] });
   }
-  P(tube([[-20, 127, 8], [-13, 125, 24], [0, 124, 30], [13, 125, 24], [20, 127, 8]], 1.7, 2.2), { cort: 1.2, cd: 0.7 }); // hyoid
+  P(tube([[-20, 127, 8], [-13, 125, 24], [0, 124, 30], [13, 125, 24], [20, 127, 8]], 1.5, 2.2), { cort: 1.2, cd: 0.55, id: 0.3 }); // hyoid
 
   // spine: C1 ring, C2 with the dens, C3 to C7, then T1 to T6
-  const Zc = y => y >= 10 ? -30 + 5 * Math.sin(Math.PI * (y - 10) / 150) : -30 - (10 - y) * 0.2;
+  const Zc = y => y >= 10 ? -35 + 5 * Math.sin(Math.PI * (y - 10) / 150) : -35 - (10 - y) * 0.2;
   {
     const z0 = -30;
-    const ring = tube([[0, 178, -12], [12, 178, -16], [20, 178, -27], [19, 178, -44], [10, 178, -56], [0, 178, -60], [-10, 178, -56], [-19, 178, -44], [-20, 178, -27], [-12, 178, -16], [0, 178, -12]], 3.2, 4.2);
-    const c1 = [ring, ell([0, 178, -12], [5, 5.5, 3.5]), ell([0, 178, -61], [4, 5, 3.5])];
-    both(s => c1.push(ell(m(s, [19, 178, -28]), [8, 8, 10]), tube([m(s, [22, 178, -28]), m(s, [40, 179, -30])], 4, 4)));
-    P(SU(2.5, ...c1), { cort: 1.3, air: [-1, 1].map(s => ecyl(m(s, [31, 178, -29]), 2.8, 2.8, 20)) });
+    const ring = tube([[0, 178, -17], [12, 178, -21], [20, 178, -32], [19, 178, -49], [10, 178, -61], [0, 178, -65], [-10, 178, -61], [-19, 178, -49], [-20, 178, -32], [-12, 178, -21], [0, 178, -17]], 3.2, 4.2);
+    const c1 = [ring, ell([0, 178, -17], [5, 5.5, 3.5]), ell([0, 178, -66], [4, 5, 3.5])];
+    both(s => c1.push(ell(m(s, [19, 178, -33]), [8, 8, 10]), tube([m(s, [22, 178, -33]), m(s, [40, 179, -35])], 4, 4)));
+    P(SU(2.5, ...c1), { cort: 1.3, air: [-1, 1].map(s => ecyl(m(s, [31, 178, -34]), 2.8, 2.8, 20)) });
     void z0;
   }
   const verts = [ // [centre y, height, spinous length, thoracic?]
@@ -227,7 +237,7 @@ const SKM = (() => {
     [12, 18, 36, 1], [-10, 19, 34, 1], [-32, 19, 34, 1], [-54, 20, 34, 1], [-76, 20, 34, 1], [-98, 21, 34, 1]];
   verts.forEach(([yc, h, sl, th], vi) => {
     const zc = Zc(yc), rx = th ? 15 + vi * 0.3 : 12.5 + vi * 0.25, rz = th ? 12.5 : 9.5, sh = [ecyl([0, yc, zc], rx, rz, h, 2)];
-    if (vi === 0) sh.push(cone([0, 158, zc + 5], [0, 188, -21], 5.8, 5)); // the dens
+    if (vi === 0) sh.push(cone([0, 158, zc + 5], [0, 188, -26], 5.8, 5)); // the dens
     both(s => {
       sh.push(tube([m(s, [8, yc + 2, zc - 7]), m(s, [13, yc + 2, zc - 15])], 3.2, 3.6, [0, 1, 0]));                     // pedicle
       sh.push(ecyl(m(s, [th ? 15 : 17, yc - 1, zc - 21]), 5.5, 6.5, h + 4, 2.2));                                      // articular pillar
@@ -296,10 +306,11 @@ const SKM = (() => {
     let d = p.s.f(x, y, z); if (d >= 0.5) return 0;
     for (const a of p.air) { const da = a.f(x, y, z); if (-da > d) d = -da; if (d >= 0.5) return 0 }
     const cov = Math.min(1, 0.5 - d); let den;
-    if (p.honey) { const n = fbm(x * 0.32, y * 0.32, z * 0.32); den = Math.abs(n - 0.5) < 0.05 ? 0.85 : 0.06 }
+    if (p.honey) { const n = fbm(x * 0.32, y * 0.32, z * 0.32); den = (Math.abs(n - 0.5) < 0.05 ? 0.8 : 0.05) * Math.min(1, Math.max(0, -d / 6)) }
     else if (d > -p.cort) den = p.cd;
     else { den = p.id * (1 - p.tex * 0.5 + p.tex * fbm(x * 0.4, y * 0.4, z * 0.4));
       if (p.cells && fbm(x * 0.42 + 3, y * 0.42, z * 0.42) > 0.5) den *= 0.12 }
+    for (const h of p.holes) { const dh = h.f(x, y, z); if (dh < 0) den *= 0.3 + 0.7 * Math.min(1, Math.max(0, dh + 1)) }
     return den * cov;
   }
   function softDensity(p, x, y, z) {
