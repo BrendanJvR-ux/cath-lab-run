@@ -669,3 +669,6 @@ input[type=range]{accent-color:var(--ink)}
 @media (max-width:920px){.stage>.toast{max-width:640px}}
 #toast[hidden]{display:flex!important;visibility:hidden}
 body.inmenu #toast[hidden],body.inreport #toast[hidden]{display:none!important}
+/* room for the longest warnings (three lines on desktop, four on a phone), so the controls never move */
+.stage>.toast{min-height:76px}
+@media (max-width:620px){.stage>.toast{min-height:96px}}
