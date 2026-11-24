@@ -293,7 +293,7 @@ test('A posteriorly placed RCA origin needs more clockwise torque than usual',()
 test('The default anatomy can be restored after random patients',()=>{buildAnatomy();ok(VBY.PLV&&VBY.PDA&&!VBY.RI&&!VBY.LPDA);ok(fx('rca').label==='mid RCA')});
 
 test('Every game script parses (a stray quote anywhere breaks the whole game)',()=>{
-  const files=['config/config.js','js/sim.js','js/gen.js','js/game.js','js/controls.js','js/heart3d.js','js/career.js','js/tutorial.js','js/glossary.js','js/intro.js'];
+  const files=['config/config.js','js/sim.js','js/gen.js','js/game.js','js/controls.js','js/heart3d.js','js/career.js','js/tutorial.js','js/glossary.js','js/intro.js','js/achievements.js'];
   for(const f of files){const x=new XMLHttpRequest();x.open('GET','../'+f+'?'+Date.now(),false);x.send();ok(x.status===200,f+' not found');try{new Function(x.responseText)}catch(e){throw new Error(f+': '+e.message)}}
   return files.length+' files';
 });
@@ -304,6 +304,20 @@ test('Plain words: vessel names and grades in everyday language, medical terms i
 test('Story difficulty: no complications, no contrast limit, the most help finding the ostia',()=>{
   const S=DIFFICULTY.story,E=DIFFICULTY.easy;ok(S.story&&S.level===1&&S.budgetX==null);ok(S.tol.L>E.tol.L&&S.tol.R>E.tol.R&&S.seek>E.seek);
   for(let i=0;i<20;i++){const ch=caseChallenge(randomCode(),'story');ok(!ch.forced&&ch.randomX===0&&ch.contrastX===1)}
+});
+test('Skill grade: difficulty-adjusted average, provisional until three cases; the streak plays no part',()=>{
+  const x=document.createElement('script');x.src='../js/achievements.js';
+  const src=(()=>{const q=new XMLHttpRequest();q.open('GET','../js/achievements.js',false);q.send();return q.responseText})();
+  const f=new Function('profile','saveProfile','dateKey','DIFFICULTY',src+';return {gradeOf,recordCase,streakNow,DIFF_WEIGHT};');
+  let p={tokens:0},today='2026-11-24';const dk=()=>today;
+  const A=f(p,()=>{},d=>{const t=new Date(d);return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')},DIFFICULTY);
+  const c=(score,diff)=>({score,diff,level:DIFFICULTY[diff].level,S:{complication:null,budget:null,contrast:80,ftime:300,blind:0,ffr:[],stents:[],d2b:null},daily:null,sig:1,opened:0,sigAll:1,graded:0,comps:[]});
+  A.recordCase(c(70,'easy'));A.recordCase(c(70,'easy'));let g=A.gradeOf(p);ok(!g.ok&&g.n===2,'provisional');
+  A.recordCase(c(70,'hard'));g=A.gradeOf(p);ok(g.ok,'graded after 3');
+  ok(Math.abs(g.r-(70*0.75*2+Math.min(100,70*1.2))/3)<1e-9,'rating '+g.r);ok(Math.abs(g.avg-70)<1e-9,'average');
+  ok(p.streak.n===1,'three cases on one day = one day of streak');ok(p.ach.got.first,'first case badge');
+  const r1=g.r;p.streak.n=40;ok(A.gradeOf(p).r===r1,'streak does not move the grade');
+  return `rating ${g.r.toFixed(1)} · grade ${g.letter} ${g.title}`;
 });
 const bad=results.filter(r=>!r.ok).length,sum=document.getElementById('sum');
 sum.textContent=bad?`${bad} of ${results.length} failed`:`All ${results.length} passed`;sum.className=bad?'bad':'ok';

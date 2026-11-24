@@ -165,7 +165,6 @@ function recordDaily(score){
     if(MEDAL_RANK[medal]>MEDAL_RANK[old]){
       bonus=(MEDAL_TOKENS[medal]||0)-(MEDAL_TOKENS[old]||0);
       profile.medals={...(profile.medals||{})};if(old!=='none')profile.medals[old]=Math.max(0,(profile.medals[old]||0)-1);profile.medals[medal]=(profile.medals[medal]||0)+1;
-      if(old==='none'){const st=profile.streak||{n:0},y=dateKey(new Date(Date.now()-864e5));profile.streak={n:st.last===y?st.n+1:st.last===today?st.n:1,last:today}}
     }
     profile.daily={date:today,score,medal,diff:S.diff};
   }
@@ -187,6 +186,7 @@ function renderMenu(){
     return;
   }
   if(menuView==='career'){ov.innerHTML=careerView();return}
+  if(menuView==='awards'){ov.innerHTML=achView();return}
   if(menuView==='exp'){
     ov.innerHTML=`<h1>How much angiography have you done?</h1>
       <p>The tutorial is a short play-through of one patient. Your answer sets how much it explains and where you start afterwards.</p>
@@ -246,8 +246,8 @@ function renderMenu(){
         <div class="mm-secondary"><button class="btn" data-act="play">Case select</button></div>
       </div>
       ${sv?`<div class="mm-strip resume"><div><b>Unfinished case</b><span>${sv.ci==='TUTORIAL'?'The tutorial':'Patient '+sv.ci} · ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:''} · ${fmtT(sv.clock)} in</span></div><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="discard">Discard</button></div>`:''}
-      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button><button class="lnk" data-act="career">Career</button><button class="lnk" data-act="intro">How it works (1 min)</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Controls</button><button class="lnk" data-gl="">Glossary</button></div>
-      <div class="mm-op">${avatarSVG(profile.avatar,32)}<span><b>${esc(profile.name)}</b> · ${typeof rankName==='function'?rankName()+' · ':''}${profile.tokens} tokens · ${DIFFICULTY[profile.diff].label}</span><button class="lnk" data-act="editop" style="background:none;border:0;padding:0;font:inherit;text-decoration:underline;cursor:pointer;color:inherit">Change</button></div>
+      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button><button class="lnk" data-act="career">Career</button><button class="lnk" data-act="awards">Achievements${typeof ACHIEVEMENTS!=='undefined'?` (${ACHIEVEMENTS.filter(a=>profile.ach&&profile.ach.got&&profile.ach.got[a.id]).length}/${ACHIEVEMENTS.length})`:''}</button><button class="lnk" data-act="intro">How it works (1 min)</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Controls</button><button class="lnk" data-gl="">Glossary</button></div>
+      <div class="mm-op">${avatarSVG(profile.avatar,32)}<span><b>${esc(profile.name)}</b> · ${typeof rankName==='function'?rankName()+' · ':''}${profile.tokens} tokens · ${DIFFICULTY[profile.diff].label}${typeof gradeOf==='function'?(()=>{const g=gradeOf(profile),n=streakNow(profile);return ` · grade ${g.ok?g.letter+' '+g.title.toLowerCase():'pending'}${n?` · 🔥 ${n}-day streak`:''}`})():''}</span><button class="lnk" data-act="editop" style="background:none;border:0;padding:0;font:inherit;text-decoration:underline;cursor:pointer;color:inherit">Change</button></div>
     </div>
     <div class="mm-art" aria-hidden="true">${CARM_SVG}</div></div>
     <p class="fine">Teaching game with simplified anatomy and physics. Not a clinical training device.</p>`;
@@ -265,6 +265,7 @@ $('startOv').addEventListener('click',e=>{
   else if(d.act==='play'){menuView=profile.exp==null&&!returning()?'exp':'play';renderMenu()}
   else if(d.act==='exp'){menuView='exp';renderMenu()}
   else if(d.act==='career'){menuView='career';renderMenu()}
+  else if(d.act==='awards'){menuView='awards';renderMenu()}
   else if(d.act==='careercase'){startCareerCase()}
   else if(d.act==='tutorial'){startTutorial()}
   else if(d.act==='skiptut'||d.act==='notut'){profile.tutSkipped=true;saveProfile();menuView='play';renderMenu()}
@@ -780,7 +781,7 @@ function tick(dt){
     {const c0=cst(c),region=c.s<S_ARCH0?0.3:c.s<=S_ROOT?1.2:1;
      const th0=c.th;S.twist=stepTorque(c,dt,{...D.torque,fric:D.torque.fric*region,moving:axial,engaged:!!c0.eng});
      // a sudden jump of the tip is a whip: say so (once per jump)
-     if(Math.abs(c.w)>260&&!S.whipT){S.whipT=1.2;toast(pw(`Whip! The tip jumped as the stored twist let go. Turn in small steps and nudge the catheter in or out as you torque.`,`Whip! The tip jumped as twist stored in the tube let go. Turn in small steps and nudge the tube in or out while you turn.`),true)}
+     if(Math.abs(c.w)>260&&!S.whipT){S.whipT=1.2;S.whips=(S.whips||0)+1;toast(pw(`Whip! The tip jumped as the stored twist let go. Turn in small steps and nudge the catheter in or out as you torque.`,`Whip! The tip jumped as twist stored in the tube let go. Turn in small steps and nudge the tube in or out while you turn.`),true)}
      S.whipT=Math.max(0,(S.whipT||0)-dt);void th0}
     // near the ostium a preshaped Judkins tends to drop in on its own (more help on easier settings): the whole catheter turns
     if(D.seek>0){const C=CATH[c.type],c0=cst(c);if(!c0.eng&&c0.u>=0.55&&!down('ArrowLeft','KeyA','ArrowRight','KeyD')&&!S.dragTurn){const diff=((OSTANG[C.sys]-c.th+540)%360)-180;if(Math.abs(diff)<D.tol[C.sys]+D.seek){const d=Math.sign(diff)*Math.min(Math.abs(diff),D.seekSpeed*dt);c.th+=d;c.hub+=d}}}
@@ -1100,12 +1101,20 @@ function finish(){
   if(!S.c.tutorial&&typeof careerRecord==='function'){const ev=S.events.filter(e=>e.kind!=='spasm'||e.sev>0.8);
     for(const n of careerRecord({diff:S.diff,score:S.complication?0:total,stemi:S.stemi,d2b:S.d2b?S.reperfAt:null,hadComp:ev.length>0,managed:ev.length>0&&ev.every(e=>e.treated||e.sealed),ffrUsed:S.ffr.length>0}))notes.unshift(n)}
   const key=S.diff+'-'+(S.c.random?'R':S.ci),prev=profile.best[key];if(prev==null||total>prev)profile.best[key]=total;saveProfile();renderWho();
+  let achRes=null;
+  if(!S.c.tutorial&&typeof recordCase==='function'){
+    const sigAll=S.lesions.filter(L=>L.sev>=0.5),sig=S.lesions.filter(L=>L.sev>=0.7),bk=L=>BUCKETS.findIndex(b=>L.sev>=b.lo&&L.sev<b.hi);
+    const graded=sigAll.filter(L=>S.marks.some(m=>m.vid===L.vid&&Math.abs(m.ld-L.at)<=L.len/2+7&&m.bucket===bk(L))).length;
+    achRes=recordCase({score:S.complication?0:total,diff:S.diff,level:S.D.level,S,daily,sig:sig.length,opened:sig.filter(L=>L.stented).length,sigAll:sigAll.length,graded,comps:S.events});
+    achRes.fresh.forEach((a,i)=>setTimeout(()=>toast(`Achievement: ${a.name} · +${a.t} tokens`),600+i*1800));
+  }
   const ov=$('resultOv');
   ov.innerHTML=`<div class="rephead">${avatarSVG(profile.avatar,48)}<div><h1>Report · ${caseName(S)}</h1><span class="fine">${esc(profile.name)} · ${S.D.label}</span></div></div>
   <div class="score"><b>${total}</b><span>${grade}</span></div>
   ${PLAIN?plainSummary():''}
   <div class="tokens">${CUP} +${earned} coffee token${earned===1?'':'s'}${S.D.tokenX>1?` (×${S.D.tokenX} for ${S.D.label})`:''} · ${profile.tokens} banked${prev!=null&&total>prev?' · new best':''}</div>
   ${daily?`<div class="medalrow">${medalBadge(daily.medal)}<span><b>Today's case: ${MEDAL_NAME[daily.medal]}</b>${daily.bonus?` · +${daily.bonus} medal tokens`:''} · bronze ${MEDALS[S.diff].bronze}, silver ${MEDALS[S.diff].silver}, gold ${MEDALS[S.diff].gold} on ${S.D.label}${profile.streak&&profile.streak.n>1?` · 🔥 ${profile.streak.n}-day streak`:''}</span></div>`:''}
+  ${achReportHTML(achRes)}
   <div class="rows">${rows.map(r=>`<span>${r[0]}</span><span class="v">${Math.round(r[1])} / ${r[2]}</span>`).join('')}</div>
   ${txBreakdown()}
   ${flowReport()}
