@@ -248,7 +248,7 @@ function renderMenu(){
         <div class="mm-secondary"><button class="btn" data-act="play">Case select</button></div>
       </div>
       ${sv?`<div class="mm-strip resume"><div><b>Unfinished case</b><span>${sv.ci==='TUTORIAL'?'The tutorial':'Patient '+sv.ci} · ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:''} · ${fmtT(sv.clock)} in</span></div><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="discard">Discard</button></div>`:''}
-      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button>${typeof weeklyInfo==='function'?`<button class="lnk" data-act="weeklysel">This week: ${weeklyInfo().mod.name}</button>`:''}<button class="lnk" data-act="career">Career</button><button class="lnk" data-act="awards">Achievements${typeof ACHIEVEMENTS!=='undefined'?` (${ACHIEVEMENTS.filter(a=>profile.ach&&profile.ach.got&&profile.ach.got[a.id]).length}/${ACHIEVEMENTS.length})`:''}</button><button class="lnk" data-act="intro">How it works (1 min)</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Controls</button><button class="lnk" data-gl="">Glossary</button></div>
+      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button>${typeof weeklyInfo==='function'?`<button class="lnk" data-act="weeklysel">This week: ${weeklyInfo().mod.name}</button>`:''}<button class="lnk" data-act="career">Career</button><button class="lnk" data-act="awards">Achievements${typeof ACHIEVEMENTS!=='undefined'?` (${ACHIEVEMENTS.filter(a=>profile.ach&&profile.ach.got&&profile.ach.got[a.id]).length}/${ACHIEVEMENTS.length})`:''}</button><button class="lnk" data-act="intro">How it works (1 min)</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Settings</button><button class="lnk" data-gl="">Glossary</button></div>
       <div class="mm-op">${avatarSVG(profile.avatar,32)}<span><b>${esc(profile.name)}</b> · ${typeof rankName==='function'?rankName()+' · ':''}${profile.tokens} tokens · ${DIFFICULTY[profile.diff].label}${typeof gradeOf==='function'?(()=>{const g=gradeOf(profile),n=streakNow(profile);return ` · grade ${g.ok?g.letter+' '+g.title.toLowerCase():'pending'}${n?` · 🔥 ${n}-day streak`:''}`})():''}</span><button class="lnk" data-act="editop" style="background:none;border:0;padding:0;font:inherit;text-decoration:underline;cursor:pointer;color:inherit">Change</button></div>
     </div>
     <div class="mm-art" aria-hidden="true">${CARM_SVG}</div></div>
@@ -1153,19 +1153,19 @@ function plainOn(){return !!profile&&(profile.plain!=null?profile.plain:(profile
 function syncPlain(){PLAIN=plainOn()}
 function applyPlain(){
   document.querySelectorAll('[data-plain]').forEach(el=>{if(el.dataset.med==null)el.dataset.med=el.textContent;el.textContent=PLAIN?el.dataset.plain:el.dataset.med});
-  const b=$('plainBtn');b.setAttribute('aria-pressed',String(PLAIN));b.textContent=PLAIN?'Plain words: on':'Plain words: off';b.hidden=!profile;
 }
 function relabel(){
   if(!S)return;const L=o=>{if(o&&VBY[o.vid])o.label=segLabel(VBY[o.vid],o.ld!=null?o.ld:o.at)};
   S.lesions.forEach(L);S.marks.forEach(L);S.events.forEach(L);S.stents.forEach(L);S.balloons.forEach(L);S.ffr.forEach(L);
   if(S.pci&&VBY[S.pci.vid])S.pci.label=segLabel(VBY[S.pci.vid],S.pci.mark);if(S.pending)L(S.pending);
 }
-$('plainBtn').addEventListener('click',()=>{
-  if(!profile)return;profile.plain=!plainOn();saveProfile();syncPlain();relabel();applyPlain();
+/* switched in the Settings dialog */
+function setPlain(on){
+  if(!profile)return;profile.plain=!!on;saveProfile();syncPlain();relabel();applyPlain();
   if(S){renderMarks();renderPCI(true);renderGrade();renderPending()}
   if(document.body.classList.contains('inmenu'))renderMenu();
   toast(PLAIN?'Plain words on: everyday language, with the medical terms in brackets.':'Plain words off: medical terms.');
-});
+}
 function plainSummary(){
   const sig=S.lesions.filter(L=>L.sev>=0.7),opened=sig.filter(L=>L.stented);
   const lines=opened.map(L=>{const pre=vesselFlow(L.vid,S.lesions.map(x=>({...x,cur:null})),null,false),post=vesselFlow(L.vid,S.lesions,S.events,true);
