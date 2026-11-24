@@ -92,8 +92,10 @@ const SCENES=[
 ];
 const SCENE_S=10;
 let introState=null;
-function openIntro(){
+/* play a set of scenes; opts: {seenKey (profile flag set when closed), onClose, finish (last button label)} */
+function openIntro(scenes,opts={}){
   closeIntro();
+  const SC=Array.isArray(scenes)?scenes:SCENES;introOpts=Array.isArray(scenes)?(opts||{}):{};
   const d=document.createElement('div');d.className='glossary intro';d.setAttribute('role','dialog');d.setAttribute('aria-label','How it works');
   d.innerHTML=`<div class="glbox introbox"><div class="glhead"><b id="inTitle"></b><button class="btn" data-in="skip">Skip</button></div>
     <canvas id="inCan" width="${IW*2}" height="${IH*2}" aria-hidden="true"></canvas>
@@ -104,15 +106,15 @@ function openIntro(){
   const can=d.querySelector('#inCan'),g=can.getContext('2d');g.setTransform(2,0,0,2,0,0);
   introState={i:0,t0:performance.now(),paused:false,pausedAt:0,raf:0};
   const show=i=>{introState.i=i;introState.t0=performance.now();introState.pausedAt=0;
-    d.querySelector('#inTitle').textContent=`${i+1} of ${SCENES.length} · ${SCENES[i].title}`;d.querySelector('#inCap').textContent=SCENES[i].cap;
-    d.querySelector('#inDots').innerHTML=SCENES.map((_,k)=>`<i class="${k<i?'done':k===i?'now':''}"></i>`).join('');
-    d.querySelector('[data-in="back"]').disabled=i===0;d.querySelector('[data-in="next"]').textContent=i===SCENES.length-1?'Start playing':'Next'};
+    d.querySelector('#inTitle').textContent=`${i+1} of ${SC.length} · ${SC[i].title}`;d.querySelector('#inCap').textContent=SC[i].cap;
+    d.querySelector('#inDots').innerHTML=SC.map((_,k)=>`<i class="${k<i?'done':k===i?'now':''}"></i>`).join('');
+    d.querySelector('[data-in="back"]').disabled=i===0;d.querySelector('[data-in="next"]').textContent=i===SC.length-1?(introOpts.finish||'Start playing'):'Next'};
   const frame=now=>{
     if(!introState)return;
     const el=introState.paused?introState.pausedAt:(now-introState.t0)/1000,t=Math.min(1,el/SCENE_S);
     g.clearRect(0,0,IW,IH);g.fillStyle='#F6F2E9';g.fillRect(0,0,IW,IH);
-    SCENES[introState.i].draw(g,t,el);
-    if(!introState.paused&&el>=SCENE_S+1.2&&introState.i<SCENES.length-1)show(introState.i+1);
+    SC[introState.i].draw(g,t,el);
+    if(!introState.paused&&el>=SCENE_S+1.2&&introState.i<SC.length-1)show(introState.i+1);
     introState.raf=requestAnimationFrame(frame);
   };
   d.addEventListener('click',e=>{
@@ -120,14 +122,17 @@ function openIntro(){
     const a=b.dataset.in;
     if(a==='skip')closeIntro(true);
     else if(a==='back'&&introState.i>0)show(introState.i-1);
-    else if(a==='next'){if(introState.i<SCENES.length-1)show(introState.i+1);else closeIntro(true)}
+    else if(a==='next'){if(introState.i<SC.length-1)show(introState.i+1);else closeIntro(true)}
     else if(a==='pause'){const p=introState;if(p.paused){p.paused=false;p.t0=performance.now()-p.pausedAt*1000;b.textContent='Pause'}else{p.pausedAt=(performance.now()-p.t0)/1000;p.paused=true;b.textContent='Play'}}
   });
   d.addEventListener('keydown',e=>{if(e.key==='Escape')closeIntro(true);if(e.key==='ArrowRight')d.querySelector('[data-in="next"]').click();if(e.key==='ArrowLeft')d.querySelector('[data-in="back"]').click()});
   show(0);introState.raf=requestAnimationFrame(frame);d.querySelector('[data-in="next"]').focus();
 }
+let introOpts={};
 function closeIntro(seen){
+  const o=introOpts;introOpts={};
   if(introState){cancelAnimationFrame(introState.raf);introState=null}
   document.querySelectorAll('.intro').forEach(n=>n.remove());
-  if(seen&&typeof profile!=='undefined'&&profile&&!profile.introSeen){profile.introSeen=true;saveProfile()}
+  const key=o.seenKey||'introSeen';if(seen&&typeof profile!=='undefined'&&profile&&!profile[key]){profile[key]=true;saveProfile()}
+  if(o.onClose)setTimeout(()=>o.onClose(!!seen),0);
 }

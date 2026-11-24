@@ -89,10 +89,11 @@ function skStart(seed,opt={}){
   if(typeof close3D==='function')close3D();
   if(typeof S!=='undefined'&&S&&!S.done&&typeof saveCase==='function')saveCase();
   S=null;skEl();
-  const dk=profile.diff||'easy',pat=skPatient(seed==null?Math.floor(Math.random()*CODE_SPACE):seed),A=skAnatomy(pat);
+  const tut=!!opt.tut;if(tut)seed=skTutSeed();
+  const dk=tut?'easy':(profile.diff||'easy'),pat=skPatient(seed==null?Math.floor(Math.random()*CODE_SPACE):seed),A=skAnatomy(pat);
   SK={dk,D:DIFFICULTY[dk],W:SK_DIFF[dk]||SK_DIFF.medium,pat,A,cat:skNewCath(),clot:null,t:0,cine:false,runs:[],review:null,inj:null,road:null,roadOn:DIFFICULTY[dk].level===1,
     found:false,gradeOk:null,pending:false,tx:null,passes:0,tici:0,reperfAt:null,emboli:false,sah:null,contrast:0,ak:0,ftime:0,guide:null,done:false,
-    ecaInj:0,maxFront:0,prevB:false,beatT:0,blockedT:0,popKey:'',ctrlT:0,firstPassTici:null};
+    ecaInj:0,maxFront:0,prevB:false,beatT:0,blockedT:0,popKey:'',ctrlT:0,firstPassTici:null,tut:tut?{i:0}:null};
   SK.clot=skClot(A,pat);
   document.body.classList.remove('inmenu','inreport');document.body.classList.add('stroke');
   $('startOv').hidden=true;$('resultOv').hidden=true;$('reviewbar').hidden=true;$('teachNote').hidden=true;
@@ -100,7 +101,7 @@ function skStart(seed,opt={}){
   const ctx=img.getContext('2d');skRender(ctx,{A,image:false});
   $('caseHead').innerHTML=`<h2>Stroke room · ${pat.code} · ${SK.D.label}</h2>${pat.rare&&RARE_BY[pat.rare]?`<p class="task">Rare patient: ${RARE_BY[pat.rare].name}. ${RARE_BY[pat.rare].short}.</p>`:''}<b>${pat.title}</b><p>${pat.pt}. ${pat.hx}</p>
     <p class="task">${SK.D.level>=3?pw('Find the occlusion on angiography and remove the clot.','Find the blocked brain artery with dye and pull the clot out.'):pw(`CT angiogram: occlusion of the ${pat.where}. Confirm it on angiography and remove the clot.`,`The CT scan shows a clot in the ${pat.where}. Find it with dye and pull it out.`)} ${pw('Every minute counts.','Every minute costs brain cells.')}</p>`;
-  skPanel(true);
+  skPanel(true);skCoach();
   toast(pw('Groin access done: the guide catheter is in the descending aorta. Advance over the arch.','The tube is in, through the top of the leg, and waiting in the main artery. Push it up over the arch.'));
   requestAnimationFrame(skLoop);
 }
@@ -114,7 +115,7 @@ function skLoop(now){
   if(!SK||SK.done)return;
   const dt=Math.min(0.05,skLast?(now-skLast)/1000:0.016);skLast=now;requestAnimationFrame(skLoop);
   skTick(dt);skDraw();
-  SK.uiAcc=(SK.uiAcc||0)+1;if(SK.uiAcc%6===0){skPanel();skPop();skGuide()}
+  SK.uiAcc=(SK.uiAcc||0)+1;if(SK.uiAcc%6===0){skPanel();skPop();skGuide();skTutTick()}
 }
 function skTick(dt){
   const s=SK,A=s.A,c=s.cat,fl=down('Space','KeyF'),inj=down('KeyJ'),busy=!!(s.tx&&s.tx.stage!=='choose');
@@ -267,6 +268,7 @@ function skResolve(){
   let f=1;if(tx.type==='sr'){const w=tx.w;f=w<1.5?0.45:w<3?0.8:w<=6?1:w<=9?0.95:0.85}
   const diffF={story:1.3,easy:1.15,medium:1,hard:0.9}[s.dk]||1,p=Math.min(0.95,base*f*diffF*Math.pow(0.9,s.passes-1)),r=Math.random();
   let tici=r<p*0.55?3:r<p?2.5:(Math.random()<0.3?2:1);
+  if(s.tut)tici=tx.type==='sr'&&(tx.w<3||tx.w>6)?2.5:3; // the tutorial pass always works
   s.tx=null;
   if(tici>=2.5){
     s.tici=Math.max(s.tici,tici);if(s.reperfAt==null)s.reperfAt=skMinutes();if(s.passes===1)s.firstPassTici=tici;
@@ -289,7 +291,7 @@ function skGuide(){
   const A=s.A,c=s.cat,route=skRoute(),k=id=>`<kbd>${shortKey(id)}</kbd>`;let t='';
   const idx=route.indexOf(c.vid);
   if(s.tx&&s.tx.stage!=='choose'){t=s.tx.type==='sr'?(s.tx.stage==='wait'?`Wait until the bar is in the middle, then hold ${k('KeyB')} to pull.`:`Hold ${k('KeyB')}.`):`Hold ${k('KeyB')} for suction.`}
-  else if(!s.runs.length&&!s.found&&idx>=0&&/CCA|ICA|VA/.test(c.vid)&&route.indexOf(c.vid)>=route.indexOf(route.find(x=>/CCA|VA/.test(x))||c.vid)){t=`Good spot to film: press ${k('KeyC')} to record, hold ${k('KeyJ')} for dye, then ${k('KeyC')} to stop.`}
+  else if(!s.runs.length&&!s.found&&idx>=0&&/ICA|VA$/.test(c.vid)&&!c.deep&&c.s>8){t=`Good spot to film: press ${k('KeyC')} to record, hold ${k('KeyJ')} for dye, then ${k('KeyC')} to stop.`}
   else if(idx<0){t=`Wrong branch (${skName(c.vid)}): pull back ${k('ArrowDown')}.`}
   else if(idx===route.length-1){const v=A.V[c.vid],face=s.clot.s-s.clot.len/2;
     if(!s.found)t=s.runs.length?`Open your film and click where the dye stops.`:`Film here (${k('KeyC')} + ${k('KeyJ')}), open the film and click where the dye stops.`;
@@ -307,6 +309,7 @@ function skGuide(){
 /* ---------- the report ---------- */
 function skFinish(){
   const s=SK;if(!s||s.done)return;s.done=true;s.cine=false;keys.btn_KeyB=false;
+  if(s.tut){profile.skTutDone=true;saveProfile();$('coach').hidden=true}
   const rows=[],notes=[],gtr=s.reperfAt!=null?s.reperfAt-s.pat.door:null;
   const rep=s.tici>=3?40:s.tici>=2.5?32:s.tici>=2?12:0;rows.push([`${pw('Reperfusion','Blood flow restored')} (TICI ${s.tici?ticiName(s.tici):'0'})`,rep,40]);
   const spd=gtr==null?0:Math.round(20*Math.max(0,Math.min(1,1-(gtr-20)/60)));rows.push([`${pw('Speed','Speed')}: ${gtr==null?pw('not reperfused','no flow restored'):pw(`groin to reperfusion ${Math.round(gtr)} min`,`${Math.round(gtr)} min from the groin to flow`)}`,spd,20]);
@@ -343,15 +346,44 @@ function skFinish(){
     <div class="notes">${notes.map(n=>`<div class="${n.c}">${n.t}</div>`).join('')}</div>
     <div class="row"><button class="btn primary" id="skNew">${pw('New stroke patient','New stroke patient')}</button><button class="btn" id="skAgain">${pw('Repeat this patient','Repeat this patient')}</button><button class="btn" id="skMenu">${pw('Main menu','Main menu')}</button></div>`;
   ov.hidden=false;window.scrollTo(0,Math.max(0,$('monitor').offsetTop-8));
-  const seed=s.pat.seed;$('skNew').onclick=()=>skStart(null);$('skAgain').onclick=()=>skStart(seed);$('skMenu').onclick=()=>showMenu('home');
+  const seed=s.pat.seed;$('skNew').onclick=()=>skStart(null);if(s.tut)$('skNew').textContent=pw('Your first real stroke patient','Your first real stroke patient');$('skAgain').onclick=()=>skStart(seed);$('skMenu').onclick=()=>showMenu('home');
 }
+/* ---------- the stroke tutorial: one patient, a coach card, one step at a time ---------- */
+function skTutSeed(){for(let i=1;i<20000;i++){const sd=(i*7919)%CODE_SPACE,p=skPatient(sd);if(p.site==='M1'&&p.side==='L'&&p.arch==='I'&&!p.bovine)return sd}return 1}
+const skReached=id=>SK.cat.vid===id||SK.cat.stack.some(x=>x.vid===id);
+const SK_TUT=[
+  {title:'X-ray on',text:()=>`Hold ${kk('Space')} (or the X-ray button) to switch the X-ray on. You see two views at once: the front on the left, the side on the right. The tube is waiting in the main artery from the heart (the aorta), at the bottom.`,done:s=>s.ftime>0.6},
+  {title:'Into the left neck artery',text:()=>`Keep the X-ray on and hold ${kk('ArrowUp')} to push the tube up and over the arch. The left neck artery (left common carotid) is the second branch. The guide under the X-ray says when to turn the tip up into it.`,done:()=>skReached('LCCA')},
+  {title:'Up the neck',text:()=>`Push on up the neck. At the fork, keep the tip pointing up to go into the internal carotid (to the brain), not the external carotid (to the face).`,done:()=>skReached('LICA')},
+  {title:'Film it',text:()=>`Press ${kk('KeyC')} to record, hold ${kk('KeyJ')} for about two seconds to inject dye, then press ${kk('KeyC')} to stop. The dye fills the brain's arteries, except beyond the clot.`,done:s=>s.runs.some(r=>r.showsClot)},
+  {title:'Find the clot',text:()=>`Open Film 1 under Films. Click where the dye column suddenly stops, then say which artery it is: the main middle brain artery (M1).`,done:s=>s.found},
+  {title:'Go deeper',text:()=>`The big tube cannot go into the skull. Push up to the top of the neck, then press ${kk('KeyX')}: a thin tube (microcatheter) comes out of it and can go into the head.`,done:s=>s.cat.deep},
+  {title:'Through the clot',text:()=>`Steer the thin tube into the M1 (the guide shows which way) and push right through the clot. The mesh stent button in the pop-up turns ready.`,done:s=>!!(s.clot&&s.cat.vid===s.clot.vid&&s.cat.s>s.clot.s+s.clot.len/2+1.5)||s.passes>0},
+  {title:'Open the stent',text:()=>`In the pop-up choose the mesh stent (stent retriever), then hold ${kk('KeyB')} to open it inside the clot.`,done:s=>!!(s.tx&&s.tx.stage!=='deploy')||s.passes>0},
+  {title:'Grip, then pull',text:()=>`Let go of ${kk('KeyB')} and wait 3 to 6 seconds while it grips (watch the bar). Then hold ${kk('KeyB')} to pull it back with suction.`,done:s=>s.passes>0},
+  {title:'Check and finish',text:()=>`The control run shows the blood flowing again (TICI). Press Finish the case for your report.`,done:s=>s.done},
+];
+const kk=id=>`<kbd>${shortKey(id)}</kbd>`;
+function skCoach(){
+  const el=$('coach');if(!SK||!SK.tut){if(SK)el.hidden=true;return}
+  const st=SK_TUT[SK.tut.i];if(!st){el.hidden=true;return}
+  el.hidden=false;el.innerHTML=`<div class="coachhead"><b>Stroke tutorial · step ${SK.tut.i+1} of ${SK_TUT.length} · ${st.title}</b><button class="btn" data-skcoach="skip">Skip tutorial</button></div><p>${typeof glossLink==='function'?glossLink(st.text()):st.text()}</p>
+    <div class="coachdots">${SK_TUT.map((_,i)=>`<i class="${i<SK.tut.i?'done':i===SK.tut.i?'now':''}"></i>`).join('')}</div>`;
+}
+function skTutTick(){
+  const s=SK;if(!s||!s.tut)return;const st=SK_TUT[s.tut.i];
+  if(st&&st.done(s)){s.tut.i++;const nx=SK_TUT[s.tut.i];if(nx)toast(`✓ ${st.title}. Next: ${nx.title.toLowerCase()}.`);skCoach()}
+}
+$('coach').addEventListener('click',e=>{const b=e.target.closest('[data-skcoach]');if(!b||!SK)return;SK.tut=null;profile.skTutDone=true;saveProfile();$('coach').hidden=true;toast('Tutorial skipped. You can replay it from the Stroke room.')});
+function skTutorial(){if(profile&&!profile.skIntroSeen&&typeof openStrokeIntro==='function')openStrokeIntro(()=>skStart(null,{tut:true}));else skStart(null,{tut:true})}
 /* ---------- menu: the stroke room folder and chart ---------- */
 function skChart(D){
   return `<div class="chead"><h2>${pw('Stroke room','Stroke room')}</h2><span class="meta">${pw('Mechanical thrombectomy','Pulling a clot out of a brain artery')} · ${D.label}</span></div>
     <dl><dt>${pw('The job','The job')}</dt><dd>${pw('A large-vessel stroke: a clot is blocking an artery in the brain. Steer up over the arch into the right neck artery, film to find where the dye stops, take the microcatheter into the head and pull the clot out.','A clot is blocking an artery in the brain. Steer the tube up into the neck, film with dye to find where it stops, send the thin tube into the head and pull the clot out.')}</dd>
     <dt>${pw('New here','New here')}</dt><dd>${pw('Two views at once (front and side), a roadmap ghost of your last film, the microcatheter (X), the stent retriever and aspiration, and the stroke clock: every minute costs brain.','Two X-ray views at once (front and side), a faint ghost of your last film to steer by, a thin tube for the head (X), a mesh stent or a suction tube, and a clock: every minute costs brain cells.')}</dd>
     <dt>${pw('Controls','Controls')}</dt><dd>${pw('The same keys as the heart room. B opens and pulls the stent retriever, or holds suction.','The same keys as the heart room. B opens and pulls the mesh stent, or holds suction.')}</dd></dl>
-    <button class="btn primary go" data-act="stroke">${pw('Start a stroke case','Start a stroke case')}</button>`;
+    ${profile.skTutDone?`<button class="btn primary go" data-act="stroke">Start a stroke case</button><div class="row"><button class="btn" data-act="sktut">Tutorial again</button><button class="btn" data-act="skintro">How a thrombectomy works (1 min)</button></div>`
+      :`<button class="btn primary go" data-act="sktut">Start the stroke tutorial</button><div class="row"><button class="btn" data-act="stroke">Skip it: start a case</button><button class="btn" data-act="skintro">How a thrombectomy works (1 min)</button></div>`}`;
 }
 /* ---------- wiring into the shared game ---------- */
 {const sm=showMenu;window.showMenu=function(v){skStop();return sm(v)}}

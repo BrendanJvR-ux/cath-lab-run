@@ -284,6 +284,8 @@ $('startOv').addEventListener('click',e=>{
   else if(d.act==='discard'){clearSave();renderMenu();toast('Unfinished case discarded.')}
   else if(d.act==='daily'){startCase(dailyCode(),{daily:true})}
   else if(d.act==='stroke'){if(typeof skStart==='function')skStart(null)}
+  else if(d.act==='sktut'){if(typeof skTutorial==='function')skTutorial()}
+  else if(d.act==='skintro'){if(typeof openStrokeIntro==='function')openStrokeIntro()}
   else if(d.act==='strokesel'){menuSel='stroke';menuView='play';renderMenu()}
   else if(d.act==='weekly'){startCase(weeklyInfo().code,{weekly:weekKey()})}
   else if(d.act==='weeklysel'){menuSel='weekly';menuView='play';renderMenu()}
