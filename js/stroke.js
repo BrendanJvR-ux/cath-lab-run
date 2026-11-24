@@ -16,10 +16,10 @@ const skProj=(p,pane)=>pane===0?[128+p[0],400-p[1]]:[384-p[2]*1.05,400-p[1]];
 /* the head and neck on X-ray, in both views. Bone is drawn as density (dark = dense) on its own layer; the layer is
    laid on paper as graphite, engraved with hatching where it is darkest (as the heart room's X-ray), then the edges
    are inked. Air spaces (sinuses, nose, airway, ear canal) are cut out of the density so they read lighter. */
-let skBgCanvas=null;
-function skBg(){
-  if(skBgCanvas)return skBgCanvas;
-  const S=2,mk=()=>{const c=document.createElement('canvas');c.width=c.height=512*S;const x=c.getContext('2d');x.scale(S,S);x.lineCap='round';x.lineJoin='round';return [c,x]};
+let skBgCanvas=null;const skBgCache={};
+function skBg(S=2){
+  if(skBgCache[S])return skBgCache[S];
+  const mk=()=>{const c=document.createElement('canvas');c.width=c.height=512*S;const x=c.getContext('2d');x.scale(S,S);x.lineCap='round';x.lineJoin='round';return [c,x]};
   const [dc,D]=mk(),[c,g]=mk();
   const P=[]; // features: {path, fill, stroke(width), lucent, ink(outline alpha), dash}
   const F=(o)=>P.push(o);
@@ -223,21 +223,28 @@ function skBg(){
   for(const ox of [0,256]){const gr=g.createRadialGradient(ox+128,256,150,ox+128,256,300);gr.addColorStop(0,'rgba(60,45,25,0)');gr.addColorStop(1,'rgba(60,45,25,0.22)');g.fillStyle=gr;g.fillRect(ox,0,256,512)}
   g.strokeStyle='#1d1b19';g.lineWidth=1.4;g.beginPath();g.moveTo(256,0);g.lineTo(256,512);g.stroke();
   g.font='italic 14px "IM Fell English", Georgia, serif';g.fillStyle='rgba(29,27,25,0.7)';g.textAlign='right';g.fillText('front (AP)',250,16);g.textAlign='left';g.fillText('side (lateral)',262,16);
-  return skBgCanvas=c;
+  skBgCache[S]=c;if(S===2)skBgCanvas=c;return c;
 }
 const SK_FLOW=200,SK_VEIN_DELAY=3; // mm of artery per second of dye travel; seconds until the veins fill
 const skHist=(h,t)=>{if(t<0||!h.length)return 0;const i=Math.floor(t/0.02);return i<h.length?h[i]:h[h.length-1]};
 /* draw the scene into any canvas: dye from a distance map up to a front, a faint roadmap, the catheter and devices */
 let skVL=null;
+const SK_ZOOM=1.8,SK_ZCY=150; // zoomed on the head: both views magnified about this height
 function skRender(ctx,o){
   const sc=ctx.canvas.width/512;ctx.setTransform(sc,0,0,sc,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
-  ctx.drawImage(skBg(),0,0,512,512);
+  const Z=o.zoom?SK_ZOOM:1,zt=pane=>[sc*Z,0,0,sc*Z,sc*(pane*256+128)*(1-Z),sc*SK_ZCY*(1-Z)];
+  // draw into one view: clipped to it, with the zoom applied
+  const inPane=(k,pane,fn)=>{k.save();k.setTransform(sc,0,0,sc,0,0);k.beginPath();k.rect(pane*256,0,256,512);k.clip();if(Z!==1)k.setTransform(...zt(pane));fn();k.restore()};
+  if(Z===1)ctx.drawImage(skBg(),0,0,512,512);
+  else{const hi=skBg(4);for(const pane of [0,1])inPane(ctx,pane,()=>ctx.drawImage(hi,0,0,512,512));
+    ctx.strokeStyle='#1d1b19';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(256,0);ctx.lineTo(256,512);ctx.stroke();
+    ctx.font='italic 14px "IM Fell English", Georgia, serif';ctx.fillStyle='rgba(29,27,25,0.75)';ctx.textAlign='right';ctx.fillText(`front ×${SK_ZOOM}`,250,16);ctx.textAlign='left';ctx.fillText(`side ×${SK_ZOOM}`,262,16)}
   if(!o.image){ctx.fillStyle='rgba(239,233,220,0.55)';ctx.fillRect(0,0,512,512);return}
   const A=o.A,lineFor=v=>Math.max(1.4,v.r*2.4);
   // vessels, catheter and any bleed go on their own layer, then multiply over the bone (as on the heart room's X-ray)
   if(!skVL||skVL.width!==ctx.canvas.width){skVL=document.createElement('canvas');skVL.width=skVL.height=ctx.canvas.width}
   const L=skVL.getContext('2d');L.setTransform(1,0,0,1,0,0);L.globalAlpha=1;L.fillStyle='#fff';L.fillRect(0,0,skVL.width,skVL.height);L.setTransform(sc,0,0,sc,0,0);L.lineCap='round';L.lineJoin='round';
-  const clip=(pane,fn)=>{L.save();L.beginPath();L.rect(pane*256,0,256,512);L.clip();fn();L.restore()};
+  const clip=(pane,fn)=>inPane(L,pane,fn);
   // the dye concentration varies along each vessel, so it is drawn in short runs of similar strength
   const tube=(pts,cs,w,road,venous)=>{for(const pane of [0,1])clip(pane,()=>{let i=0;
     while(i<pts.length-1){const lv=Math.round(Math.min(1,cs[i])*6);if(lv<=0){i++;continue}
@@ -270,7 +277,7 @@ function skRender(ctx,o){
   ctx.globalCompositeOperation='source-over';
   if(typeof vign!=='undefined'){ctx.drawImage(vign,0,0,256,512);ctx.drawImage(vign,256,0,256,512)}
   // the clot, once marked: a double ring in oxblood ink
-  if(o.mark&&o.clot){const v=A.V[o.clot.vid],p=skPt(v,o.clot.s-o.clot.len/2);for(const pane of [0,1]){const q=skProj(p,pane);ctx.strokeStyle='#8A2D1F';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(q[0],q[1],10,0,7);ctx.stroke();ctx.lineWidth=0.6;ctx.beginPath();ctx.arc(q[0],q[1],13,0,7);ctx.stroke()}}
+  if(o.mark&&o.clot){const v=A.V[o.clot.vid],p=skPt(v,o.clot.s-o.clot.len/2);for(const pane of [0,1])inPane(ctx,pane,()=>{const q=skProj(p,pane);ctx.strokeStyle='#8A2D1F';ctx.lineWidth=1.4/Z;ctx.beginPath();ctx.arc(q[0],q[1],10/Z,0,7);ctx.stroke();ctx.lineWidth=0.6/Z;ctx.beginPath();ctx.arc(q[0],q[1],13/Z,0,7);ctx.stroke()})}
 }
 /* a small picture for the casebook: the arteries the rare patient is known for */
 function skThumb(cv,seed){
@@ -294,7 +301,7 @@ function skStart(seed,opt={}){
   const dk=tut?'easy':(profile.diff||'easy'),pat=skPatient(seed==null?Math.floor(Math.random()*CODE_SPACE):seed),A=skAnatomy(pat);
   SK={dk,D:DIFFICULTY[dk],W:SK_DIFF[dk]||SK_DIFF.medium,pat,A,cat:skNewCath(),clot:null,t:0,cine:false,runs:[],review:null,inj:null,road:null,roadOn:DIFFICULTY[dk].level===1,
     found:false,gradeOk:null,pending:false,tx:null,passes:0,tici:0,reperfAt:null,emboli:false,sah:null,contrast:0,ak:0,ftime:0,guide:null,done:false,
-    ecaInj:0,maxFront:0,hist:[],vhist:[],src:0,dist:null,injOn:false,autoInj:0,toBrain:false,prevB:false,beatT:0,blockedT:0,popKey:'',ctrlT:0,firstPassTici:null,tut:tut?{i:0}:null};
+    ecaInj:0,zoom:false,zoomSet:false,maxFront:0,hist:[],vhist:[],src:0,dist:null,injOn:false,autoInj:0,toBrain:false,prevB:false,beatT:0,blockedT:0,popKey:'',ctrlT:0,firstPassTici:null,tut:tut?{i:0}:null};
   SK.clot=skClot(A,pat);
   document.body.classList.remove('inmenu','inreport');document.body.classList.add('stroke');
   $('startOv').hidden=true;$('resultOv').hidden=true;$('reviewbar').hidden=true;$('teachNote').hidden=true;
@@ -368,8 +375,8 @@ function skTick(dt){
 }
 function skDraw(){
   const s=SK,ctx=img.getContext('2d'),fl=down('Space','KeyF')||s.cine||s.ctrlT>0;
-  if(s.review){skRender(ctx,{A:s.A,image:true,dist:s.review.dist,front:s.review.front,fade:1,cath:s.review.cath,guide:s.review.guide,clot:s.clot,mark:s.found});}
-  else skRender(ctx,{A:s.A,image:fl,cine:s.cine,dist:s.dist,conc:d=>skHist(s.hist,s.t-d/SK_FLOW),vein:dl=>0.55*skHist(s.vhist,s.t-SK_VEIN_DELAY-dl),road:s.roadOn&&s.road?s.road:null,cath:s.cat,guide:s.guide,clot:s.clot,mark:s.found,device:s.tx&&s.tx.type==='sr'&&s.tx.stage!=='deploy'&&s.tx.stage!=='choose'?'sr':null,perf:s.sah});
+  if(s.review){skRender(ctx,{A:s.A,image:true,zoom:s.zoom,dist:s.review.dist,front:s.review.front,fade:1,cath:s.review.cath,guide:s.review.guide,clot:s.clot,mark:s.found});}
+  else skRender(ctx,{A:s.A,image:fl,zoom:s.zoom,cine:s.cine,dist:s.dist,conc:d=>skHist(s.hist,s.t-d/SK_FLOW),vein:dl=>0.55*skHist(s.vhist,s.t-SK_VEIN_DELAY-dl),road:s.roadOn&&s.road?s.road:null,cath:s.cat,guide:s.guide,clot:s.clot,mark:s.found,device:s.tx&&s.tx.type==='sr'&&s.tx.stage!=='deploy'&&s.tx.stage!=='choose'?'sr':null,perf:s.sah});
   // the text on the image
   const m=skMinutes(),hh=Math.floor(m/60),mm=String(Math.floor(m%60)).padStart(2,'0');
   hudTL.textContent=`${s.pat.code} · ${s.pat.pt}\nNIHSS ${skNihss()}`;
@@ -389,17 +396,20 @@ function skToggleCine(){
   toast(`${pw('Film','Film')} ${run.id} ${pw('saved','saved')} · ${run.where}${showsClot&&!s.found?pw(' · open it and click the cut-off',' · open it and click where the dye stops'):''}`);
   skPanel(true);
 }
+/* Z: zoom in on the head, or back out */
+function skToggleZoom(){if(!SK)return;SK.zoom=!SK.zoom;SK.zoomSet=true;skPanel(true)}
 /* X: the microcatheter out of the guide, or back */
 function skDeeper(){
   const s=SK,c=s.cat,v=s.A.V[c.vid];
   if(c.deep){if(v.intra){toast(pw('Pull the microcatheter back into the neck first.','Pull the thin tube back down into the neck first.'));return}c.deep=false;s.guide=null;toast(pw('Microcatheter back in the guide.','The thin tube is back inside the big one.'));return}
   if(!/ICA|VA|CCA/.test(c.vid)){toast(pw('Park the guide in a neck artery (carotid or vertebral) first.','First bring the big tube up into a neck artery (carotid or vertebral).'));return}
-  c.deep=true;s.guide=skCathPath(s.A,c);toast(pw('Microcatheter and wire out of the guide: you can go into the head now.','The thin tube (microcatheter) is out of the big one: you can now steer into the head.'));if(typeof sfx==='function')sfx('engage');skPanel(true);
+  c.deep=true;s.guide=skCathPath(s.A,c);if(!s.zoomSet&&!s.zoom){s.zoom=true;setTimeout(()=>toast(`Zoomed in on the head. ${shortKey('KeyZ')} to zoom out.`),1600)}toast(pw('Microcatheter and wire out of the guide: you can go into the head now.','The thin tube (microcatheter) is out of the big one: you can now steer into the head.'));if(typeof sfx==='function')sfx('engage');skPanel(true);
 }
 /* marking the clot on a film */
 img.addEventListener('click',e=>{
   if(!SK||SK.done||!SK.review)return;
-  const r=img.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*512,y=(e.clientY-r.top)/r.height*512,cl=SK.clot;
+  const r=img.getBoundingClientRect();let x=(e.clientX-r.left)/r.width*512,y=(e.clientY-r.top)/r.height*512;const cl=SK.clot;
+  if(SK.zoom){const pane=x<256?0:1,cx=pane*256+128;x=cx+(x-cx)/SK_ZOOM;y=SK_ZCY+(y-SK_ZCY)/SK_ZOOM}
   if(!cl){toast(pw('There is no clot left to mark.','Nothing is blocked any more.'));return}
   const p=skPt(SK.A.V[cl.vid],cl.s-cl.len/2),near=[0,1].some(pane=>{const q=skProj(p,pane);return Math.hypot(q[0]-x,q[1]-y)<20});
   if(near&&SK.review.showsClot){SK.pending=true;SK.popKey='';skPop()}
@@ -408,13 +418,13 @@ img.addEventListener('click',e=>{
 /* ---------- the side panel ---------- */
 function skPanel(force){
   const s=SK;if(!s)return;const el=$('skPanel'),c=s.cat,saved=skBrainSaved();
-  const key=[s.runs.length,c.vid,c.deep,s.roadOn,!!s.review,s.found,s.tici,s.passes,Math.round(skMinutes()),skNihss(),!!s.sah].join();if(!force&&key===s.panelKey)return;s.panelKey=key;
+  const key=[s.runs.length,c.vid,c.deep,s.roadOn,s.zoom,!!s.review,s.found,s.tici,s.passes,Math.round(skMinutes()),skNihss(),!!s.sah].join();if(!force&&key===s.panelKey)return;s.panelKey=key;
   el.innerHTML=`<h2>${pw('The brain','The brain')}</h2>
     <div class="reads"><div class="read"><span>NIHSS</span><b>${skNihss()}</b></div><div class="read"><span>${pw('Brain saved','Brain still savable')}</span><b>${saved}<small>%</small></b><i class="lvl"><b style="width:${saved}%"></b></i></div>
     <div class="read"><span>${pw('Reperfusion','Blood flow')}</span><b>${s.tici?ticiName(s.tici):'–'}<small>${s.tici?'TICI':''}</small></b></div><div class="read"><span>${pw('Passes','Tries')}</span><b>${s.passes}</b></div></div>
     <h2 style="margin-top:8px">${pw('Catheter','The tube')}</h2>
     <div class="status">${pw('Tip in the','Tip in the')} ${skName(c.vid)}${c.deep?pw(' · microcatheter out',' · thin tube out'):''}.</div>
-    <div class="row"><button class="btn" data-sk="deep">${c.deep?pw('Microcatheter back','Thin tube back'):pw('Go deeper: microcatheter','Go deeper: thin tube')} <kbd>${shortKey('KeyX')}</kbd></button><button class="btn" data-sk="road" aria-pressed="${s.roadOn}">${pw('Roadmap','Roadmap (ghost of the last film)')}: ${s.roadOn?'on':'off'}</button></div>
+    <div class="row"><button class="btn" data-sk="deep">${c.deep?pw('Microcatheter back','Thin tube back'):pw('Go deeper: microcatheter','Go deeper: thin tube')} <kbd>${shortKey('KeyX')}</kbd></button><button class="btn" data-sk="zoom" aria-pressed="${!!s.zoom}">${s.zoom?pw('Zoom out','Zoom out'):pw('Zoom in on the head','Zoom in on the head')} <kbd>${shortKey('KeyZ')}</kbd></button><button class="btn" data-sk="road" aria-pressed="${s.roadOn}">${pw('Roadmap','Roadmap (ghost of the last film)')}: ${s.roadOn?'on':'off'}</button></div>
     <h2 style="margin-top:8px">${pw('Films','Films')}</h2>
     <div class="runs">${s.runs.length?s.runs.map(r=>`<button class="run${s.review===r?' sel':''}" data-skrun="${r.id}"><b>${pw('Film','Film')} ${r.id}</b><span>${r.where}</span></button>`).join(''):`<div class="empty">${pw(`No films yet. Press ${shortKey('KeyC')} to record, hold ${shortKey('KeyJ')} to inject.`,`No films yet. Press ${shortKey('KeyC')} to record, then hold ${shortKey('KeyJ')} to inject dye.`)}</div>`}</div>
     ${s.review?`<div class="row"><button class="btn" data-sk="live">${pw('Back to live','Back to live')}</button></div>`:''}
@@ -423,6 +433,7 @@ function skPanel(force){
 function skPanelClick(e){
   const b=e.target.closest('button');if(!b||!SK)return;const d=b.dataset;
   if(d.sk==='deep')skDeeper();
+  else if(d.sk==='zoom')skToggleZoom();
   else if(d.sk==='road'){SK.roadOn=!SK.roadOn;if(SK.roadOn&&!SK.road)toast(pw('Record a film first: the roadmap is its ghost.','Record a film first: the roadmap is a faint copy of it.'))}
   else if(d.sk==='live')SK.review=null;
   else if(d.sk==='finish')skFinish();

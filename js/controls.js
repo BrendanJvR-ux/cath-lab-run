@@ -11,11 +11,12 @@ const ACTIONS=[
   {id:'Space',label:'Fluoro (hold)',grp:'X-ray',def:['Space','KeyF']},
   {id:'KeyC',label:'Record cine (start / stop)',grp:'X-ray',def:['KeyC',null]},
   {id:'KeyJ',label:'Inject contrast (hold)',grp:'X-ray',def:['KeyJ',null]},
+  {id:'KeyZ',label:'Zoom in on the head (stroke room)',grp:'X-ray',def:['KeyZ',null]},
   {id:'KeyB',label:'Inflate balloon or stent (hold)',grp:'Treatment',def:['KeyB',null]},
 ];
 // mouse-first layout: left button for fluoro, right button to inject, wheel to advance and withdraw, middle button records
 const MOUSE_PRESET={ArrowUp:['WheelUp','ArrowUp'],ArrowDown:['WheelDown','ArrowDown'],ArrowLeft:['ArrowLeft','KeyA'],ArrowRight:['ArrowRight','KeyD'],
-  KeyX:['KeyX',null],Space:['Mouse0','Space'],KeyC:['Mouse1','KeyC'],KeyJ:['Mouse2','KeyJ'],KeyB:['KeyB',null]};
+  KeyX:['KeyX',null],Space:['Mouse0','Space'],KeyC:['Mouse1','KeyC'],KeyJ:['Mouse2','KeyJ'],KeyZ:['KeyZ',null],KeyB:['KeyB',null]};
 const RESERVED=new Set(['Escape','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7']);
 let CTRL=null,INPUT_MAP=new Map();
 function ctrlDefaults(){const b={};for(const a of ACTIONS)b[a.id]=a.def.slice();return {binds:b,drag:false}}
@@ -47,6 +48,7 @@ const HELD={};
 function actPress(id,src){
   if(id==='KeyC'){toggleCine();return}
   if(id==='KeyX'){if(S&&!S.done)exchangeTo(S.cath.type==='JL'?'JR':'JL');return}
+  if(id==='KeyZ'){if(typeof SK!=='undefined'&&SK&&!SK.done&&typeof skToggleZoom==='function')skToggleZoom();return}
   (HELD[id]=HELD[id]||new Set()).add(src);keys[id]=true;
 }
 function actRelease(id,src){const h=HELD[id];if(!h)return;h.delete(src);keys[id]=h.size>0}
