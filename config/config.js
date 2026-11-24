@@ -46,7 +46,7 @@ const VARIANT_PARTS={
   LCX_MID:[[50,7,-41],[46,-6,-44],[36,-15,-43]],
   LPL:{id:'LPL',sys:'L',name:'posterolateral',parent:'LCx',r0:0.95,r1:0.45,ctrl:[[36,-15,-43],[30,-24,-38],[22,-30,-31]]},
   // where the RCA arises from the right sinus (default is between these)
-  RCA_ORIGIN:{anterior:[[-4,44,15],[-15,38,21]],posterior:[[-13,39,5],[-22,35,13]]},
+  RCA_ORIGIN:{anterior:[[-4,44,15],[-15,38,21]],posterior:[[-13,39,5],[-22,35,13]],high:[[1,46,17],[-11,41,23]]},
 };
 
 /* Coronary flow speed (mm/s) for contrast travel. */

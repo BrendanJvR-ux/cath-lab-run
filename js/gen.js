@@ -12,6 +12,29 @@ const CODE_SPACE=Math.pow(CODE_ABC.length,5);
 function randomCode(){return seedToCode(Math.floor(Math.random()*CODE_SPACE))}
 
 /* Where lesions may sit: vessel, range along it (fraction of length), and how often it's chosen. */
+/* Rare patients: about one in thirteen, decided on its own random stream from the case code (so everyone with the
+   code gets the same patient, and other codes are unchanged). Each is a page in the casebook (js/casebook.js). */
+const RARE_KINDS=[
+  {id:'anomrca',name:'Anomalous right coronary',short:'An RCA that starts high and to the front',
+    blurb:'The right coronary artery leaves the aorta higher and further forward than usual. The usual turn of the JR4 points below it.',
+    tip:'Turn further clockwise than normal and come up a little higher in the root; small test puffs show where the opening really is.'},
+  {id:'leftdom',name:'Left-dominant heart',short:'The circumflex supplies the back of the heart',
+    blurb:'In about one person in ten the circumflex, not the right coronary, gives the artery that runs under the heart (PDA). The RCA is small.',
+    tip:'Do not hunt for a missing PDA from the right side: film the left system to see the whole underside of the heart.'},
+  {id:'tortuous',name:'Corkscrew arteries',short:'Very twisty coronary arteries',
+    blurb:'Long-standing high blood pressure and age leave some arteries winding like corkscrews. Narrowings hide on the bends.',
+    tip:'Take extra views: a narrowing that looks mild on a bend may be tight when the bend is opened up.'},
+  {id:'leftmain',name:'Left main narrowing',short:'Disease in the short trunk feeding the whole left side',
+    blurb:'The left main feeds both the LAD and the circumflex, so a narrowing here puts most of the heart at risk.',
+    tip:'Do not push the catheter deep: it can block the left main itself. Short careful puffs, and stent it precisely.'},
+  {id:'long',name:'Long narrowing',short:'A narrowing almost as long as the longest stent',
+    blurb:'Diffuse disease narrows a long stretch of artery rather than one short spot.',
+    tip:'Measure it: only the 30 mm stent covers it with a margin. Predilate if it is tight.'},
+  {id:'kidney',name:'Kidneys on the edge',short:'Very little dye, on every difficulty',
+    blurb:'With kidneys working at a fraction of normal, dye (contrast) can tip them into failure.',
+    tip:'Plan every view, use short puffs and record only what you need. There is a dye limit even on Easy and Story.'},
+];
+const RARE_BY=Object.fromEntries(RARE_KINDS.map(k=>[k.id,k]));
 const LESION_SITES=[['LAD',0.06,0.6,5],['RCA',0.08,0.75,4],['LCx',0.1,0.6,3],['D1',0.08,0.4,1.2],['OM1',0.1,0.45,1.2],['RI',0.1,0.45,1],['OM2',0.1,0.4,0.5],['PDA',0.1,0.4,0.5],['LPDA',0.1,0.4,0.5]];
 const REGION={II:'inferior',V3:'anterior',V5:'lateral'};
 
@@ -21,6 +44,7 @@ function describeAnatomy(sp){
   if(sp.shortLM)out.push('a short left main');
   if(sp.rca==='anterior')out.push('an anteriorly placed RCA origin');
   if(sp.rca==='posterior')out.push('a posteriorly placed RCA origin (more clockwise torque)');
+  if(sp.rca==='high')out.push('an RCA arising high and anteriorly (anomalous origin)');
   if(sp.d1==='large')out.push('a large first diagonal');
   if(sp.d1==='small')out.push('a small first diagonal');
   if(!sp.om2)out.push('a single obtuse marginal');
@@ -35,6 +59,11 @@ function generatePatient(code){
   const u=R(),anatomy={dom:u<0.78?'R':u<0.89?'L':'C',ramus:chance(0.2),shortLM:chance(0.12),
     rca:(v=>v<0.7?'normal':v<0.85?'anterior':'posterior')(R()),d1:(v=>v<0.6?'normal':v<0.85?'large':'small')(R()),
     om2:chance(0.75),tort:{seed:Math.round(rnd(0,40)*10)/10,amp:Math.round(rnd(0.7,1.45)*100)/100}};
+  // rare patients (own random stream)
+  const RR=mulberry32((seed^0x2f6a3b17)>>>0);RR();const rare=RR()<0.075?RARE_KINDS[Math.floor(RR()*RARE_KINDS.length)].id:null;
+  if(rare==='anomrca')anatomy.rca='high';
+  if(rare==='leftdom')anatomy.dom='L';
+  if(rare==='tortuous')anatomy.tort.amp=2.15;
   buildAnatomy(anatomy);
   // lesions
   const sites=LESION_SITES.filter(s=>VBY[s[0]]),wsum=sites.reduce((a,s)=>a+s[3],0);
@@ -53,11 +82,13 @@ function generatePatient(code){
   };
   const nSig=chance(0.3)?2:1,nMild=(v=>v<0.45?0:v<0.85?1:2)(R());
   const culprit=place(0.72,0.96,2.4)||(lesions.push({vid:'LAD',at:16,len:10,sev:0.8,e:[1,0.2,0.3]}),lesions[lesions.length-1]);
+  if(rare==='leftmain'){const v=VBY.LM;culprit.vid='LM';culprit.len=Math.max(4,Math.round(v.len/TREE_SCALE*0.55));culprit.at=Math.round(v.len/TREE_SCALE*0.5*10)/10}
+  if(rare==='long'){const v=VBY[culprit.vid],L=26+Math.floor(RR()*4),half=L/2+2,maxAt=v.len/TREE_SCALE-half;culprit.len=L;culprit.at=Math.round(Math.min(maxAt,Math.max(half,culprit.at))*10)/10}
   if(nSig>1)place(0.7,0.88,2.4);
   for(let i=0;i<nMild;i++)chance(0.35)?place(0.52,0.66,2.2):place(0.28,0.46,2.0);
   // presentation follows the culprit's territory
   const lead=TERRITORY[culprit.vid],region=REGION[lead],male=chance(0.66),age=Math.round(rnd(44,83));
-  const risks=['smoker','ex-smoker','diabetic','hypertensive','high cholesterol','family history of early heart disease','overweight'].filter(()=>chance(0.35)).slice(0,3);
+  const risks=['smoker','ex-smoker','diabetic','hypertensive','high cholesterol','family history of early heart disease','overweight'].filter(()=>chance(0.35)).slice(0,3).filter((r,i,a)=>!(r==='ex-smoker'&&a.includes('smoker'))); // never both
   const riskTxt=risks.length?risks.join(', ').replace(/^./,c=>c.toUpperCase())+'. ':'';
   const renal=chance(0.2),acs=culprit.sev>=0.88&&chance(0.65);
   let title,hx,ecg=null;
@@ -83,12 +114,15 @@ function generatePatient(code){
     hx=`${riskTxt}${['Forty minutes','An hour','Ninety minutes'][Math.floor(RS()*3)]} of crushing central chest pain, sweaty and grey. ECG: ST elevation in ${st}. Aspirin and heparin given; the emergency team has activated the cath lab.`;
     ecg={stemi:[lead]};
   }
-  if(renal)hx+=` eGFR ${Math.round(rnd(34,52))}, so keep contrast to a minimum.`;
+  if(renal&&rare!=='kidney')hx+=` eGFR ${Math.round(rnd(34,52))}, so keep contrast to a minimum.`;
+  if(rare==='kidney')hx+=` Severe kidney disease (eGFR ${14+Math.floor(RR()*9)}): every millilitre of dye counts.`;
+  if(rare==='anomrca')hx+=' An earlier CT showed the right coronary arising high and anteriorly.';
+  if(rare==='leftmain')hx+=' A CT coronary angiogram raised concern about the left main.';
   const extra=lesions.length>nSig;
   const task=stemi?'Find the blocked artery and open it fast: wire, balloon, stent.':acs?(extra?'Find the culprit lesion and treat it. Report any other disease you see.':'Find the culprit lesion and treat it.')
     :(extra?'Map all disease, significant or not, and treat only what is significant.':'Find the significant stenosis and treat it.');
-  const budget=renal?50:70+10*(nSig-1)+5*(lesions.length-nSig);
-  return {code:seedToCode(seed),random:true,title,pt:(male?'M':'F')+', '+age,hx,task,budget,budgetInTask:renal,ecg,lesions,anatomy,anatomyNote:describeAnatomy(buildAnatomy(anatomy))};
+  const budget=rare==='kidney'?30:renal?50:70+10*(nSig-1)+5*(lesions.length-nSig);
+  return {code:seedToCode(seed),random:true,rare,fixedBudget:rare==='kidney',title,pt:(male?'M':'F')+', '+age,hx,task,budget,budgetInTask:renal||rare==='kidney',ecg,lesions,anatomy,anatomyNote:describeAnatomy(buildAnatomy(anatomy))};
 }
 
 /* What a case throws at you on a difficulty, fixed by the case code and the difficulty (so a shared code plays the

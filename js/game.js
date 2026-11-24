@@ -30,7 +30,7 @@ const tierOf=id=>(profile&&profile.tiers&&profile.tiers[id])||0;
 /* the effect of an upgrade at the operator's current tier (its base value if not bought) */
 function upgradeVal(id){const u=UPGRADES.find(x=>x.id===id),t=tierOf(id);return t?u.tiers[t-1].val:u.base}
 /* Contrast budget for a case on a difficulty (null = no limit), including the power injector. */
-function caseBudget(c,D){return D.budgetX==null?null:Math.round(c.budget*D.budgetX*upgradeVal('injector'))}
+function caseBudget(c,D){if(c.fixedBudget)return Math.round(c.budget*upgradeVal('injector'));return D.budgetX==null?null:Math.round(c.budget*D.budgetX*upgradeVal('injector'))}
 function caseTask(c,D){const b=caseBudget(c,D);return c.task+(c.budgetInTask&&b!=null?` Aim for under ${b} mL of contrast.`:'')}
 
 function avatarSVG(i,size){
@@ -129,7 +129,7 @@ function caseFolders(){
   if(sv)F.push({id:'resume',cls:'inprogress',tab:'In progress',title:sv.ci==='TUTORIAL'?'The tutorial':patientOf(sv.ci).title,sub:`${fmtT(sv.clock)} in · ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:''}`,tag:'Resume'});
   const tp=patientOf(today);F.push({id:'today',cls:'today',tab:"Today's case",title:tp.title,sub:tp.pt,tag:dd?MEDAL_NAME[dd.medal]:'Medals',code:today});
   if(typeof weeklyInfo==='function'){const wi=weeklyInfo(),w=weeklyRec();F.push({id:'weekly',cls:'weekly',tab:'This week',title:wi.mod.name,sub:patientOf(wi.code).title,tag:w.best!=null?'Best '+w.best:'Challenge'})}
-  for(const code of waitingList()){const p=patientOf(code);F.push({id:'w:'+code,tab:code,title:p.title,sub:p.pt,tag:p.ecg&&p.ecg.stemi?'Emergency':'',code})}
+  for(const code of waitingList()){const p=patientOf(code);F.push({id:'w:'+code,cls:p.rare?'rare':'',tab:code,title:p.title,sub:p.pt,tag:p.rare?'Rare':p.ecg&&p.ecg.stemi?'Emergency':'',code})}
   if(typeof careerOf==='function'){const c=careerOf();if(c.lvl<CAREER.length)F.push({id:'career',tab:'Career',title:CAREER[c.lvl].rank,sub:`${c.prog} of ${CAREER[c.lvl].need}`,tag:'Next goal'})}
   F.push({id:'tutorial',cls:'tutorial',tab:'Tutorial',title:'Learn the ropes',sub:'One patient, step by step',tag:profile.tutDone?'Done':''});
   return F;
@@ -143,7 +143,7 @@ function folderChart(f,D){
   if(f.id==='career'){const c=careerOf(),g=CAREER[c.lvl];return `<div class="chead"><h2>${g.rank}</h2><span class="meta">${c.prog} of ${g.need}</span></div><dl><dt>Goal</dt><dd>${g.goal}</dd><dt>Plays on</dt><dd>${DIFFICULTY[g.diff].label}${g.kind==='stemi'?' · a STEMI':g.kind==='comp'?' · with a complication':''}</dd></dl><button class="btn primary go" data-act="careercase">Start case</button>`}
   const p=patientOf(f.code),today=f.id==='today',th=MEDALS[profile.diff];
   return `<div class="chead"><h2>${esc(p.title)}</h2><span class="meta">${esc(p.pt)} · ${f.code}</span></div>
-    <dl><dt>History</dt><dd>${esc(p.hx)}</dd><dt>Task</dt><dd>${esc(caseTask(p,D))}</dd>${today?`<dt>Medals</dt><dd>Bronze ${th.bronze} · silver ${th.silver} · gold ${th.gold} on ${D.label}. Everyone gets this patient today.</dd>`:''}</dl>
+    <dl>${p.rare&&RARE_BY[p.rare]?`<dt>Rare</dt><dd><b>${RARE_BY[p.rare].name}.</b> ${RARE_BY[p.rare].short}.${casebookOf().rare[p.rare]?'':' Not in your casebook yet.'}</dd>`:''}<dt>History</dt><dd>${esc(p.hx)}</dd><dt>Task</dt><dd>${esc(caseTask(p,D))}</dd>${today?`<dt>Medals</dt><dd>Bronze ${th.bronze} · silver ${th.silver} · gold ${th.gold} on ${D.label}. Everyone gets this patient today.</dd>`:''}</dl>
     <button class="btn primary go" data-act="${today?'daily':'startcode'}" data-code="${f.code}">Start case</button>`;
 }
 
@@ -189,6 +189,7 @@ function renderMenu(){
   }
   if(menuView==='career'){ov.innerHTML=careerView();return}
   if(menuView==='awards'){ov.innerHTML=achView();return}
+  if(menuView==='casebook'){ov.innerHTML=casebookView();drawCasebookImages();return}
   if(menuView==='exp'){
     ov.innerHTML=`<h1>How much angiography have you done?</h1>
       <p>The tutorial is a short play-through of one patient. Your answer sets how much it explains and where you start afterwards.</p>
@@ -248,7 +249,7 @@ function renderMenu(){
         <div class="mm-secondary"><button class="btn" data-act="play">Case select</button></div>
       </div>
       ${sv?`<div class="mm-strip resume"><div><b>Unfinished case</b><span>${sv.ci==='TUTORIAL'?'The tutorial':'Patient '+sv.ci} · ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:''} · ${fmtT(sv.clock)} in</span></div><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="discard">Discard</button></div>`:''}
-      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button>${typeof weeklyInfo==='function'?`<button class="lnk" data-act="weeklysel">This week: ${weeklyInfo().mod.name}</button>`:''}<button class="lnk" data-act="career">Career</button><button class="lnk" data-act="awards">Achievements${typeof ACHIEVEMENTS!=='undefined'?` (${ACHIEVEMENTS.filter(a=>profile.ach&&profile.ach.got&&profile.ach.got[a.id]).length}/${ACHIEVEMENTS.length})`:''}</button><button class="lnk" data-act="intro">How it works (1 min)</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Settings</button><button class="lnk" data-gl="">Glossary</button></div>
+      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button>${typeof weeklyInfo==='function'?`<button class="lnk" data-act="weeklysel">This week: ${weeklyInfo().mod.name}</button>`:''}<button class="lnk" data-act="career">Career</button>${typeof casebookOf==='function'?`<button class="lnk" data-act="casebook">Casebook (${RARE_KINDS.filter(k=>casebookOf().rare[k.id]).length}/${RARE_KINDS.length})</button>`:''}<button class="lnk" data-act="awards">Achievements${typeof ACHIEVEMENTS!=='undefined'?` (${ACHIEVEMENTS.filter(a=>profile.ach&&profile.ach.got&&profile.ach.got[a.id]).length}/${ACHIEVEMENTS.length})`:''}</button><button class="lnk" data-act="intro">How it works (1 min)</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Settings</button><button class="lnk" data-gl="">Glossary</button></div>
       <div class="mm-op">${avatarSVG(profile.avatar,32)}<span><b>${esc(profile.name)}</b> · ${typeof rankName==='function'?rankName()+' · ':''}${profile.tokens} tokens · ${DIFFICULTY[profile.diff].label}${typeof gradeOf==='function'?(()=>{const g=gradeOf(profile),n=streakNow(profile);return ` · grade ${g.ok?g.letter+' '+g.title.toLowerCase():'pending'}${n?` · 🔥 ${n}-day streak`:''}`})():''}</span><button class="lnk" data-act="editop" style="background:none;border:0;padding:0;font:inherit;text-decoration:underline;cursor:pointer;color:inherit">Change</button></div>
     </div>
     <div class="mm-art" aria-hidden="true"><img src="assets/heart-tree.png" alt="" width="500" height="512"></div></div>
@@ -268,6 +269,7 @@ $('startOv').addEventListener('click',e=>{
   else if(d.act==='exp'){menuView='exp';renderMenu()}
   else if(d.act==='career'){menuView='career';renderMenu()}
   else if(d.act==='awards'){menuView='awards';renderMenu()}
+  else if(d.act==='casebook'){menuView='casebook';renderMenu()}
   else if(d.act==='careercase'){startCareerCase()}
   else if(d.act==='tutorial'){startTutorial()}
   else if(d.act==='skiptut'||d.act==='notut'){profile.tutSkipped=true;saveProfile();menuView='play';renderMenu()}
@@ -339,7 +341,7 @@ function startCase(ci,opt={}){
   S=newState(ci,opt);S.daily=!!opt.daily&&ci===dailyCode();
   if(S.weekly){const m=weeklyInfo(S.weekly).mod;if(m.flag)m.flag(S)}document.body.classList.remove('inmenu','inreport');
   $('startOv').hidden=true;$('resultOv').hidden=true;closeReview();
-  const c=S.c;$('caseHead').innerHTML=`<h2>${S.weekly?'Weekly challenge · '+weeklyInfo(S.weekly).mod.name:S.c.code?'Random patient · '+S.c.code:'Patient · '+caseName(S)} · ${S.D.label}</h2>${S.weekly?`<p class="task">${weeklyInfo(S.weekly).mod.desc}</p>`:''}<b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
+  const c=S.c;$('caseHead').innerHTML=`<h2>${S.weekly?'Weekly challenge · '+weeklyInfo(S.weekly).mod.name:S.c.code?'Random patient · '+S.c.code:'Patient · '+caseName(S)} · ${S.D.label}</h2>${S.weekly?`<p class="task">${weeklyInfo(S.weekly).mod.desc}</p>`:''}${S.c.rare&&RARE_BY[S.c.rare]?`<p class="task">Rare patient: ${RARE_BY[S.c.rare].name}. ${RARE_BY[S.c.rare].short}.</p>`:''}<b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
   ictx.fillStyle=PAPER;ictx.fillRect(0,0,W,W);
   syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   toast(`${pw('Sheath in the right femoral artery.','The tube goes in through the artery at the top of the right leg (femoral artery).')} ${keyName('Hold '+shortKey('Space'),'Hold Fluoro')} for X-ray and ${keyName(shortKey('ArrowUp'),'Advance')} to advance.`);
@@ -1111,6 +1113,7 @@ function finish(){
   if(!S.c.tutorial&&typeof careerRecord==='function'){const ev=S.events.filter(e=>e.kind!=='spasm'||e.sev>0.8);
     for(const n of careerRecord({diff:S.diff,score:S.complication?0:total,stemi:S.stemi,d2b:S.d2b?S.reperfAt:null,hadComp:ev.length>0,managed:ev.length>0&&ev.every(e=>e.treated||e.sealed),ffrUsed:S.ffr.length>0}))notes.unshift(n)}
   const key=S.diff+'-'+(S.c.random?'R':S.ci),prev=profile.best[key];if(prev==null||total>prev)profile.best[key]=total;saveProfile();renderWho();
+  const caseFresh=!S.c.tutorial&&typeof recordCasebook==='function'?recordCasebook(S.c,S.complication?0:total):null;
   let achRes=null;
   if(!S.c.tutorial&&typeof recordCase==='function'){
     const sigAll=S.lesions.filter(L=>L.sev>=0.5),sig=S.lesions.filter(L=>L.sev>=0.7),bk=L=>BUCKETS.findIndex(b=>L.sev>=b.lo&&L.sev<b.hi);
@@ -1118,7 +1121,7 @@ function finish(){
     achRes=recordCase({score:S.complication?0:total,diff:S.diff,level:S.D.level,S,daily,sig:sig.length,opened:sig.filter(L=>L.stented).length,sigAll:sigAll.length,graded,comps:S.events});
     achRes.fresh.forEach((a,i)=>setTimeout(()=>toast(`Achievement: ${a.name} · +${a.t} tokens`),600+i*1800));
   }
-  if(typeof sfx==='function'&&((achRes&&achRes.fresh.length)||(daily&&daily.medal!=='none')||(weekly&&(weekly.newBest||weekly.tries===1))))setTimeout(()=>sfx('chime'),350);
+  if(typeof sfx==='function'&&(caseFresh||(achRes&&achRes.fresh.length)||(daily&&daily.medal!=='none')||(weekly&&(weekly.newBest||weekly.tries===1))))setTimeout(()=>sfx('chime'),350);
   const ov=$('resultOv');
   ov.innerHTML=`<div class="rephead">${avatarSVG(profile.avatar,48)}<div><h1>Report · ${caseName(S)}</h1><span class="fine">${esc(profile.name)} · ${S.D.label}</span></div></div>
   <div class="score"><b>${total}</b><span>${grade}</span></div>
@@ -1126,6 +1129,7 @@ function finish(){
   <div class="tokens">${CUP} +${earned} coffee token${earned===1?'':'s'}${S.D.tokenX>1?` (×${S.D.tokenX} for ${S.D.label})`:''} · ${profile.tokens} banked${prev!=null&&total>prev?' · new best':''}</div>
   ${daily?`<div class="medalrow">${medalBadge(daily.medal)}<span><b>Today's case: ${MEDAL_NAME[daily.medal]}</b>${daily.bonus?` · +${daily.bonus} medal tokens`:''} · bronze ${MEDALS[S.diff].bronze}, silver ${MEDALS[S.diff].silver}, gold ${MEDALS[S.diff].gold} on ${S.D.label}${profile.streak&&profile.streak.n>1?` · 🔥 ${profile.streak.n}-day streak`:''}</span></div>`:''}
   ${weekly?weeklyReportHTML(weekly):''}
+  ${caseFresh?casebookReportHTML(caseFresh):''}
   ${achReportHTML(achRes)}
   <div class="rows">${rows.map(r=>`<span>${r[0]}</span><span class="v">${Math.round(r[1])} / ${r[2]}</span>`).join('')}</div>
   ${txBreakdown()}

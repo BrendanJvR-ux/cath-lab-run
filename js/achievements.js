@@ -33,6 +33,8 @@ const ACHIEVEMENTS=[
   {id:'wk1',icon:'W',name:'Challenge accepted',desc:'Complete a weekly challenge.',t:10,test:c=>!!c.S.weekly},
   {id:'wk4',icon:'W4',name:'Weekly regular',desc:'Complete the weekly challenge in four different weeks.',t:30,test:(c,p)=>(p.weeklyHist||[]).length>=4},
   {id:'wkgold',icon:'W★',name:'Challenge champion',desc:'Win gold on a weekly challenge.',t:25,test:c=>!!c.S.weekly&&c.score>=MEDALS.medium.gold},
+  {id:'rare1',icon:'✎',name:'Curiosity',desc:'Treat a rare patient (a new casebook page).',t:15,test:c=>!!c.S.c.rare},
+  {id:'rareall',icon:'✎6',name:'The full casebook',desc:'Treat every kind of rare patient.',t:60,test:(c,p)=>typeof RARE_KINDS!=='undefined'&&RARE_KINDS.every(k=>p.casebook&&p.casebook.rare&&p.casebook.rare[k.id])},
   {id:'c10',icon:'10',name:'Regular',desc:'Complete 10 cases.',t:10,test:(c,p)=>p.stats.n>=10},
   {id:'c50',icon:'50',name:'Veteran',desc:'Complete 50 cases.',t:40,test:(c,p)=>p.stats.n>=50},
   {id:'gA',icon:'A',name:'Expert grade',desc:'Reach skill grade A.',t:30,test:(c,p)=>gradeOf(p).ok&&gradeOf(p).r>=70},

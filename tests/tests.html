@@ -293,7 +293,7 @@ test('A posteriorly placed RCA origin needs more clockwise torque than usual',()
 test('The default anatomy can be restored after random patients',()=>{buildAnatomy();ok(VBY.PLV&&VBY.PDA&&!VBY.RI&&!VBY.LPDA);ok(fx('rca').label==='mid RCA')});
 
 test('Every game script parses (a stray quote anywhere breaks the whole game)',()=>{
-  const files=['config/config.js','js/sim.js','js/gen.js','js/game.js','js/controls.js','js/heart3d.js','js/career.js','js/tutorial.js','js/glossary.js','js/intro.js','js/achievements.js','js/weekly.js','js/sound.js'];
+  const files=['config/config.js','js/sim.js','js/gen.js','js/game.js','js/controls.js','js/heart3d.js','js/career.js','js/tutorial.js','js/glossary.js','js/intro.js','js/achievements.js','js/weekly.js','js/sound.js','js/casebook.js'];
   for(const f of files){const x=new XMLHttpRequest();x.open('GET','../'+f+'?'+Date.now(),false);x.send();ok(x.status===200,f+' not found');try{new Function(x.responseText)}catch(e){throw new Error(f+': '+e.message)}}
   return files.length+' files';
 });
@@ -328,6 +328,18 @@ test('Weekly challenge: ISO weeks (Monday to Sunday), the same twist and patient
   ok(Wk.weekDaysLeft(new Date(2026,10,23))===7&&Wk.weekDaysLeft(new Date(2026,10,29))===1,'days left');
   const seen=new Set();for(let w=1;w<=40;w++){const k='2027-W'+String(w).padStart(2,'0'),i=Wk.weeklyInfo(k);seen.add(i.mod.id);ok(Wk.weeklyInfo(k).code===i.code,'deterministic');if(i.mod.need)ok(i.mod.need(pof(i.code)),k+' '+i.mod.id+' patient does not fit')}
   buildAnatomy();ok(seen.size>=5,'twists used: '+[...seen]);return `${seen.size} twists over 40 weeks`;
+});
+test('Rare patients: about one in thirteen, every kind turns up, each is set up as described and can be engaged',()=>{
+  const n=6000,count={};let rare=0;const seen={};
+  for(let i=0;i<n;i++){const code=seedToCode(i*7919%CODE_SPACE),p=generatePatient(code);if(!p.rare)continue;rare++;count[p.rare]=(count[p.rare]||0)+1;if(!seen[p.rare])seen[p.rare]=code;
+    if(p.rare==='kidney')ok(p.fixedBudget&&p.budget===30,'kidney budget');
+    if(p.rare==='leftmain')ok(p.lesions[0].vid==='LM','left main lesion');
+    if(p.rare==='long'){const L=p.lesions[0];ok(L.len>=26&&L.at+L.len/2<=VBY[L.vid].len/TREE_SCALE+0.01,'long lesion fits '+L.vid+' '+L.at+' '+L.len)}
+    if(p.rare==='leftdom')ok(p.anatomy.dom==='L','left dominant');if(p.rare==='anomrca')ok(p.anatomy.rca==='high','high RCA');if(p.rare==='tortuous')ok(p.anatomy.tort.amp>2,'tortuous')}
+  const f=rare/n;ok(f>0.06&&f<0.09,'rare share '+f.toFixed(3));for(const k of RARE_KINDS)ok(count[k.id]>20,k.id+' '+count[k.id]);
+  // the anomalous RCA can still be engaged with a JR4 pointed at it
+  buildAnatomy(generatePatient(seen.anomrca).anatomy);const cs=cathState({type:'JR',th:OSTANG.R,hub:OSTANG.R,s:S_ROOT+16},DIFFICULTY.medium);ok(cs.eng==='R','anomalous RCA engages');
+  buildAnatomy();return `${(f*100).toFixed(1)}% rare · `+RARE_KINDS.map(k=>k.id+' '+count[k.id]).join(', ');
 });
 const bad=results.filter(r=>!r.ok).length,sum=document.getElementById('sum');
 sum.textContent=bad?`${bad} of ${results.length} failed`:`All ${results.length} passed`;sum.className=bad?'bad':'ok';

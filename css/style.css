@@ -672,3 +672,14 @@ body.inmenu #toast[hidden],body.inreport #toast[hidden]{display:none!important}
 /* room for the longest warnings (three lines on desktop, four on a phone), so the controls never move */
 .stage>.toast{min-height:76px}
 @media (max-width:620px){.stage>.toast{min-height:96px}}
+/* ===== Casebook ===== */
+.cbpages{display:grid;gap:12px}
+.cbpage{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px;align-items:start;border:1px solid var(--ink);box-shadow:var(--rule);background:var(--panel);border-radius:3px;padding:12px}
+@media (max-width:560px){.cbpage{grid-template-columns:1fr}}
+.cbimg{width:150px;height:150px;border:1px solid var(--ink);box-shadow:0 0 0 3px var(--panel),0 0 0 4px rgba(29,27,25,.5);background:#efe9dc;display:grid;place-items:center;font-family:var(--f-display);font-size:42px;color:#b9b1a2}
+.cbpage h3{margin:0;font-family:var(--f-display);font-style:italic;font-weight:400;font-size:22px}
+.cbpage p{margin:4px 0;max-width:62ch}.cbshort{font-style:italic;color:var(--muted)}
+.cbtip b{font-family:var(--f-display);font-weight:400;font-style:italic}
+.cbpage.locked{opacity:.75}.cbpage.locked h3{color:var(--muted)}
+.cbseen{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:16px;color:var(--muted)}.cbseen .got{color:var(--fg)}.cbseen small{color:var(--muted)}
+#startOv .folder.rare::after{content:'✎';position:absolute;right:8px;bottom:6px;font-family:var(--f-display);color:var(--danger)}
