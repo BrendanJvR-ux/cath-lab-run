@@ -23,14 +23,16 @@ const SK_NAMES={
   RA1:['right A1 (anterior cerebral)','right front brain artery (anterior cerebral)'],LA1:['left A1 (anterior cerebral)','left front brain artery (anterior cerebral)'],
   RACA:['right anterior cerebral','right front brain artery (anterior cerebral)'],LACA:['left anterior cerebral','left front brain artery (anterior cerebral)'],
   RVA:['right vertebral artery','right back-of-neck artery (vertebral)'],LVA:['left vertebral artery','left back-of-neck artery (vertebral)'],
+  RM3a:['right frontal branch (M3)','right front branch (M3)'],RM3b:['right parietal branch (M3)','right top branch (M3)'],RM3c:['right temporal branch (M3)','right side branch (M3)'],RM3d:['right angular branch (M3)','right back branch (M3)'],
+  LM3a:['left frontal branch (M3)','left front branch (M3)'],LM3b:['left parietal branch (M3)','left top branch (M3)'],LM3c:['left temporal branch (M3)','left side branch (M3)'],LM3d:['left angular branch (M3)','left back branch (M3)'],
   BA:['basilar artery','artery at the base of the brain (basilar)'],RPCA:['right posterior cerebral','right back brain artery (posterior cerebral)'],LPCA:['left posterior cerebral','left back brain artery (posterior cerebral)'],
 };
-/* build the arch, neck and brain arteries. spec: {arch:'I'|'II'|'III', bovine} */
+/* build the arch, neck and brain arteries (and the veins that drain the brain). spec: {arch:'I'|'II'|'III', bovine} */
 function skAnatomy(spec={}){
   const d={I:0,II:-14,III:-30}[spec.arch||'I'],bov=!!spec.bovine;
   const V={},order=[];
   const add=(id,parent,ctrl,r,rot,o={})=>{const pts=skCurve(ctrl),cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1],pts[i][2]-pts[i-1][2]));
-    const v={id,parent,pts,cum,len:cum[cum.length-1],n:pts.length,r,rot,children:[],guideMaxY:o.guideMaxY??1e9,intra:!!o.intra,trap:!!o.trap,link:o.link||null,end:!!o.end};
+    const v={id,parent,pts,cum,len:cum[cum.length-1],n:pts.length,r,rot,children:[],guideMaxY:o.guideMaxY??1e9,intra:!!o.intra,trap:!!o.trap,link:o.link||null,end:!!o.end,noEntry:!!o.noEntry};
     if(parent){const P=V[parent];let oi=P.n-1;if(!o.atEnd){let bd=1e9;for(let i=0;i<P.n;i++){const q=P.pts[i],dd=Math.hypot(q[0]-ctrl[0][0],q[1]-ctrl[0][1],q[2]-ctrl[0][2]);if(dd<bd){bd=dd;oi=i}}}
       v.oi=oi;v.os=P.cum[oi];P.children.push(v)}
     V[id]=v;order.push(id);return v};
@@ -38,25 +40,52 @@ function skAnatomy(spec={}){
   add('AO',null,[[24,-125,-22],[24,-70,-20],[22,-28+d,-14],[9,-6+d,-3],[-6,-7+d,6],[-16,-30+d,14],[-18,-95,16]],11,0);
   const top=(x,y,z)=>[x,y+d,z];
   add('BCT','AO',[top(-7,-6,5),[-12,18,6],[-18,38,4]],6,0);
-  if(bov)add('LCCA','BCT',[[-10,6,5],[4,40,6],[18,80,7],[27,138,8]],3.5,90,{guideMaxY:1e9});
+  if(bov)add('LCCA','BCT',[[-10,6,5],[4,40,6],[18,80,7],[27,138,8]],3.5,90);
   else add('LCCA','AO',[top(5,-3,1),[12,30,5],[20,80,7],[27,138,8]],3.5,0);
   add('LSCA','AO',[top(16,-8,-8),[24,15,-8],[36,30,-8],[58,38,-8],[86,30,-8]],4,0);
   add('RSCA','BCT',[[-18,38,4],[-34,45,0],[-58,40,-6],[-86,30,-8]],4,270,{atEnd:true});
   add('RCCA','BCT',[[-18,38,4],[-23,90,6],[-27,138,8]],3.5,0,{atEnd:true});
   for(const S of ['R','L']){const sx=S==='R'?-1:1,lat=S==='R'?270:90,med=S==='R'?90:270;
-    add(S+'ICA',S+'CCA',[[sx*27,138,8],[sx*30,170,1],[sx*31,205,-2],[sx*28,222,9],[sx*24,238,14],[sx*22,250,4]],2.4,0,{atEnd:true,guideMaxY:204});
+    // internal carotid: straight up the neck, then through the skull base (petrous part, bending forwards), up through the
+    // cavernous sinus in an S-shaped siphon, and on to its end where it splits into the middle and anterior cerebrals
+    add(S+'ICA',S+'CCA',[[sx*27,138,8],[sx*30,175,0],[sx*31,198,-4],[sx*29,206,4],[sx*25,210,14],[sx*21,220,21],[sx*20,233,18],[sx*21,240,7],[sx*22,250,4]],2.4,0,{atEnd:true,guideMaxY:200});
+    add(S+'OPH',S+'ICA',[[sx*20,234,17],[sx*25,238,36],[sx*29,234,58],[sx*30,230,70]],0.7,0,{noEntry:true,intra:true,end:true});
+    // external carotid and its branches (to the face and scalp): a wrong turn for this job
     add(S+'ECA',S+'CCA',[[sx*27,138,8],[sx*22,160,22],[sx*30,185,30],[sx*38,205,34]],2.1,S==='R'?55:305,{atEnd:true,trap:true});
-    add(S+'M1',S+'ICA',[[sx*22,250,4],[sx*38,252,2],[sx*54,251,0],[sx*63,253,-2]],1.6,lat,{atEnd:true,intra:true});
-    add(S+'M2s',S+'M1',[[sx*63,253,-2],[sx*70,268,4],[sx*73,290,0],[sx*70,306,-6]],1.1,0,{atEnd:true,intra:true,end:true});
-    add(S+'M2i',S+'M1',[[sx*63,253,-2],[sx*73,246,-8],[sx*80,250,-22],[sx*82,262,-34]],1.1,180,{atEnd:true,intra:true,end:true});
-    add(S+'A1',S+'ICA',[[sx*22,250,4],[sx*11,256,10],[sx*3,262,14]],1.2,med,{atEnd:true,intra:true});
-    add(S+'ACA',S+'A1',[[sx*3,262,14],[sx*3,290,24],[sx*4,320,10],[sx*6,334,-10]],1.1,0,{atEnd:true,intra:true,end:true})}
-  add('LVA','LSCA',[[30,24,-8],[23,90,-22],[18,150,-26],[12,205,-34],[4,222,-32]],1.8,0,{guideMaxY:160});
-  add('RVA','RSCA',[[-32,44,-2],[-23,90,-22],[-18,150,-26],[-12,205,-34],[-4,222,-32]],1.7,0,{guideMaxY:160,link:'BA'});
-  add('BA','LVA',[[4,222,-32],[0,234,-30],[0,252,-24],[0,268,-20]],1.8,0,{atEnd:true,intra:true});
-  add('LPCA','BA',[[0,268,-20],[16,272,-28],[32,270,-40],[44,264,-52]],1.2,90,{atEnd:true,intra:true,end:true});
-  add('RPCA','BA',[[0,268,-20],[-16,272,-28],[-32,270,-40],[-44,264,-52]],1.2,270,{atEnd:true,intra:true,end:true});
-  return {V,order,spec:{arch:spec.arch||'I',bovine:bov}};
+    add(S+'FAC',S+'ECA',[[sx*23,162,23],[sx*32,170,44],[sx*34,186,58],[sx*28,204,66]],0.9,0,{noEntry:true,end:true});
+    add(S+'OCC',S+'ECA',[[sx*25,168,25],[sx*32,182,0],[sx*34,200,-30],[sx*30,222,-62]],0.9,0,{noEntry:true,end:true});
+    add(S+'STA',S+'ECA',[[sx*38,205,34],[sx*48,232,30],[sx*56,262,24],[sx*60,292,16]],1,0,{noEntry:true,end:true,atEnd:true});
+    add(S+'MAX',S+'ECA',[[sx*35,196,32],[sx*30,204,46],[sx*24,206,58]],0.8,0,{noEntry:true,end:true});
+    // middle cerebral: M1 out sideways, tiny perforators up into the deep brain, then two M2 trunks fanning over the hemisphere
+    add(S+'M1',S+'ICA',[[sx*22,250,4],[sx*36,252,2],[sx*50,251,0],[sx*58,252,-2]],1.6,lat,{atEnd:true,intra:true});
+    for(const [k,f] of [['a',0.35],['b',0.55]])add(S+'LS'+k,S+'M1',[[sx*(22+f*36),251,2],[sx*(23+f*36),262,3],[sx*(24+f*36),272,6]],0.4,0,{noEntry:true,intra:true,end:true});
+    add(S+'M2s',S+'M1',[[sx*58,252,-2],[sx*66,262,4],[sx*70,276,6],[sx*72,292,2]],1.1,0,{atEnd:true,intra:true});
+    add(S+'M2i',S+'M1',[[sx*58,252,-2],[sx*68,250,-12],[sx*74,256,-26],[sx*76,268,-40]],1.1,180,{atEnd:true,intra:true});
+    add(S+'M3a',S+'M2s',[[sx*72,292,2],[sx*68,308,26],[sx*60,320,50],[sx*52,324,66]],0.75,90,{atEnd:true,intra:true,end:true});
+    add(S+'M3b',S+'M2s',[[sx*72,292,2],[sx*71,314,-8],[sx*64,330,-34],[sx*56,334,-52]],0.75,270,{atEnd:true,intra:true,end:true});
+    add(S+'M3c',S+'M2i',[[sx*76,268,-40],[sx*74,262,-60],[sx*68,270,-78],[sx*60,282,-90]],0.75,180,{atEnd:true,intra:true,end:true});
+    add(S+'M3d',S+'M2i',[[sx*76,268,-40],[sx*76,290,-50],[sx*70,308,-66],[sx*62,320,-78]],0.75,0,{atEnd:true,intra:true,end:true});
+    // anterior cerebral: A1 inwards, then up the midline and back in an arc over the corpus callosum (pericallosal),
+    // with the callosomarginal branch running above it
+    add(S+'A1',S+'ICA',[[sx*22,250,4],[sx*11,256,10],[sx*3,260,14]],1.2,med,{atEnd:true,intra:true});
+    add(S+'ACA',S+'A1',[[sx*3,260,14],[sx*3,276,30],[sx*4,296,36],[sx*5,312,22],[sx*5,318,-10],[sx*5,314,-44],[sx*5,302,-66]],1.1,0,{atEnd:true,intra:true,end:true});
+    add(S+'CMA',S+'ACA',[[sx*4,294,36],[sx*6,318,42],[sx*7,334,16],[sx*7,334,-24]],0.7,0,{noEntry:true,intra:true,end:true})}
+  // vertebral arteries: up through the neck bones, a loop round the atlas (C1), then into the skull to join as the basilar
+  add('LVA','LSCA',[[30,24,-8],[23,90,-20],[18,150,-24],[17,186,-26],[24,198,-30],[30,206,-40],[18,212,-40],[8,218,-34],[4,222,-32]],1.8,0,{guideMaxY:186});
+  add('RVA','RSCA',[[-32,44,-2],[-23,90,-20],[-18,150,-24],[-17,186,-26],[-24,198,-30],[-30,206,-40],[-18,212,-40],[-8,218,-34],[-4,222,-32]],1.7,0,{guideMaxY:186,link:'BA'});
+  add('BA','LVA',[[4,222,-32],[1,236,-28],[0,252,-24],[0,268,-20]],1.8,0,{atEnd:true,intra:true});
+  for(const S of ['L','R']){const sx=S==='R'?-1:1;
+    add(S+'PCA','BA',[[0,268,-20],[sx*14,270,-28],[sx*28,268,-44],[sx*34,262,-64],[sx*30,256,-84]],1.2,S==='R'?270:90,{atEnd:true,intra:true,end:true});
+    add(S+'CALC',S+'PCA',[[sx*30,256,-84],[sx*22,266,-94],[sx*14,276,-98]],0.7,0,{noEntry:true,intra:true,end:true,atEnd:true});
+    add(S+'SCA','BA',[[0,264,-21],[sx*16,262,-30],[sx*28,256,-46]],0.6,0,{noEntry:true,intra:true,end:true})}
+  // the veins and sinuses that drain the brain (filled late, in the venous phase); not for the catheter
+  const veins=[];const vein=(ctrl,r,delay)=>{const pts=skCurve(ctrl,3),cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1],pts[i][2]-pts[i-1][2]));veins.push({pts,cum,n:pts.length,r,delay})};
+  for(const sx of [-1,1]){vein([[sx*62,300,24],[sx*36,326,30],[sx*4,342,24]],0.9,0);vein([[sx*66,292,-40],[sx*36,320,-56],[sx*4,328,-62]],0.9,0.1);vein([[sx*64,262,-20],[sx*58,258,-58],[sx*52,258,-82]],0.8,0.1)}
+  vein([[0,330,64],[0,346,22],[0,342,-30],[0,324,-70],[0,292,-96],[0,262,-100]],2.8,0.4);           // superior sagittal sinus
+  vein([[0,300,14],[0,292,-28],[0,274,-70],[0,262,-100]],1.8,0.5);                                  // inferior sagittal and straight sinus
+  for(const sx of [-1,1]){vein([[0,262,-100],[sx*30,260,-98],[sx*54,250,-80],[sx*60,232,-60],[sx*56,214,-44],[sx*48,200,-34]],2.6,0.9); // transverse and sigmoid sinus
+    vein([[sx*48,200,-34],[sx*42,170,-12],[sx*36,120,-2],[sx*32,60,0],[sx*30,0,2]],3.6,1.4)}         // internal jugular vein
+  return {V,order,veins,spec:{arch:spec.arch||'I',bovine:bov}};
 }
 const skPt=(v,s)=>{let i=0;while(i<v.n-1&&v.cum[i+1]<s)i++;const t=v.cum[i+1]>v.cum[i]?Math.min(1,Math.max(0,(s-v.cum[i])/(v.cum[i+1]-v.cum[i]))):0,a=v.pts[i],b=v.pts[Math.min(v.n-1,i+1)];return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t]};
 const skAngDiff=(a,b)=>Math.abs(((a-b)%360+540)%360-180);
@@ -75,7 +104,7 @@ function skMove(A,cat,ds,dk,clot){
     const ns=cat.s+ds;
     // branches whose openings the tip is passing, entered if it is turned their way
     let best=null,bd=1e9;
-    for(const c of v.children){const near=c.os>=v.len-0.5?ns>=v.len-1:Math.abs(ns-c.os)<=3;if(!near)continue;
+    for(const c of v.children){if(c.noEntry)continue;const near=c.os>=v.len-0.5?ns>=v.len-1:Math.abs(ns-c.os)<=3;if(!near)continue;
       if(c.intra&&!cat.deep)continue;const df=skAngDiff(cat.rot,c.rot);if(df<=skWindow(A,c,dk)&&df<bd){bd=df;best=c}}
     if(!best&&v.link&&ns>=v.len-1&&cat.deep&&skAngDiff(cat.rot,0)<=skWindow(A,A.V[v.link],dk))best=A.V[v.link];
     if(best){cat.stack.push({vid:v.id,s:Math.min(ns,v.len)});cat.vid=best.id;cat.s=0;cat.push=0;return {entered:best.id,trap:best.trap}}
@@ -94,10 +123,10 @@ function skMove(A,cat,ds,dk,clot){
 }
 /* which branch the next push would enter from here (or null), using the same rule as skMove */
 function skPick(A,cat,dk){const v=A.V[cat.vid];let best=null,bd=1e9;
-  for(const c of v.children){const near=c.os>=v.len-0.5?cat.s>=v.len-4:Math.abs(cat.s-c.os)<=3;if(!near||(c.intra&&!cat.deep))continue;const df=skAngDiff(cat.rot,c.rot);if(df<=skWindow(A,c,dk)&&df<bd){bd=df;best=c}}
+  for(const c of v.children){if(c.noEntry)continue;const near=c.os>=v.len-0.5?cat.s>=v.len-4:Math.abs(cat.s-c.os)<=3;if(!near||(c.intra&&!cat.deep))continue;const df=skAngDiff(cat.rot,c.rot);if(df<=skWindow(A,c,dk)&&df<bd){bd=df;best=c}}
   if(!best&&v.link&&cat.s>=v.len-4&&cat.deep&&skAngDiff(cat.rot,0)<=skWindow(A,A.V[v.link],dk))best=A.V[v.link];return best}
 /* is a branch opening near the tip worth steering towards? returns {child, diff} for the nearest */
-function skNearBranch(A,cat){const v=A.V[cat.vid];let best=null;for(const c of v.children){const dist=c.os>=v.len-0.5?v.len-cat.s:Math.abs(cat.s-c.os);if(dist>14)continue;if(!best||dist<best.dist)best={child:c,dist}}return best}
+function skNearBranch(A,cat){const v=A.V[cat.vid];let best=null;for(const c of v.children){if(c.noEntry)continue;const dist=c.os>=v.len-0.5?v.len-cat.s:Math.abs(cat.s-c.os);if(dist>14)continue;if(!best||dist<best.dist)best={child:c,dist}}return best}
 /* where the tip can reach: the path from the aorta, for drawing the catheter */
 function skCathPath(A,cat){const segs=[];for(const st of cat.stack)segs.push(st);segs.push({vid:cat.vid,s:cat.s});
   const pts=[];let prevVid=null;for(const sg of segs){const v=A.V[sg.vid];const s0=prevVid?0:0;for(let s=s0;s<=sg.s;s+=2)pts.push(skPt(v,s));pts.push(skPt(v,sg.s));prevVid=sg.vid}return pts}
