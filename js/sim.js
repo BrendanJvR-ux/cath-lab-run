@@ -282,7 +282,7 @@ const vign=document.createElement('canvas');vign.width=vign.height=W;{const g=vi
 let RES=2;
 const hiCanvas=()=>{const c=document.createElement('canvas');c.width=c.height=W*RES;const g=c.getContext('2d');g.setTransform(RES,0,0,RES,0,0);return c};
 const bgCache=new Map();
-const PAPER='#F7F7F5';
+const PAPER='#EFE9DC';
 /* hand-drawn helpers: a stable pseudo-random number per (i, j), and pencil hatching over the whole canvas (clip it first) */
 const hsh=(i,j)=>{const x=Math.sin(i*127.1+j*311.7)*43758.5453;return x-Math.floor(x)};
 function hatch(g,deg,gap,lw,col,seed){
@@ -393,7 +393,7 @@ function drawHeartSketch(g,B){
     // labels: the RV on the right/anterior side of the interventricular groove, the LV on the left/posterior side
     const toward=id=>{const v=VBY[id];return v?norm(sub(v.p[Math.floor(v.n*0.6)],V.c)):[0,0,0]};
     const rv=add(V.c,add(mul(toward(VBY.AM?'AM':'RCA'),24),[0,0,14])),lv=add(V.c,mul(toward('OM1'),22));
-    g.font='500 14px Inter, system-ui, sans-serif';g.fillStyle=ink(0.42);g.textAlign='center';g.textBaseline='middle';
+    g.font='italic 16px "Cormorant Garamond", Georgia, serif';g.fillStyle=ink(0.42);g.textAlign='center';g.textBaseline='middle';
     for(const [t,c] of [['RA',parts.RA.c],['LA',parts.LA.c],['RV',rv],['LV',lv],['Ao',[-6,70,4]],['PA',[24,62,16]],['SVC',[-29,104,-14]],...(B.u[1]>0.9?[['IVC',[-29,-84,-33]]]:[])])
       {const q=P(c);if(q[0]>16&&q[0]<W-16&&q[1]>16&&q[1]<W-16)g.fillText(t,q[0],q[1])}
     g.textAlign='left';g.textBaseline='alphabetic';
@@ -476,12 +476,27 @@ function getBg(a,b){
   // compose: paper, cross-hatched heart shadow, then the anatomy as graphite drawn twice slightly offset (a sketchy pencil line)
   const gc=c.getContext('2d');gc.fillStyle=PAPER;gc.fillRect(0,0,W,W);
   drawHeartSketch(gc,B);
-  const tint=hiCanvas();{const t=tint.getContext('2d');t.drawImage(lay,0,0,W,W);t.globalCompositeOperation='source-in';t.fillStyle='rgb(38,38,38)';t.fillRect(0,0,W,W)}
+  const tint=hiCanvas();{const t=tint.getContext('2d');t.drawImage(lay,0,0,W,W);t.globalCompositeOperation='source-in';t.fillStyle='rgb(29,27,25)';t.fillRect(0,0,W,W)}
   gc.globalAlpha=0.9;gc.drawImage(tint,0,0,W,W);gc.globalAlpha=1;
+  engraveBg(c);
   if(bgCache.size>16)bgCache.delete(bgCache.keys().next().value);
   bgCache.set(key,c);return c;
 }
 
+/* pen-and-ink look: lay engraved hatching over the background, denser and cross-hatched where it is darker, and keep
+   the original drawing faintly underneath so fine lines and labels still read. Runs once per view (the result is cached). */
+function engraveBg(c){
+  const N=200,sm=document.createElement('canvas');sm.width=sm.height=N;const sg=sm.getContext('2d');sg.drawImage(c,0,0,N,N);
+  const I=sg.getImageData(0,0,N,N).data,dark=(x,y)=>{if(x<0||y<0||x>=N||y>=N)return 0;const i=((y|0)*N+(x|0))*4;return 1-(I[i]*0.3+I[i+1]*0.59+I[i+2]*0.11)/236};
+  const old=document.createElement('canvas');old.width=c.width;old.height=c.height;old.getContext('2d').drawImage(c,0,0);
+  const g=c.getContext('2d');g.save();g.setTransform(RES,0,0,RES,0,0);g.fillStyle=PAPER;g.fillRect(0,0,W,W);g.globalAlpha=0.55;g.drawImage(old,0,0,W,W);g.globalAlpha=1;
+  g.strokeStyle='rgba(29,27,25,0.78)';g.lineWidth=0.5;g.lineCap='round';
+  const pass=(ang,gap,th)=>{const cs=Math.cos(ang),sn=Math.sin(ang),L=W*1.45;g.beginPath();
+    for(let k=-L/2;k<L/2;k+=gap){let on=false;for(let t=-L/2;t<L/2;t+=3){const x=W/2+cs*t-sn*k,y=W/2+sn*t+cs*k,d=dark(x/W*N,y/W*N);
+      if(d>th){if(!on){g.moveTo(x,y);on=true}else g.lineTo(x,y)}else on=false}}g.stroke()};
+  pass(0.12,3.2,0.1);pass(-0.9,3.6,0.22);pass(0.9,3.8,0.34);pass(1.6,3.2,0.48);
+  g.restore();
+}
 /* ---------- rendering ---------- */
 let ictx=null; // set by js/game.js (or a test) to the 2D context the image is drawn into
 let dcan=hiCanvas(),dctx=dcan.getContext('2d');
@@ -492,7 +507,7 @@ let vcan=hiCanvas(),vctx=vcan.getContext('2d');
 /* drop to a lighter resolution (for slow devices): rebuilds the working canvases and the background cache */
 function setResolution(r){if(r===RES)return;RES=r;dcan=hiCanvas();dctx=dcan.getContext('2d');vcan=hiCanvas();vctx=vcan.getContext('2d');bgCache.clear()}
 /* ink: v = 1 is bare paper (white in the multiply layer), v = 0 is full blue-black ink */
-const INK=[22,22,22];
+const INK=[29,27,25];
 const grey=v=>{v=clamp(v,0,1);return 'rgb('+Math.round(INK[0]+(255-INK[0])*v)+','+Math.round(INK[1]+(255-INK[1])*v)+','+Math.round(INK[2]+(255-INK[2])*v)+')'};
 let lastProj=null;
 function renderImage(st){
@@ -571,8 +586,8 @@ function renderImage(st){
   lastProj={B,k,projV};
   if(st.labels)drawVesselLabels(ctx,projV);
   if(st.marks&&st.marks.length){
-    ctx.lineWidth=1.6;ctx.font='500 14px Inter, system-ui, sans-serif';
-    st.marks.forEach((m,i)=>{const q=proj(motion(m.p3,k),B);ctx.strokeStyle='#E5432D';ctx.beginPath();ctx.arc(q[0],q[1],14,0,7);ctx.stroke();ctx.fillStyle='#E5432D';ctx.fillText(String(i+1),q[0]+16,q[1]-10)});
+    ctx.lineWidth=1.4;ctx.font='italic 17px "IM Fell English", Georgia, serif';
+    st.marks.forEach((m,i)=>{const q=proj(motion(m.p3,k),B);ctx.strokeStyle='#8A2D1F';ctx.beginPath();ctx.arc(q[0],q[1],14,0,7);ctx.stroke();ctx.lineWidth=0.6;ctx.beginPath();ctx.arc(q[0],q[1],17.5,0,7);ctx.stroke();ctx.lineWidth=1.4;ctx.fillStyle='#8A2D1F';ctx.fillText(String(i+1),q[0]+16,q[1]-10)});
   }
 }
 
@@ -583,16 +598,16 @@ function renderImage(st){
 /* Teaching mode (Easy): name each vessel that is holding contrast, in handwriting beside it. */
 const VESSEL_SHORT={LAD:'LAD',D1:'D1',D2:'D2',LCx:'Cx',OM1:'OM1',OM2:'OM2',RI:'Ramus',RCA:'RCA',AM:'AM',PDA:'PDA',PLV:'PL',LPDA:'PDA',LPL:'PL'}; // small septals, conus and the short left main would crowd the bifurcation
 function drawVesselLabels(ctx,projV){
-  ctx.save();ctx.font='500 12px Inter, system-ui, sans-serif';ctx.textBaseline='middle';ctx.lineJoin='round';
+  ctx.save();ctx.font='italic 14px "IM Fell English", Georgia, serif';ctx.textBaseline='middle';ctx.lineJoin='round';
   for(const P of projV){
     const v=P.v,name=VESSEL_SHORT[v.id];if(!name)continue;
     const i=Math.min(v.n-2,Math.floor(v.n*(v.id==='LM'?0.5:v.id==='LAD'||v.id==='RCA'||v.id==='LCx'?0.42:0.6)));
     if(P.cs[i]<0.25)continue;
     let nx=P.ys[i-1]-P.ys[i+1],ny=P.xs[i+1]-P.xs[i-1];const l=Math.hypot(nx,ny)||1;nx/=l;ny/=l;
     const x=P.xs[i]+nx*14,y=P.ys[i]+ny*14,w=ctx.measureText(name).width;
-    ctx.fillStyle='rgba(255,255,255,0.88)';ctx.strokeStyle='rgba(17,17,17,0.25)';ctx.lineWidth=1;
+    ctx.fillStyle='rgba(241,236,225,0.9)';ctx.strokeStyle='rgba(29,27,25,0.7)';ctx.lineWidth=0.8;
     ctx.beginPath();ctx.roundRect?ctx.roundRect(x-w/2-6,y-9,w+12,18,9):ctx.rect(x-w/2-5,y-10,w+10,20);ctx.fill();ctx.stroke();
-    ctx.fillStyle='#111';ctx.fillText(name,x-w/2,y+1);
+    ctx.fillStyle='#1d1b19';ctx.fillText(name,x-w/2,y+1);
   }
   ctx.restore();
 }

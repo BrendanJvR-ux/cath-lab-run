@@ -572,3 +572,94 @@ input[type=range]{accent-color:var(--ink)}
 .achline{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14.5px;color:var(--muted)}.achline b{color:var(--fg);font-weight:500}
 #startOv .folder.weekly{background:#fff;border-color:var(--ink)}#startOv .folder.weekly::before{background:var(--ink);color:#fff;border-color:var(--ink)}
 .sndrow{display:flex;align-items:center;gap:12px}.sndrow input{flex:1;accent-color:var(--ink)}
+
+/* ===== Pen-and-ink style: cream paper, iron-gall ink, old-style serif, engraved double rules, oval plaques =====
+   Overrides the minimal block above. One accent, an oxblood ink, for anything live or marked. */
+:root{
+  --bg:#f1ece1;--panel:#f6f2e9;--panel2:#ece6d9;--line:#1d1b19;--ink:#1d1b19;--fg:#1d1b19;--muted:#6b6357;--faint:#d6cdbb;
+  --amber:#8a2d1f;--amber-dim:#e4cdc4;--hi:#e6dfcf;--danger:#8a2d1f;--ok:#3d5a2e;--blue:#3a4a5c;--press:#8a2d1f;
+  --f-display:"IM Fell English",Georgia,"Times New Roman",serif;--f-body:"Cormorant Garamond",Georgia,"Times New Roman",serif;--f-mono:"Cormorant Garamond",Georgia,serif;
+  --rule:inset 0 0 0 3px var(--panel),inset 0 0 0 4px rgba(29,27,25,.55);
+}
+html,body{background:var(--bg)}
+body{font-family:var(--f-body);font-size:17.5px;font-weight:500;line-height:1.38;letter-spacing:0;
+  background-image:radial-gradient(rgba(120,95,60,.05) 1px,transparent 1.2px);background-size:7px 7px}
+h1,.overlay h1,#startOv h1{font-family:var(--f-display)!important;font-style:italic;font-weight:400!important;letter-spacing:0}
+#startOv .mm-title{font-size:clamp(46px,8.5vw,74px)}
+.brand{font-family:var(--f-display);font-style:italic;font-size:24px;font-weight:400;text-transform:none}
+.brand small{font-family:var(--f-body);font-style:italic;font-size:14.5px}
+.mm-kicker{font-family:var(--f-body);font-style:italic;text-transform:none;letter-spacing:.02em;font-size:16px;color:var(--muted)}
+/* buttons: engraved ovals with a double rule; the main action in solid ink */
+.btn{font-family:var(--f-display);font-style:italic;font-size:16.5px;font-weight:400;border:1px solid var(--ink);border-radius:999px;background:var(--panel);
+  box-shadow:inset 0 0 0 2.5px var(--panel),inset 0 0 0 3.3px rgba(29,27,25,.6);padding:7px 18px}
+.btn:hover:not(:disabled){background:#fbf8f1}
+.btn.primary{background:var(--ink);color:var(--panel);box-shadow:inset 0 0 0 2.5px var(--ink),inset 0 0 0 3.3px rgba(246,242,233,.7)}
+.btn.primary:hover:not(:disabled){background:#38332d}
+#startOv .mm-actions .xl{font-size:21px;padding:12px 32px}
+.lnk,#startOv .mm-links .lnk{font-family:var(--f-display)!important;font-style:italic;font-size:16px!important;text-decoration-color:rgba(29,27,25,.35)!important}
+/* panels: paper with an engraved double frame */
+.chart,.mm-strip,.case,.pending,.txpop,.glbox,.gradecard,.badge,.plainsum,.guide,.coach,.daily,.alert,.mark,.read,.diff,.item,.opcard,.crow,#startOv .folder,.gradetab{
+  border:1px solid var(--ink)!important;box-shadow:var(--rule)!important;background:var(--panel)!important;border-radius:3px!important}
+.read{padding:8px 12px!important}
+.read b{font-family:var(--f-display)!important;font-weight:400!important;font-size:27px!important}
+.read span{font-style:italic}
+.alert{background:#f3e6df!important}.alert b{color:var(--danger);font-family:var(--f-display);font-style:italic;font-weight:400}
+.mark{border-style:solid!important}
+#startOv .folder::before{border:1px solid var(--ink)!important;border-bottom:0!important;background:var(--panel)!important;color:var(--ink)!important;font-family:var(--f-display);font-style:italic;font-weight:400;font-size:13px;letter-spacing:0;text-transform:none}
+#startOv .folder[aria-pressed="true"]{box-shadow:var(--rule),0 0 0 2px var(--ink)!important}
+#startOv .folder.weekly,#startOv .folder.weekly::before{background:var(--ink)!important;color:var(--panel)!important}
+#startOv .folder.weekly span,#startOv .folder.weekly b{color:var(--panel)}#startOv .folder.weekly .tag{border-color:var(--panel);color:var(--panel)}
+.chart h2,.mm-strip b,#startOv .folder b,.case b,.tools .btn b,.badge b,.gradecard .gtitle,.txhead b{font-family:var(--f-display);font-style:italic;font-weight:400}
+.gradecard .letter{font-family:var(--f-display);font-weight:400}
+.badge.got i{border:1px solid var(--ink);color:var(--ink);background:var(--panel);box-shadow:inset 0 0 0 2px var(--panel),inset 0 0 0 2.8px rgba(29,27,25,.6);font-family:var(--f-display)}
+.badge i{font-family:var(--f-display)}
+/* section headings: italic with a fine rule under them */
+.sec{border-top:0;position:relative}
+.sec+.sec::before{content:'';position:absolute;left:18px;right:18px;top:0;border-top:1px solid var(--ink);box-shadow:0 2px 0 -1px var(--faint)}
+.sec h2{font-family:var(--f-display);font-style:italic;font-size:19px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink)}
+.grouplabel,.slabel,.gradetab th{font-family:var(--f-body)!important;font-style:italic;font-size:14.5px!important;font-weight:500!important;letter-spacing:.02em!important;text-transform:none!important;color:var(--muted)!important}
+.console{border-left:1px solid var(--ink);box-shadow:-3px 0 0 -2px var(--faint)}
+/* the monitor: ink frame with a second fine rule outside it */
+.monitor{border:2px solid var(--ink);border-radius:2px;box-shadow:0 0 0 4px var(--bg),0 0 0 5px var(--ink);background:#efe9dc}
+.hud{font-family:var(--f-display);font-style:italic;text-shadow:0 0 3px #efe9dc,0 0 6px #efe9dc;font-size:clamp(14px,2.2vw,17px)}
+.hemo{border:1px solid var(--ink);box-shadow:0 0 0 3px var(--bg),0 0 0 4px rgba(29,27,25,.5);background:#f6f2e9}
+.lamp{font-family:var(--f-display);font-style:italic;letter-spacing:.04em;font-size:14px;border:1px solid var(--ink)}
+.lamp.on{background:var(--danger);border-color:var(--danger)}
+.who{font-family:var(--f-display);font-style:italic;border:1px solid var(--ink)!important}
+/* control strip: oval plaques; inject is an ink ribbon with notched ends */
+.strip .sbtn,.hold{font-family:var(--f-display);font-style:italic;font-weight:400;border:1px solid var(--ink);background:var(--panel);
+  box-shadow:inset 0 0 0 2.5px var(--panel),inset 0 0 0 3.3px rgba(29,27,25,.6)}
+.strip .sbtn.on,.hold.on,.hold.cine.on,.hold.inj.on{background:var(--ink);color:var(--panel);box-shadow:inset 0 0 0 2.5px var(--ink),inset 0 0 0 3.3px rgba(246,242,233,.6)}
+.strip .inj{background:var(--ink);color:var(--panel);border:0;border-radius:0;font-size:21px;box-shadow:inset 0 0 0 5px var(--ink),inset 0 0 0 6px rgba(246,242,233,.6);
+  clip-path:polygon(0 50%,16px 0,calc(100% - 16px) 0,100% 50%,calc(100% - 16px) 100%,16px 100%)}
+.strip .inj.on{background:var(--danger);box-shadow:inset 0 0 0 5px var(--danger),inset 0 0 0 6px rgba(246,242,233,.6)}
+kbd{font-family:var(--f-body);font-style:normal;font-size:12.5px;border:1px solid rgba(29,27,25,.4);color:var(--muted);border-radius:3px}
+.strip .sbtn.on kbd,.hold.on kbd,.strip .inj kbd{color:#d9d0bf;border-color:rgba(246,242,233,.45)}
+/* messages, pop-ups and the steering guide */
+.toast{font-family:var(--f-display);font-style:italic;font-size:16px;background:var(--ink);color:var(--panel);border-radius:0;
+  clip-path:polygon(0 50%,12px 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,12px 100%);padding:8px 26px}
+.toast.danger{background:var(--danger)}
+.txpop{box-shadow:var(--rule),3px 5px 0 rgba(29,27,25,.12)!important}
+.gradepop{border-width:2px!important}
+.txclose{border:1px solid var(--ink);background:var(--panel);font-family:var(--f-display)}
+.txdot{border:1px solid var(--danger);box-shadow:0 0 0 3px transparent,0 0 0 4px var(--danger)}
+.sev button{font-family:var(--f-display);font-style:italic;border:1px solid var(--ink);background:var(--panel)}
+.sev button.sel{background:var(--ink);color:var(--panel)}
+.gmeter{background:var(--faint)}.gmeter b{background:var(--ink)}
+.read .lvl b{background:var(--ink)}
+.score b{font-family:var(--f-display);font-weight:400}
+.cathtoggle button{font-family:var(--f-display);font-style:italic}
+.cathtoggle button[aria-pressed="true"]{background:var(--ink)!important;color:var(--panel)}
+#startOv .seg{border:1px solid var(--ink)}
+#startOv .seg button{font-family:var(--f-display);font-style:italic}
+#startOv .seg button[aria-pressed="true"],.diff.sel{background:var(--ink)!important;color:var(--panel)}
+.chip,.bind{font-family:var(--f-body);border:1px solid var(--ink)}
+.bind.cap{background:var(--ink);color:var(--panel)}
+.glossary{background:rgba(29,27,25,.3)}
+.view3d{background:#f1ece1}
+/* the menu picture: the heart that grew roots, in ink */
+.mm-art img{width:100%;max-width:440px;height:auto;filter:none!important;opacity:1!important}
+@media (max-width:620px){.mm-art img{max-width:150px}}
+input[type=range]{accent-color:var(--ink)}
+.ctrlcheck input{accent-color:var(--ink)}
+.overlay,.overlay[data-view="home"]{background:rgba(246,242,233,.97)}body.inmenu .monitor,body.inreport .monitor{background:var(--panel)}

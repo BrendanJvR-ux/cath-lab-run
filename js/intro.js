@@ -3,12 +3,12 @@
    the leg, filming with dye, opening it with a balloon and stent, then what the player does in the game.
    Shown once to new players after the experience question, and any time from "How it works" on the main menu. */
 "use strict";
-const IW=720,IH=380,INK_='#111',GREY_='#c9c8c2',RED_='#E5432D',PINK_='#FBE3DE',PLAQ_='#E7DFC6';
+const IW=720,IH=380,INK_='#1d1b19',GREY_='#b9b1a2',RED_='#8A2D1F',PINK_='#EFE2D6',PLAQ_='#E3D7BC';
 const ease=t=>t<=0?0:t>=1?1:t*t*(3-2*t);
 const iseg=(t,a,b)=>ease((t-a)/(b-a));
 const bz=(p,t)=>{const u=1-t;return [u*u*u*p[0][0]+3*u*u*t*p[1][0]+3*u*t*t*p[2][0]+t*t*t*p[3][0],u*u*u*p[0][1]+3*u*u*t*p[1][1]+3*u*t*t*p[2][1]+t*t*t*p[3][1]]};
 function strokeBz(g,p,upto=1,n=60){g.beginPath();for(let i=0;i<=n*upto;i++){const q=bz(p,i/n);i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1])}g.stroke()}
-function label(g,txt,x,y,col=INK_,align='left'){g.font='500 15px Inter, system-ui, sans-serif';g.fillStyle=col;g.textAlign=align;g.textBaseline='middle';g.fillText(txt,x,y)}
+function label(g,txt,x,y,col=INK_,align='left'){g.font='italic 17px "IM Fell English", Georgia, serif';g.fillStyle=col;g.textAlign=align;g.textBaseline='middle';g.fillText(txt,x,y)}
 function arrowTo(g,x0,y0,x1,y1,col=INK_){g.strokeStyle=col;g.lineWidth=1.2;g.beginPath();g.moveTo(x0,y0);g.lineTo(x1,y1);g.stroke();const a=Math.atan2(y1-y0,x1-x0);g.beginPath();g.moveTo(x1,y1);g.lineTo(x1-7*Math.cos(a-0.45),y1-7*Math.sin(a-0.45));g.moveTo(x1,y1);g.lineTo(x1-7*Math.cos(a+0.45),y1-7*Math.sin(a+0.45));g.stroke()}
 
 /* a simple heart: two lobes and a point, tilted the way it sits in the chest */
@@ -44,8 +44,8 @@ function artery(g,bump,time,speed,opts={}){
 const SCENES=[
   {title:'Your heart has its own arteries',cap:'The heart is a muscle that pumps all day. It needs its own blood supply: the coronary arteries, which run over its surface.',
    draw(g,t,time){const s=1+0.025*Math.sin(time*7.5);g.save();g.translate(360,200);g.scale(s,s);g.translate(-360,-200);
-     g.strokeStyle=INK_;g.lineWidth=1.6;g.fillStyle='#F4F2EE';heartPath(g,360,190,1.45);g.fill();g.stroke();
-     for(const [w,c] of [[17,INK_],[14,'#F4F2EE']]){g.beginPath();g.moveTo(352,128);g.bezierCurveTo(344,70,404,44,428,84);g.lineTo(432,112);g.strokeStyle=c;g.lineWidth=w;g.lineCap='butt';g.stroke()} // aorta
+     g.strokeStyle=INK_;g.lineWidth=1.6;g.fillStyle='#EFE9DC';heartPath(g,360,190,1.45);g.fill();g.stroke();
+     for(const [w,c] of [[17,INK_],[14,'#EFE9DC']]){g.beginPath();g.moveTo(352,128);g.bezierCurveTo(344,70,404,44,428,84);g.lineTo(432,112);g.strokeStyle=c;g.lineWidth=w;g.lineCap='butt';g.stroke()} // aorta
      g.strokeStyle=RED_;g.lineWidth=4;g.lineCap='round';HEART_ART.forEach((p,i)=>strokeBz(g,p,iseg(t,0.05+i*0.08,0.4+i*0.08)));
      if(t>0.5)flowDots(g,HEART_ART,time,0.35);g.restore();
      if(t>0.45){g.globalAlpha=iseg(t,0.45,0.6);arrowTo(g,520,150,452,186);label(g,'coronary arteries',528,146);arrowTo(g,250,74,336,84);label(g,'aorta: the main artery',244,74,INK_,'right');g.globalAlpha=1}}},
@@ -54,7 +54,7 @@ const SCENES=[
      if(t>0.45){g.globalAlpha=iseg(t,0.45,0.6);arrowTo(g,360,300,360,236);label(g,'plaque',360,316,INK_,'center');g.globalAlpha=1}
      if(t>0.65){g.globalAlpha=iseg(t,0.65,0.8);label(g,'less blood gets past',560,110,RED_,'center');g.globalAlpha=1}}},
   {title:'A thin tube, from the leg to the heart',cap:'To fix it without surgery, a doctor slides a thin tube (a catheter) into an artery at the top of the leg and steers it up to the heart.',
-   draw(g,t){g.strokeStyle=INK_;g.lineWidth=1.6;g.fillStyle='#F4F2EE';
+   draw(g,t){g.strokeStyle=INK_;g.lineWidth=1.6;g.fillStyle='#EFE9DC';
      g.beginPath();g.arc(360,58,26,0,7);g.fill();g.stroke();
      g.beginPath();g.moveTo(330,92);g.bezierCurveTo(296,96,290,112,288,150);g.lineTo(296,250);g.lineTo(424,250);g.lineTo(432,150);g.bezierCurveTo(430,112,424,96,390,92);g.closePath();g.fill();g.stroke();
      g.beginPath();g.moveTo(300,250);g.lineTo(306,368);g.moveTo(344,252);g.lineTo(350,368);g.moveTo(376,252);g.lineTo(370,368);g.moveTo(420,250);g.lineTo(414,368);g.stroke();
@@ -64,7 +64,7 @@ const SCENES=[
      if(t>0.15){g.globalAlpha=iseg(t,0.15,0.3);arrowTo(g,226,300,326,300);label(g,'in at the top of the leg',218,300,INK_,'right');g.globalAlpha=1}
      if(t>0.8){g.globalAlpha=iseg(t,0.8,0.92);arrowTo(g,520,130,398,136);label(g,'catheter tip at the heart',526,130);g.globalAlpha=1}}},
   {title:'Dye and X-ray show the narrowing',cap:'Blood does not show on X-ray. So the doctor injects dye through the catheter and films it: the arteries appear, and a narrowing shows as a pinch.',
-   draw(g,t){g.fillStyle='#F7F7F5';g.fillRect(200,30,320,320);g.strokeStyle=GREY_;g.lineWidth=1;g.strokeRect(200,30,320,320);
+   draw(g,t){g.fillStyle='#EFE9DC';g.fillRect(200,30,320,320);g.strokeStyle=GREY_;g.lineWidth=1;g.strokeRect(200,30,320,320);
      const trunk=[[260,60],[300,110],[330,190],[360,320]],br=[[[300,110],[350,120],[410,160],[460,240]],[[330,190],[360,200],[400,230],[420,280]],[[285,92],[260,140],[240,200],[236,260]]];
      const f=iseg(t,0.1,0.7);g.lineCap='round';
      // grey outline of the catheter
@@ -88,7 +88,7 @@ const SCENES=[
    draw(g,t){const steps=['Steer the catheter into a heart artery','Film it: record, then inject dye','Find the narrowing and say how bad it is','Open it with a balloon and a stent'];
      steps.forEach((s,i)=>{const a=iseg(t,0.05+i*0.14,0.18+i*0.14);if(!a)return;g.globalAlpha=a;const y=86+i*64;
        g.strokeStyle=INK_;g.lineWidth=1.4;g.beginPath();g.arc(190,y,19,0,7);g.stroke();label(g,String(i+1),190,y+1,INK_,'center');
-       g.font='300 22px Inter, system-ui, sans-serif';g.fillStyle=INK_;g.textAlign='left';g.fillText(s,228,y+1);g.globalAlpha=1})}},
+       g.font='italic 24px "IM Fell English", Georgia, serif';g.fillStyle=INK_;g.textAlign='left';g.fillText(s,228,y+1);g.globalAlpha=1})}},
 ];
 const SCENE_S=10;
 let introState=null;
@@ -110,7 +110,7 @@ function openIntro(){
   const frame=now=>{
     if(!introState)return;
     const el=introState.paused?introState.pausedAt:(now-introState.t0)/1000,t=Math.min(1,el/SCENE_S);
-    g.clearRect(0,0,IW,IH);g.fillStyle='#fff';g.fillRect(0,0,IW,IH);
+    g.clearRect(0,0,IW,IH);g.fillStyle='#F6F2E9';g.fillRect(0,0,IW,IH);
     SCENES[introState.i].draw(g,t,el);
     if(!introState.paused&&el>=SCENE_S+1.2&&introState.i<SCENES.length-1)show(introState.i+1);
     introState.raf=requestAnimationFrame(frame);

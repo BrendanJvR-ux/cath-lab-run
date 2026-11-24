@@ -251,7 +251,7 @@ function renderMenu(){
       <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button>${typeof weeklyInfo==='function'?`<button class="lnk" data-act="weeklysel">This week: ${weeklyInfo().mod.name}</button>`:''}<button class="lnk" data-act="career">Career</button><button class="lnk" data-act="awards">Achievements${typeof ACHIEVEMENTS!=='undefined'?` (${ACHIEVEMENTS.filter(a=>profile.ach&&profile.ach.got&&profile.ach.got[a.id]).length}/${ACHIEVEMENTS.length})`:''}</button><button class="lnk" data-act="intro">How it works (1 min)</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Settings</button><button class="lnk" data-gl="">Glossary</button></div>
       <div class="mm-op">${avatarSVG(profile.avatar,32)}<span><b>${esc(profile.name)}</b> · ${typeof rankName==='function'?rankName()+' · ':''}${profile.tokens} tokens · ${DIFFICULTY[profile.diff].label}${typeof gradeOf==='function'?(()=>{const g=gradeOf(profile),n=streakNow(profile);return ` · grade ${g.ok?g.letter+' '+g.title.toLowerCase():'pending'}${n?` · 🔥 ${n}-day streak`:''}`})():''}</span><button class="lnk" data-act="editop" style="background:none;border:0;padding:0;font:inherit;text-decoration:underline;cursor:pointer;color:inherit">Change</button></div>
     </div>
-    <div class="mm-art" aria-hidden="true">${CARM_SVG}</div></div>
+    <div class="mm-art" aria-hidden="true"><img src="assets/heart-tree.png" alt="" width="500" height="512"></div></div>
     <p class="fine">Teaching game with simplified anatomy and physics. Not a clinical training device.</p>`;
 }
 $('startOv').addEventListener('click',e=>{
@@ -446,6 +446,8 @@ const hemo=$('hemo'),hctx=hemo.getContext('2d');let HB=null,hx=0,dpr=1;
 const HEMO_H=168;
 function sizeHemo(){dpr=Math.min(2,window.devicePixelRatio||1);const w=Math.max(200,Math.round(hemo.clientWidth*dpr)),h=Math.round(HEMO_H*dpr);hemo.width=w;hemo.height=h;HB={p:new Float32Array(w).fill(NaN),pd:new Float32Array(w).fill(NaN)};for(const l of LEADS)HB[l]=new Float32Array(w).fill(NaN);hx=0}
 window.addEventListener('resize',sizeHemo);
+// the strip is hidden behind the menu at load, so size it again whenever its width on screen changes
+if(typeof ResizeObserver==='function'){let lastW=0;new ResizeObserver(()=>{const w=hemo.clientWidth;if(w&&w!==lastW){lastW=w;sizeHemo()}}).observe(hemo)}
 const gs=(x,m,s)=>Math.exp(-((x-m)*(x-m))/(2*s*s));
 /* One beat of an ECG lead: st = ST shift (+ elevation, − depression), twi = inverted T wave, amp = QRS size. */
 function ecgAt(ph,st=0,twi=false,amp=1){
@@ -470,20 +472,20 @@ function drawHemo(){
   if(!HB)return;const w=hemo.width,h=hemo.height;hctx.clearRect(0,0,w,h);
   const rowH=h*0.19,pTop=h*0.62,pBot=h-6*dpr,pm=v=>pBot-(v/160)*(pBot-pTop);
   // ECG paper: fine pink grid with heavier lines every fifth square
-  const sq=6*dpr;for(let x=0,n=0;x<w;x+=sq,n++){hctx.strokeStyle=n%5?'rgba(17,17,17,0.035)':'rgba(17,17,17,0.09)';hctx.lineWidth=1;hctx.beginPath();hctx.moveTo(x,0);hctx.lineTo(x,h);hctx.stroke()}
-  for(let y=0,n=0;y<h;y+=sq,n++){hctx.strokeStyle=n%5?'rgba(17,17,17,0.035)':'rgba(17,17,17,0.09)';hctx.lineWidth=1;hctx.beginPath();hctx.moveTo(0,y);hctx.lineTo(w,y);hctx.stroke()}
-  hctx.strokeStyle='rgba(17,17,17,0.12)';hctx.setLineDash([4*dpr,4*dpr]);
+  const sq=6*dpr;for(let x=0,n=0;x<w;x+=sq,n++){hctx.strokeStyle=n%5?'rgba(90,70,40,0.05)':'rgba(90,70,40,0.13)';hctx.lineWidth=1;hctx.beginPath();hctx.moveTo(x,0);hctx.lineTo(x,h);hctx.stroke()}
+  for(let y=0,n=0;y<h;y+=sq,n++){hctx.strokeStyle=n%5?'rgba(90,70,40,0.05)':'rgba(90,70,40,0.13)';hctx.lineWidth=1;hctx.beginPath();hctx.moveTo(0,y);hctx.lineTo(w,y);hctx.stroke()}
+  hctx.strokeStyle='rgba(29,27,25,0.16)';hctx.setLineDash([4*dpr,4*dpr]);
   for(const v of [40,80,120]){hctx.beginPath();hctx.moveTo(0,pm(v));hctx.lineTo(w,pm(v));hctx.stroke()}hctx.setLineDash([]);
   const trace=(arr,map,col)=>{hctx.strokeStyle=col;hctx.lineWidth=1.5*dpr;hctx.beginPath();let pen=false;for(let x=0;x<w;x++){const v=arr[x];if(isNaN(v)){pen=false;continue}const y=map(v);pen?hctx.lineTo(x,y):hctx.moveTo(x,y);pen=true}hctx.stroke()};
-  hctx.font=`500 ${11*dpr}px Inter, system-ui, sans-serif`;
-  LEADS.forEach((l,i)=>{const base=rowH*(i+0.72);trace(HB[l],v=>base-v*rowH*0.62,'#111111');hctx.fillStyle='#111111';hctx.fillText(l,6*dpr,rowH*i+12*dpr);
-    const stv=S?S.st[l]:0;if(Math.abs(stv)>0.25){hctx.fillStyle=stv>0?'#E5432D':'#4A5A70';hctx.fillText(`ST ${stv>0?'↑':'↓'} ${(Math.abs(stv)*2).toFixed(1)} mm`,26*dpr,rowH*i+12*dpr)}});
-  trace(HB.p,pm,'#E5432D');trace(HB.pd,pm,'#4A5A70');
-  if(S&&S.pdRatio!=null){hctx.fillStyle='#4A5A70';hctx.fillText(`Pd/Pa ${S.pdRatio.toFixed(2)}`,6*dpr,pTop+24*dpr)}
-  hctx.fillStyle='#E5432D';hctx.fillText('AO 0–160',6*dpr,pTop+8*dpr);
+  hctx.font=`italic ${14*dpr}px "Cormorant Garamond", Georgia, serif`;
+  LEADS.forEach((l,i)=>{const base=rowH*(i+0.72);trace(HB[l],v=>base-v*rowH*0.62,'#1d1b19');hctx.fillStyle='#1d1b19';hctx.fillText(l,6*dpr,rowH*i+12*dpr);
+    const stv=S?S.st[l]:0;if(Math.abs(stv)>0.25){hctx.fillStyle=stv>0?'#8A2D1F':'#3A4A5C';hctx.fillText(`ST ${stv>0?'↑':'↓'} ${(Math.abs(stv)*2).toFixed(1)} mm`,26*dpr,rowH*i+12*dpr)}});
+  trace(HB.p,pm,'#8A2D1F');trace(HB.pd,pm,'#3A4A5C');
+  if(S&&S.pdRatio!=null){hctx.fillStyle='#3A4A5C';hctx.fillText(`Pd/Pa ${S.pdRatio.toFixed(2)}`,6*dpr,pTop+24*dpr)}
+  hctx.fillStyle='#8A2D1F';hctx.fillText('AO 0–160',6*dpr,pTop+8*dpr);
   const hr=S?Math.round(S.hr):72,sp=S?Math.round(S.sysP):128,dp=S?Math.round(S.diaP):74;
-  hctx.textAlign='right';hctx.font=`300 ${17*dpr}px Inter, system-ui, sans-serif`;hctx.fillStyle='#111111';hctx.fillText('HR '+hr,w-8*dpr,16*dpr);
-  hctx.fillStyle='#E5432D';hctx.fillText(`${sp}/${dp} (${Math.round(dp+(sp-dp)/3)})`,w-8*dpr,pTop+10*dpr);hctx.textAlign='left';
+  hctx.textAlign='right';hctx.font=`italic ${19*dpr}px "IM Fell English", Georgia, serif`;hctx.fillStyle='#1d1b19';hctx.fillText('HR '+hr,w-8*dpr,16*dpr);
+  hctx.fillStyle='#8A2D1F';hctx.fillText(`${sp}/${dp} (${Math.round(dp+(sp-dp)/3)})`,w-8*dpr,pTop+10*dpr);hctx.textAlign='left';
 }
 
 /* ---------- PCI: wire, balloon, stent ---------- */

@@ -21,7 +21,7 @@ function toonMat(color,opts={}){
   if(!TOON){const d=new Uint8Array([90,170,255]);TOON=new THREE.DataTexture(d,3,1,THREE.LuminanceFormat);TOON.minFilter=TOON.magFilter=THREE.NearestFilter;TOON.needsUpdate=true}
   return new THREE.MeshToonMaterial({color,gradientMap:TOON,...opts});
 }
-const INK3=0x3a3a3a;
+const INK3=0x1d1b19;
 /* a tube plus a slightly fatter dark back-face tube round it: the classic inked outline */
 const OUTLINE=new Map();
 function inkedTube(pts,r,mat,seg){
@@ -30,10 +30,10 @@ function inkedTube(pts,r,mat,seg){
   g.add(new THREE.Mesh(tubeGeo(pts,r+Math.max(0.45,r*0.22),seg),om));return g;
 }
 /* a handwritten label that always faces the camera */
-function label3(text,pos,color='#111111',size=1){
-  const c=document.createElement('canvas'),x=c.getContext('2d');x.font='500 36px Inter, system-ui, sans-serif';
+function label3(text,pos,color='#1d1b19',size=1){
+  const c=document.createElement('canvas'),x=c.getContext('2d');x.font='italic 40px "IM Fell English", Georgia, serif';
   const w=Math.ceil(x.measureText(text).width)+28;c.width=w;c.height=64;
-  x.font='500 36px Inter, system-ui, sans-serif';x.fillStyle='rgba(255,255,255,0.9)';x.strokeStyle='rgba(17,17,17,0.25)';x.lineWidth=2;
+  x.font='italic 40px "IM Fell English", Georgia, serif';x.fillStyle='rgba(241,236,225,0.92)';x.strokeStyle='rgba(29,27,25,0.6)';x.lineWidth=2;
   x.beginPath();x.roundRect?x.roundRect(3,6,w-6,52,14):x.rect(3,6,w-6,52);x.fill();x.stroke();
   x.fillStyle=color;x.textBaseline='middle';x.fillText(text,14,33);
   const t=new THREE.CanvasTexture(c),s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}));
@@ -49,23 +49,23 @@ function tubeGeo(pts,r,seg){const curve=new THREE.CatmullRomCurve3(pts.map(v3));
 
 /* build the scene: post = after the case (show disease, devices and complications) */
 function buildHeartScene(post){
-  const scene=new THREE.Scene();scene.background=new THREE.Color(0xffffff);
+  const scene=new THREE.Scene();scene.background=new THREE.Color(0xf1ece1);
   scene.add(new THREE.AmbientLight(0xffffff,0.55));
   const sun=new THREE.DirectionalLight(0xffffff,0.75);sun.position.set(-120,180,260);scene.add(sun);
   const {V}=heartGeometry(),parts=HEART_PARTS;
   // chambers: see-through so the coronaries on the back still show
   const cham=(e,col,op)=>{const g=ellMesh(e,toonMat(col,{transparent:true,opacity:op,depthWrite:false}));g.renderOrder=1;scene.add(g);return g};
-  cham(V,0xdedcd8,0.55);cham(parts.RA,0xcfd2d6,0.55);cham(parts.LA,0xe4e1dc,0.55);cham(parts.LAA,0xe4e1dc,0.6);cham(parts.RAA,0xcfd2d6,0.6);
+  cham(V,0xe6dccb,0.55);cham(parts.RA,0xd9cfbd,0.55);cham(parts.LA,0xe9e1d2,0.55);cham(parts.LAA,0xe9e1d2,0.6);cham(parts.RAA,0xd9cfbd,0.6);
   // great vessels
   const ves=(pts,r,col)=>scene.add(inkedTube(pts,r,toonMat(col)));
   const tubes=heartTubes();
-  const colours=[0xbdbdb8,0xa9aeb5,0xa9aeb5,0xa9aeb5,0xa9aeb5,0xa9aeb5,0xbdbdb8,0xbdbdb8,0xbdbdb8];
+  const colours=[0xcdbfa6,0xb9b1a2,0xb9b1a2,0xb9b1a2,0xb9b1a2,0xb9b1a2,0xcdbfa6,0xcdbfa6,0xcdbfa6];
   tubes.forEach(([pts,r],i)=>{if(i===0)pts=pts.filter(p=>p[1]>18); // the aorta from just below the arch, as anatomy drawings show it
     ves(pts,r*0.95,colours[i]||0xbdbdb8)});
   // coronary tree, each vessel tapering from its origin
   for(const v of VESSELS){
     const pts=v.p.filter((_,i)=>i%2===0||i===v.n-1),r=(v.r0+v.r1)/2*1.15;
-    scene.add(inkedTube(pts,Math.max(0.55,r),toonMat(0xe5432d),pts.length*2));
+    scene.add(inkedTube(pts,Math.max(0.55,r),toonMat(0x8a2d1f),pts.length*2));
   }
   // labels
   const tl=(t,p,c)=>scene.add(label3(t,v3(p),c));
