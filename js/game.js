@@ -71,7 +71,7 @@ function showMenu(view){
    rebuilt from its case code, so only what happened is stored: the contrast history, runs, marks, devices,
    complications and where the catheter is. A cine run being recorded at that moment is not kept. */
 const SAVE_KEY='cathlabrun.save.v1';
-const SAVE_FIELDS=['clock','phase','hr','hrT','a','b','cath','exch','cL','cR','cRoot','histN','contrast','ak','ftime','ctime','blind','wasted','runs','marks','imgAcc','frame','deepInj','rcaInj','complication','sysP','diaP','pci','events','drugs','hrDip','bpDip','isch','effusion','tamponade','pcT','pcCount','protamine','seals','prevEng','prevDeep','st','forced','twist','ffr','tut','daily'];
+const SAVE_FIELDS=['clock','phase','hr','hrT','a','b','cath','exch','cL','cR','cRoot','histN','contrast','ak','ftime','ctime','blind','wasted','runs','marks','imgAcc','frame','deepInj','rcaInj','complication','sysP','diaP','pci','events','drugs','hrDip','bpDip','isch','effusion','tamponade','pcT','pcCount','protamine','seals','prevEng','prevDeep','st','forced','twist','ffr','tut','daily','weekly'];
 const r3=a=>a.map(x=>Math.round(x*1000)/1000);
 function saveCase(){
   if(!S||S.done)return;
@@ -89,8 +89,8 @@ function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
 function resumeCase(){
   syncPlain();
   const sv=loadSave();if(!sv)return;
-  if(sv.ci!=='TUTORIAL'){profile.diff=sv.diff;saveProfile()}
-  startCase(sv.ci,{daily:sv.daily});
+  if(sv.ci!=='TUTORIAL'&&!sv.weekly){profile.diff=sv.diff;saveProfile()}
+  startCase(sv.ci,{daily:sv.daily,weekly:sv.weekly});
   for(const k of SAVE_FIELDS)if(sv[k]!==undefined)S[k]=sv[k];
   S.hist={L:sv.hist.L,R:sv.hist.R,root:sv.hist.root};S.mapped=new Set(sv.mapped);S.twi=new Set(sv.twi);
   sv.lesions.forEach((x,i)=>{const L=S.lesions[i];if(!L)return;if(x.cur!=null)L.cur=x.cur;L.predil=x.predil;L.stented=x.stented});
@@ -128,6 +128,7 @@ function caseFolders(){
   const F=[],sv=loadSave(),today=dailyCode(),dd=profile.daily&&profile.daily.date===dateKey()?profile.daily:null;
   if(sv)F.push({id:'resume',cls:'inprogress',tab:'In progress',title:sv.ci==='TUTORIAL'?'The tutorial':patientOf(sv.ci).title,sub:`${fmtT(sv.clock)} in · ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:''}`,tag:'Resume'});
   const tp=patientOf(today);F.push({id:'today',cls:'today',tab:"Today's case",title:tp.title,sub:tp.pt,tag:dd?MEDAL_NAME[dd.medal]:'Medals',code:today});
+  if(typeof weeklyInfo==='function'){const wi=weeklyInfo(),w=weeklyRec();F.push({id:'weekly',cls:'weekly',tab:'This week',title:wi.mod.name,sub:patientOf(wi.code).title,tag:w.best!=null?'Best '+w.best:'Challenge'})}
   for(const code of waitingList()){const p=patientOf(code);F.push({id:'w:'+code,tab:code,title:p.title,sub:p.pt,tag:p.ecg&&p.ecg.stemi?'Emergency':'',code})}
   if(typeof careerOf==='function'){const c=careerOf();if(c.lvl<CAREER.length)F.push({id:'career',tab:'Career',title:CAREER[c.lvl].rank,sub:`${c.prog} of ${CAREER[c.lvl].need}`,tag:'Next goal'})}
   F.push({id:'tutorial',cls:'tutorial',tab:'Tutorial',title:'Learn the ropes',sub:'One patient, step by step',tag:profile.tutDone?'Done':''});
@@ -137,6 +138,7 @@ function folderChart(f,D){
   if(!f)return '';
   if(f.id==='resume'){const sv=loadSave();return `<div class="chead"><h2>${f.title}</h2><span class="meta">${sv?sv.ci:''}</span></div><p>Pick up where you left off: same patient, your runs, marks, devices and any complications.</p>
     <div class="row"><button class="btn primary go" data-act="resume">Resume case</button><button class="btn" data-act="discard">Discard</button></div>`}
+  if(f.id==='weekly')return weeklyChart();
   if(f.id==='tutorial')return `<div class="chead"><h2>Tutorial</h2><span class="meta">Easy · about 5–10 minutes</span></div><p>One patient from start to finish. A coach under the monitor explains each step and waits for you to do it.</p><button class="btn primary go" data-act="exp">Start tutorial</button>`;
   if(f.id==='career'){const c=careerOf(),g=CAREER[c.lvl];return `<div class="chead"><h2>${g.rank}</h2><span class="meta">${c.prog} of ${g.need}</span></div><dl><dt>Goal</dt><dd>${g.goal}</dd><dt>Plays on</dt><dd>${DIFFICULTY[g.diff].label}${g.kind==='stemi'?' · a STEMI':g.kind==='comp'?' · with a complication':''}</dd></dl><button class="btn primary go" data-act="careercase">Start case</button>`}
   const p=patientOf(f.code),today=f.id==='today',th=MEDALS[profile.diff];
@@ -246,7 +248,7 @@ function renderMenu(){
         <div class="mm-secondary"><button class="btn" data-act="play">Case select</button></div>
       </div>
       ${sv?`<div class="mm-strip resume"><div><b>Unfinished case</b><span>${sv.ci==='TUTORIAL'?'The tutorial':'Patient '+sv.ci} · ${DIFFICULTY[sv.diff]?DIFFICULTY[sv.diff].label:''} · ${fmtT(sv.clock)} in</span></div><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="discard">Discard</button></div>`:''}
-      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button><button class="lnk" data-act="career">Career</button><button class="lnk" data-act="awards">Achievements${typeof ACHIEVEMENTS!=='undefined'?` (${ACHIEVEMENTS.filter(a=>profile.ach&&profile.ach.got&&profile.ach.got[a.id]).length}/${ACHIEVEMENTS.length})`:''}</button><button class="lnk" data-act="intro">How it works (1 min)</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Controls</button><button class="lnk" data-gl="">Glossary</button></div>
+      <div class="mm-links"><button class="lnk" data-act="daily">Today's case${dd?` (${MEDAL_NAME[dd.medal].toLowerCase()})`:''}</button>${typeof weeklyInfo==='function'?`<button class="lnk" data-act="weeklysel">This week: ${weeklyInfo().mod.name}</button>`:''}<button class="lnk" data-act="career">Career</button><button class="lnk" data-act="awards">Achievements${typeof ACHIEVEMENTS!=='undefined'?` (${ACHIEVEMENTS.filter(a=>profile.ach&&profile.ach.got&&profile.ach.got[a.id]).length}/${ACHIEVEMENTS.length})`:''}</button><button class="lnk" data-act="intro">How it works (1 min)</button><button class="lnk" data-act="exp">Tutorial</button><button class="lnk" data-act="shop">Coffee cart</button><button class="lnk" data-ctrl="">Controls</button><button class="lnk" data-gl="">Glossary</button></div>
       <div class="mm-op">${avatarSVG(profile.avatar,32)}<span><b>${esc(profile.name)}</b> · ${typeof rankName==='function'?rankName()+' · ':''}${profile.tokens} tokens · ${DIFFICULTY[profile.diff].label}${typeof gradeOf==='function'?(()=>{const g=gradeOf(profile),n=streakNow(profile);return ` · grade ${g.ok?g.letter+' '+g.title.toLowerCase():'pending'}${n?` · 🔥 ${n}-day streak`:''}`})():''}</span><button class="lnk" data-act="editop" style="background:none;border:0;padding:0;font:inherit;text-decoration:underline;cursor:pointer;color:inherit">Change</button></div>
     </div>
     <div class="mm-art" aria-hidden="true">${CARM_SVG}</div></div>
@@ -277,6 +279,8 @@ $('startOv').addEventListener('click',e=>{
   else if(d.act==='resume'){resumeCase()}
   else if(d.act==='discard'){clearSave();renderMenu();toast('Unfinished case discarded.')}
   else if(d.act==='daily'){startCase(dailyCode(),{daily:true})}
+  else if(d.act==='weekly'){startCase(weeklyInfo().code,{weekly:weekKey()})}
+  else if(d.act==='weeklysel'){menuSel='weekly';menuView='play';renderMenu()}
   else if(d.act==='code'){const v=($('codeIn').value||'').trim(),n=codeToSeed(v);if(n==null){toast('That is not a case code. Codes look like CLR-7KQ2M.',true);return}startCase(seedToCode(n))}
   else if(d.act==='shop'){menuView='shop';renderMenu()}
   else if(d.act==='home'){draft=null;menuView='home';renderMenu()}
@@ -291,9 +295,10 @@ const keys={};
 const d2bNow=()=>S&&S.d2b?Math.round(S.d2b.start+S.clock*S.d2b.rate):0;
 const stemiCulprit=()=>S&&S.stemi?S.lesions.find(L=>L.sev>=0.98):null;
 const caseName=S=>S.c.tutorial?'the tutorial patient':'patient '+S.c.code;
-function newState(ci){
+function newState(ci,opt={}){
   syncPlain();
-  const tut=ci==='TUTORIAL',dk=tut?'easy':profile.diff,base=DIFFICULTY[dk]||DIFFICULTY.easy,ch=caseChallenge(ci,dk),c=tut?tutorialCase():{...generatePatient(ci)};
+  const wk=opt.weekly&&typeof weeklyInfo==='function'?weeklyInfo(opt.weekly).mod:null; // first: it may build other patients' anatomy
+  const tut=ci==='TUTORIAL',dk=tut?'easy':wk?WEEKLY_DIFF:profile.diff,base=DIFFICULTY[dk]||DIFFICULTY.easy,ch=caseChallenge(ci,dk),c=tut?tutorialCase():{...generatePatient(ci)};
   // a severe contrast restriction halves the budget and joins the story
   if(ch.contrastX<1&&base.budgetX!=null){c.budget=Math.round(c.budget*ch.contrastX);c.budgetInTask=true;c.hx+=` Severe chronic kidney disease (eGFR ${12+(codeToSeed(ci)%14)}): every millilitre of contrast counts.`}
   // STEMI: the door-to-balloon clock runs on Medium and Hard. It starts with the minutes already spent getting to the
@@ -307,7 +312,8 @@ function newState(ci){
   HEART_MODE=['chambers','outline','none'][base.level-1]||'outline'; // the heart sketch: labelled chambers on Easy, outline on Medium, none on Hard
   // shop perks adjust a copy of the difficulty settings
   const D={...base,tol:{...base.tol}},tq=upgradeVal('torque');D.tol.L+=tq;D.tol.R+=tq;
-  return {ci,c,D,ch,forced:ch.forced,diff:dk,stemi,d2b,reperfAt:null,d2bWarned:0,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,hub:CATH.JL.home,w:0,type:'JL'},twist:0,exch:0,
+  if(wk&&wk.prep)wk.prep(c,D); // the weekly twist
+  return {ci,c,D,ch,forced:ch.forced,diff:dk,weekly:opt.weekly||null,stemi,d2b,reperfAt:null,d2bWarned:0,budget:caseBudget(c,base),lesions:prepLesions(c.lesions),clock:0,phase:0,hr:72,hrT:72,a:0,b:0,cath:{s:0,th:CATH.JL.home,hub:CATH.JL.home,w:0,type:'JL'},twist:0,exch:0,
     cL:0,cR:0,cRoot:0,hist:{L:[],R:[],root:[]},histN:0,contrast:0,ak:0,ftime:0,ctime:0,blind:0,wasted:0,
     cine:null,runs:[],marks:[],pending:null,review:null,imgAcc:0,frame:0,deepInj:0,rcaInj:0,complication:null,done:false,
     sysP:128,diaP:74,beatMax:0,beatMin:999,pci:null,stents:[],balloons:[],mapped:new Set(),events:[],drugs:[],ffr:[],pdRatio:null,hrDip:0,bpDip:0,isch:0,effusion:0,tamponade:false,pcT:0,pcCount:0,protamine:false,seals:[],prevEng:null,prevDeep:false,
@@ -322,7 +328,7 @@ let toastT=0;
 function toast(msg,danger){toastEl.textContent=msg;toastEl.className='toast'+(danger?' danger':'');toastEl.hidden=false;toastT=2.8}
 $('presets').innerHTML=PRESETS.map((p,i)=>`<button data-i="${i}" title="Key ${i+1}">${p[0]}</button>`).join('');
 $('presets').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setPreset(+b.dataset.i)});
-function setPreset(i){if(!S||S.cine)return;S.a=PRESETS[i][1];S.b=PRESETS[i][2];syncArm()}
+function setPreset(i){if(!S||S.cine)return;if(S.noPresets){toast('No shortcuts this week: set the angles with the sliders.');return}S.a=PRESETS[i][1];S.b=PRESETS[i][2];syncArm()}
 function syncArm(){$('sA').value=S?S.a:0;$('sB').value=S?S.b:0;const a=S?S.a:0,b=S?S.b:0;$('oA').textContent=a===0?'AP':(a>0?'LAO ':'RAO ')+Math.abs(a)+'°';$('oB').textContent=b===0?'0°':(b>0?'CRA ':'CAU ')+Math.abs(b)+'°'}
 $('sA').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.a=+e.target.value;syncArm()});
 $('sB').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.b=+e.target.value;syncArm()});
@@ -330,9 +336,10 @@ $('sB').addEventListener('input',e=>{if(!S||S.cine){syncArm();return}S.b=+e.targ
 function startCase(ci,opt={}){
   if(typeof renderCoach==='function')setTimeout(renderCoach,0);
   if(typeof close3D==='function')close3D();
-  S=newState(ci);S.daily=!!opt.daily&&ci===dailyCode();document.body.classList.remove('inmenu','inreport');
+  S=newState(ci,opt);S.daily=!!opt.daily&&ci===dailyCode();
+  if(S.weekly){const m=weeklyInfo(S.weekly).mod;if(m.flag)m.flag(S)}document.body.classList.remove('inmenu','inreport');
   $('startOv').hidden=true;$('resultOv').hidden=true;closeReview();
-  const c=S.c;$('caseHead').innerHTML=`<h2>${S.c.code?'Random patient · '+S.c.code:'Patient · '+caseName(S)} · ${S.D.label}</h2><b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
+  const c=S.c;$('caseHead').innerHTML=`<h2>${S.weekly?'Weekly challenge · '+weeklyInfo(S.weekly).mod.name:S.c.code?'Random patient · '+S.c.code:'Patient · '+caseName(S)} · ${S.D.label}</h2>${S.weekly?`<p class="task">${weeklyInfo(S.weekly).mod.desc}</p>`:''}<b>${c.title}</b><p>${c.pt}. ${c.hx}</p><p class="task">${caseTask(c,DIFFICULTY[S.diff])}</p>`;
   ictx.fillStyle=PAPER;ictx.fillRect(0,0,W,W);
   syncArm();renderRuns();renderMarks();renderPending();renderPCI(true);renderWho();
   toast(`${pw('Sheath in the right femoral artery.','The tube goes in through the artery at the top of the right leg (femoral artery).')} ${keyName('Hold '+shortKey('Space'),'Hold Fluoro')} for X-ray and ${keyName(shortKey('ArrowUp'),'Advance')} to advance.`);
@@ -349,7 +356,7 @@ document.querySelectorAll('.hold[data-k]').forEach(b=>{
   b.addEventListener('contextmenu',e=>e.preventDefault());
 });
 $('bCine').addEventListener('click',toggleCine);
-$('b3d').addEventListener('click',()=>{if(S&&!S.done&&S.D.level<3)open3D(false)});
+$('b3d').addEventListener('click',()=>{if(S&&!S.done&&S.D.level<3&&!S.no3D)open3D(false)});
 const down=(...ks)=>ks.some(k=>keys[k]||keys['btn_'+k]);
 
 function exchangeTo(type){
@@ -938,10 +945,10 @@ function updateUI(){
   $('rdAK').querySelector('b').innerHTML=`${Math.round(S.ak)}<small>mGy</small>`;$('rdAK').classList.toggle('hot',S.ak>800);
   $('rdCM').querySelector('b').innerHTML=`${Math.round(S.contrast)}<small>${S.budget==null?'mL':'/ '+S.budget+' mL'}</small>`;$('rdCM').classList.toggle('hot',S.budget!=null&&S.contrast>S.budget);
   if(PLAIN){const lv=f=>`<i class="lvl"><b style="width:${Math.round(Math.min(1,f)*100)}%"></b></i><em>${f<0.4?'low':f<0.8?'medium':'high'}</em>`;
-    $('rdAK').querySelector('b').innerHTML+=lv(S.ak/upgradeVal('fluoro'));$('rdCM').querySelector('b').innerHTML+=lv(S.contrast/(S.budget||120))}
+    $('rdAK').querySelector('b').innerHTML+=lv(S.ak/(upgradeVal('fluoro')*(S.radX||1)));$('rdCM').querySelector('b').innerHTML+=lv(S.contrast/(S.budget||120))}
   updateGuide();
   $('rdHD').querySelector('b').innerHTML=`${Math.round(S.hr)}<small>${Math.round(S.sysP)}/${Math.round(S.diaP)}</small>`;$('rdHD').classList.toggle('hot',S.hr<55||(S.cs&&S.cs.deep));
-  {const b=$('b3d'),off=!S||S.done||S.D.level>=3;if(b.disabled!==off){b.disabled=off;b.title=S&&S.D.level>=3?'No 3D help on Hard':'An orbitable 3D model of this patient\'s heart and coronaries (anatomy only during the case)'}}
+  {const b=$('b3d'),off=!S||S.done||S.D.level>=3||!!S.no3D;if(b.disabled!==off){b.disabled=off;b.title=S&&S.D.level>=3?'No 3D help on Hard':'An orbitable 3D model of this patient\'s heart and coronaries (anatomy only during the case)'}}
   $('cathType').textContent=S.exch>0?'Exchanging…':(S.pci?'6F guide':'6F');
   {const tgt=S.exch>0?(S.cath.type==='JL'?'JR':'JL'):S.cath.type,lock=S.exch>0||!!S.complication||!!S.pci;
    for(const b of $('cathToggle').querySelectorAll('button')){const on=b.dataset.cath===tgt;if(b.getAttribute('aria-pressed')!==String(on))b.setAttribute('aria-pressed',on);b.disabled=lock&&!on;b.classList.toggle('busy',on&&S.exch>0)}}
@@ -955,7 +962,7 @@ function updateUI(){
   else if(cs.u>0){cls='warn';const need=CATH[S.cath.type].sys,tw=Math.round(S.twist||0);msg=pw(`In the aortic root, ${CATH[S.cath.type].label} tip at ${Math.round(S.cath.th)}°. Torque to find the ${need==='L'?'left main':'right coronary'} ostium; a short test puff shows where you are.`+(Math.abs(tw)>6?` ${Math.abs(tw)}° of twist stored in the shaft: nudge the catheter in or out to let it reach the tip, or it may whip.`:''),`At the heart (aortic root), tip pointing ${Math.round(S.cath.th)}°. Turn to find the ${need==='L'?'left':'right'} artery opening; a short puff of dye shows where you are.`+(Math.abs(tw)>6?` ${Math.abs(tw)}° of twist is stored in the tube: nudge it in or out so the turn reaches the tip, or it may jump.`:''))}
   else{msg=pw(`${cs.region||'Femoral sheath'} · ${Math.round(S.cath.s)} mm inserted.`,`${({'Descending aorta':'On the way up the main artery (descending aorta)','Aortic arch':'Going over the arch of the main artery (aortic arch)','Ascending aorta':'Nearly at the heart (ascending aorta)'})[cs.region]||'At the top of the leg (femoral sheath)'} · ${Math.round(S.cath.s)} mm in.`)}
   st.className='status '+cls;st.textContent=msg;
-  document.querySelectorAll('#presets button').forEach(b=>b.disabled=!!S.cine);
+  document.querySelectorAll('#presets button').forEach(b=>b.disabled=!!S.cine||!!S.noPresets);
   $('sA').disabled=$('sB').disabled=!!S.cine;
   renderPCI();txUpdate();
 }
@@ -1084,7 +1091,7 @@ function finish(){
   if(nL<3)notes.push({c:'',t:'A standard left system study uses at least three or four projections: RAO caudal, RAO cranial, LAO cranial and LAO caudal.'});
   if(nR<2)notes.push({c:'',t:'Image the RCA in at least two orthogonal views, for example LAO 40° and RAO 30°.'});
   const B=S.budget;const cm=B==null?15:Math.round(15*clamp(1-(S.contrast-B)/(B*2),0,1));rows.push([`Contrast ${Math.round(S.contrast)} mL (${B==null?'no limit on Easy':'budget '+B})`,cm,15]);
-  const akMax=upgradeVal('fluoro'),rad=Math.round(10*clamp(1-(S.ak-akMax)/1000,0,1));rows.push([`Air kerma ${Math.round(S.ak)} mGy (full marks to ${akMax}) · fluoro ${fmtT(S.ftime)}`,rad,10]);
+  const akMax=Math.round(upgradeVal('fluoro')*(S.radX||1)),rad=Math.round(10*clamp(1-(S.ak-akMax)/1000,0,1));rows.push([`Air kerma ${Math.round(S.ak)} mGy (full marks to ${akMax}) · fluoro ${fmtT(S.ftime)}`,rad,10]);
   if(S.ak>akMax)notes.push({c:'',t:'Steep angles and long cine runs drive dose up. Keep runs to 3–4 seconds and collimate your pedal time.'});
   const saf=10-Math.min(10,Math.round(S.blind*2));rows.push(['Safety (catheter moved under fluoro)',saf,10]);
   let total=lesPts+tx+comp+cm+rad+saf;
@@ -1098,6 +1105,7 @@ function finish(){
   const earned=S.complication?0:Math.round(total/10*S.D.tokenX);
   profile.tokens+=earned;if(S.c.random)profile.randomDone=(profile.randomDone||0)+1;
   const daily=S.daily?recordDaily(S.complication?0:total):null;
+  const weekly=S.weekly&&typeof recordWeekly==='function'?recordWeekly(S.complication?0:total,S.weekly):null;
   if(!S.c.tutorial&&typeof careerRecord==='function'){const ev=S.events.filter(e=>e.kind!=='spasm'||e.sev>0.8);
     for(const n of careerRecord({diff:S.diff,score:S.complication?0:total,stemi:S.stemi,d2b:S.d2b?S.reperfAt:null,hadComp:ev.length>0,managed:ev.length>0&&ev.every(e=>e.treated||e.sealed),ffrUsed:S.ffr.length>0}))notes.unshift(n)}
   const key=S.diff+'-'+(S.c.random?'R':S.ci),prev=profile.best[key];if(prev==null||total>prev)profile.best[key]=total;saveProfile();renderWho();
@@ -1114,6 +1122,7 @@ function finish(){
   ${PLAIN?plainSummary():''}
   <div class="tokens">${CUP} +${earned} coffee token${earned===1?'':'s'}${S.D.tokenX>1?` (×${S.D.tokenX} for ${S.D.label})`:''} · ${profile.tokens} banked${prev!=null&&total>prev?' · new best':''}</div>
   ${daily?`<div class="medalrow">${medalBadge(daily.medal)}<span><b>Today's case: ${MEDAL_NAME[daily.medal]}</b>${daily.bonus?` · +${daily.bonus} medal tokens`:''} · bronze ${MEDALS[S.diff].bronze}, silver ${MEDALS[S.diff].silver}, gold ${MEDALS[S.diff].gold} on ${S.D.label}${profile.streak&&profile.streak.n>1?` · 🔥 ${profile.streak.n}-day streak`:''}</span></div>`:''}
+  ${weekly?weeklyReportHTML(weekly):''}
   ${achReportHTML(achRes)}
   <div class="rows">${rows.map(r=>`<span>${r[0]}</span><span class="v">${Math.round(r[1])} / ${r[2]}</span>`).join('')}</div>
   ${txBreakdown()}
@@ -1121,7 +1130,7 @@ function finish(){
   <div class="notes">${notes.map(n=>`<div class="${n.c}">${n.t}</div>`).join('')}</div>
   <div class="row"><button class="btn primary" id="rNew">New random patient</button><button class="btn" id="r3d">View in 3D</button><button class="btn" id="rAgain">Repeat this patient</button><button class="btn" id="rCases">Change difficulty</button><button class="btn" id="rMenu">Main menu</button></div>`;
   ov.hidden=false;document.body.classList.add('inreport');window.scrollTo(0,Math.max(0,$('monitor').offsetTop-8));
-  $('rAgain').onclick=()=>startCase(S.ci,{daily:S.daily});
+  $('rAgain').onclick=()=>startCase(S.ci,{daily:S.daily,weekly:S.weekly&&S.weekly===weekKey()?S.weekly:null});
   if($('rNew'))$('rNew').onclick=()=>startCase(randomCode());
   $('r3d').onclick=()=>open3D(true);
   $('rCases').onclick=()=>showMenu('play');
@@ -1129,7 +1138,9 @@ function finish(){
   renderMarks();renderPCI(true);
 }
 
-sizeHemo();showMenu();
+sizeHemo();
+// draw the menu once every script has loaded (achievements, weekly challenge and the rest add to it)
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>showMenu(),{once:true});else showMenu();
 if(profile&&profile.refunded){toast(`The monitor colour filters are gone: ${profile.refunded} coffee tokens refunded.`);delete profile.refunded;saveProfile();renderWho()}
 requestAnimationFrame(loop);
 

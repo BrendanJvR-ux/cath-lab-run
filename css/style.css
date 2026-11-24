@@ -570,3 +570,4 @@ input[type=range]{accent-color:var(--ink)}
 .achrep{display:flex;flex-direction:column;gap:8px}
 .achnew{display:grid;gap:8px}
 .achline{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14.5px;color:var(--muted)}.achline b{color:var(--fg);font-weight:500}
+#startOv .folder.weekly{background:#fff;border-color:var(--ink)}#startOv .folder.weekly::before{background:var(--ink);color:#fff;border-color:var(--ink)}

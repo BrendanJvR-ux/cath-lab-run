@@ -293,7 +293,7 @@ test('A posteriorly placed RCA origin needs more clockwise torque than usual',()
 test('The default anatomy can be restored after random patients',()=>{buildAnatomy();ok(VBY.PLV&&VBY.PDA&&!VBY.RI&&!VBY.LPDA);ok(fx('rca').label==='mid RCA')});
 
 test('Every game script parses (a stray quote anywhere breaks the whole game)',()=>{
-  const files=['config/config.js','js/sim.js','js/gen.js','js/game.js','js/controls.js','js/heart3d.js','js/career.js','js/tutorial.js','js/glossary.js','js/intro.js','js/achievements.js'];
+  const files=['config/config.js','js/sim.js','js/gen.js','js/game.js','js/controls.js','js/heart3d.js','js/career.js','js/tutorial.js','js/glossary.js','js/intro.js','js/achievements.js','js/weekly.js'];
   for(const f of files){const x=new XMLHttpRequest();x.open('GET','../'+f+'?'+Date.now(),false);x.send();ok(x.status===200,f+' not found');try{new Function(x.responseText)}catch(e){throw new Error(f+': '+e.message)}}
   return files.length+' files';
 });
@@ -318,6 +318,16 @@ test('Skill grade: difficulty-adjusted average, provisional until three cases; t
   ok(p.streak.n===1,'three cases on one day = one day of streak');ok(p.ach.got.first,'first case badge');
   const r1=g.r;p.streak.n=40;ok(A.gradeOf(p).r===r1,'streak does not move the grade');
   return `rating ${g.r.toFixed(1)} · grade ${g.letter} ${g.title}`;
+});
+test('Weekly challenge: ISO weeks (Monday to Sunday), the same twist and patient for everyone, each twist finds a fitting patient',()=>{
+  const q=new XMLHttpRequest();q.open('GET','../js/weekly.js',false);q.send();
+  const PC=new Map(),pof=c=>{if(!PC.has(c))PC.set(c,generatePatient(c));return PC.get(c)};
+  const Wk=new Function('patientOf','profile','medalFor','MEDAL_NAME','medalBadge','esc',q.responseText+';return {weekKey,weeklyInfo,weekDaysLeft,WEEKLY_MODS};')(pof,null,()=>'none',{},()=>'',x=>x);
+  ok(Wk.weekKey(new Date(2026,10,23))==='2026-W48',Wk.weekKey(new Date(2026,10,23)));ok(Wk.weekKey(new Date(2026,10,29))==='2026-W48','Sunday same week');
+  ok(Wk.weekKey(new Date(2026,10,30))==='2026-W49','Monday new week');ok(Wk.weekKey(new Date(2027,0,1))==='2026-W53','1 Jan 2027 is in 2026-W53');
+  ok(Wk.weekDaysLeft(new Date(2026,10,23))===7&&Wk.weekDaysLeft(new Date(2026,10,29))===1,'days left');
+  const seen=new Set();for(let w=1;w<=40;w++){const k='2027-W'+String(w).padStart(2,'0'),i=Wk.weeklyInfo(k);seen.add(i.mod.id);ok(Wk.weeklyInfo(k).code===i.code,'deterministic');if(i.mod.need)ok(i.mod.need(pof(i.code)),k+' '+i.mod.id+' patient does not fit')}
+  buildAnatomy();ok(seen.size>=5,'twists used: '+[...seen]);return `${seen.size} twists over 40 weeks`;
 });
 const bad=results.filter(r=>!r.ok).length,sum=document.getElementById('sum');
 sum.textContent=bad?`${bad} of ${results.length} failed`:`All ${results.length} passed`;sum.className=bad?'bad':'ok';
