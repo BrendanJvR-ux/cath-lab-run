@@ -571,3 +571,4 @@ input[type=range]{accent-color:var(--ink)}
 .achnew{display:grid;gap:8px}
 .achline{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14.5px;color:var(--muted)}.achline b{color:var(--fg);font-weight:500}
 #startOv .folder.weekly{background:#fff;border-color:var(--ink)}#startOv .folder.weekly::before{background:var(--ink);color:#fff;border-color:var(--ink)}
+.sndrow{display:flex;align-items:center;gap:12px}.sndrow input{flex:1;accent-color:var(--ink)}

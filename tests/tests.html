@@ -293,7 +293,7 @@ test('A posteriorly placed RCA origin needs more clockwise torque than usual',()
 test('The default anatomy can be restored after random patients',()=>{buildAnatomy();ok(VBY.PLV&&VBY.PDA&&!VBY.RI&&!VBY.LPDA);ok(fx('rca').label==='mid RCA')});
 
 test('Every game script parses (a stray quote anywhere breaks the whole game)',()=>{
-  const files=['config/config.js','js/sim.js','js/gen.js','js/game.js','js/controls.js','js/heart3d.js','js/career.js','js/tutorial.js','js/glossary.js','js/intro.js','js/achievements.js','js/weekly.js'];
+  const files=['config/config.js','js/sim.js','js/gen.js','js/game.js','js/controls.js','js/heart3d.js','js/career.js','js/tutorial.js','js/glossary.js','js/intro.js','js/achievements.js','js/weekly.js','js/sound.js'];
   for(const f of files){const x=new XMLHttpRequest();x.open('GET','../'+f+'?'+Date.now(),false);x.send();ok(x.status===200,f+' not found');try{new Function(x.responseText)}catch(e){throw new Error(f+': '+e.message)}}
   return files.length+' files';
 });

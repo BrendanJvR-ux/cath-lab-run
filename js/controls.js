@@ -105,8 +105,9 @@ function openControls(){
     const groups=[...new Set(ACTIONS.map(a=>a.grp))];
     const isMouse=ACTIONS.every(a=>JSON.stringify(CTRL.binds[a.id])===JSON.stringify(MOUSE_PRESET[a.id]));
     const isKeys=ACTIONS.every(a=>JSON.stringify(CTRL.binds[a.id])===JSON.stringify(a.def));
-    d.innerHTML=`<div class="glbox ctrlbox"><div class="glhead"><b>Controls</b><span class="fine" style="flex:1">Click a box, then press a key, click a mouse button or scroll.</span><button class="btn" data-c-close="1">Done</button></div>
+    d.innerHTML=`<div class="glbox ctrlbox"><div class="glhead"><b>Controls and sound</b><span class="fine" style="flex:1">Click a box, then press a key, click a mouse button or scroll.</span><button class="btn" data-c-close="1">Done</button></div>
       <div class="ctrlbody">
+        ${typeof soundSettingsHTML==='function'?soundSettingsHTML()+'<div class="grouplabel" style="margin-top:6px">Controls</div>':''}
         <div class="ctrlpresets"><span class="grouplabel">Layout</span>
           <button class="btn${isKeys?' primary':''}" data-c-preset="keys">Keyboard</button>
           <button class="btn${isMouse?' primary':''}" data-c-preset="mouse">Mouse + keyboard</button></div>
@@ -129,12 +130,14 @@ function openControls(){
   };
   d.addEventListener('click',e=>{
     if(e.target===d||e.target.closest('[data-c-close]')){closeControls();return}
+    if(e.target.closest('[data-snd]')){if(e.target.closest('button')&&typeof soundSettingEvent==='function')soundSettingEvent(e);return}
     const b=e.target.closest('button');if(!b)return;
     if(b.dataset.cId){if(capturing)return;capturing={id:b.dataset.cId,slot:+b.dataset.cSlot};note='';draw();return}
     if(b.dataset.cPreset){const p=b.dataset.cPreset;for(const a of ACTIONS)CTRL.binds[a.id]=(p==='mouse'?MOUSE_PRESET[a.id]:a.def).slice();if(p==='mouse')CTRL.drag=true;note=p==='mouse'?'Mouse layout: left click fluoro, right click inject, wheel advances and withdraws, middle click records, drag sideways to turn.':'';saveControls();draw()}
     if(b.dataset.cReset){const z=ctrlDefaults();CTRL.binds=z.binds;CTRL.drag=false;note='';saveControls();draw()}
   });
-  d.addEventListener('change',e=>{if(e.target.id==='ctrlDrag'){CTRL.drag=e.target.checked;saveControls()}});
+  d.addEventListener('change',e=>{if(e.target.id==='ctrlDrag'){CTRL.drag=e.target.checked;saveControls()}else if(typeof soundSettingEvent==='function')soundSettingEvent(e)});
+  d.addEventListener('input',e=>{if(e.target.dataset&&e.target.dataset.snd==='vol'&&typeof soundSettingEvent==='function')soundSettingEvent(e)});
   // capture: the next key, mouse button or wheel notch after a box was clicked
   ctrlKeyHandler=e=>{
     if(!capturing){if(e.key==='Escape')closeControls();return}

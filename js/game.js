@@ -1116,6 +1116,7 @@ function finish(){
     achRes=recordCase({score:S.complication?0:total,diff:S.diff,level:S.D.level,S,daily,sig:sig.length,opened:sig.filter(L=>L.stented).length,sigAll:sigAll.length,graded,comps:S.events});
     achRes.fresh.forEach((a,i)=>setTimeout(()=>toast(`Achievement: ${a.name} · +${a.t} tokens`),600+i*1800));
   }
+  if(typeof sfx==='function'&&((achRes&&achRes.fresh.length)||(daily&&daily.medal!=='none')||(weekly&&(weekly.newBest||weekly.tries===1))))setTimeout(()=>sfx('chime'),350);
   const ov=$('resultOv');
   ov.innerHTML=`<div class="rephead">${avatarSVG(profile.avatar,48)}<div><h1>Report · ${caseName(S)}</h1><span class="fine">${esc(profile.name)} · ${S.D.label}</span></div></div>
   <div class="score"><b>${total}</b><span>${grade}</span></div>
