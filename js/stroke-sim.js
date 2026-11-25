@@ -109,7 +109,8 @@ function skStartCath(A,pat){
   const vid=pat.site==='BA'?'LVA':pat.side+'ICA',v=A.V[vid],at=y=>{let s=0;while(s<v.len&&skPt(v,s)[1]<y)s+=0.5;return s};
   const stack=[];let ch=v;while(ch.parent){stack.unshift({vid:ch.parent,s:ch.os});ch=A.V[ch.parent]}
   const loop=A.spec.loop&&vid===A.spec.side+'ICA',s=at(vid==='LVA'?158:loop?142:162),floor=Math.min(s,at(vid==='LVA'?148:141));
-  return {vid,s,rot:0,stack,deep:false,push:0,floor:{vid,s:floor}};
+  // the microcatheter is already out of the guide: the player steers one tube all the way
+  return {vid,s,rot:0,stack,deep:true,push:0,floor:{vid,s:floor}};
 }
 /* move the tip by ds millimetres; returns what happened */
 function skMove(A,cat,ds,dk,clot){
@@ -119,9 +120,7 @@ function skMove(A,cat,ds,dk,clot){
     if(clot&&cat.vid===clot.vid&&cat.s>clot.s-clot.len/2-1&&cat.s<clot.s+clot.len/2+1)ds*=0.35;
     const ns=cat.s+ds;
     // branches whose openings the tip is passing, entered if it is turned their way
-    let best=null,bd=1e9;
-    for(const c of v.children){if(c.noEntry)continue;const near=c.os>=v.len-0.5?ns>=v.len-1:Math.abs(ns-c.os)<=3;if(!near)continue;
-      if(c.intra&&!cat.deep)continue;const df=skAngDiff(cat.rot,c.rot);if(df<=skWindow(A,c,dk)&&df<bd){bd=df;best=c}}
+    let best=skChoose(A,v,cat,dk,ns,1);
     if(!best&&v.link&&ns>=v.len-1&&cat.deep&&skAngDiff(cat.rot,0)<=skWindow(A,A.V[v.link],dk))best=A.V[v.link];
     if(best){cat.stack.push({vid:v.id,s:Math.min(ns,v.len)});cat.vid=best.id;cat.s=0;cat.push=0;return {entered:best.id,trap:best.trap}}
     // the guide catheter cannot go into the head: the microcatheter has to
@@ -138,9 +137,16 @@ function skMove(A,cat,ds,dk,clot){
     return out}
   return out;
 }
+/* the branch the tip goes into at position ns along v (or null). Where the artery ends in a fork (M1 into its two M2s,
+   the carotid into M1 and A1) the tip always takes the branch it is turned most nearly towards, so it never stalls
+   against the fork; a side branch off the length of an artery is entered when the tip is turned within a window of it
+   (wider inside the head, where the microcatheter does the steering). */
+function skChoose(A,v,cat,dk,ns,endTol){let best=null,bd=1e9;
+  for(const c of v.children){if(c.noEntry||(c.intra&&!cat.deep))continue;const fork=c.os>=v.len-0.5,near=fork?ns>=v.len-endTol:Math.abs(ns-c.os)<=3;if(!near)continue;
+    const df=skAngDiff(cat.rot,c.rot),win=fork&&(v.intra||c.intra)?180:skWindow(A,c,dk)*(v.intra?1.4:1);if(df<=win&&df<bd){bd=df;best=c}}
+  return best}
 /* which branch the next push would enter from here (or null), using the same rule as skMove */
-function skPick(A,cat,dk){const v=A.V[cat.vid];let best=null,bd=1e9;
-  for(const c of v.children){if(c.noEntry)continue;const near=c.os>=v.len-0.5?cat.s>=v.len-4:Math.abs(cat.s-c.os)<=3;if(!near||(c.intra&&!cat.deep))continue;const df=skAngDiff(cat.rot,c.rot);if(df<=skWindow(A,c,dk)&&df<bd){bd=df;best=c}}
+function skPick(A,cat,dk){const v=A.V[cat.vid];let best=skChoose(A,v,cat,dk,cat.s,4);
   if(!best&&v.link&&cat.s>=v.len-4&&cat.deep&&skAngDiff(cat.rot,0)<=skWindow(A,A.V[v.link],dk))best=A.V[v.link];return best}
 /* is a branch opening near the tip worth steering towards? returns {child, diff} for the nearest */
 function skNearBranch(A,cat){const v=A.V[cat.vid];let best=null;for(const c of v.children){if(c.noEntry)continue;const dist=c.os>=v.len-0.5?v.len-cat.s:Math.abs(cat.s-c.os);if(dist>14)continue;if(!best||dist<best.dist)best={child:c,dist}}return best}
@@ -171,14 +177,14 @@ function skClot(A,pat){
 /* the patient, fixed by a seed (so a code always gives the same patient) */
 const SK_RARE=[
   {id:'loop',name:'Coiled carotid',short:'The internal carotid makes a full loop in the neck',
-    blurb:'In some older people the neck part of the internal carotid is so long that it coils into a loop. The stiff guide catheter cannot follow it round.',
-    tip:'Leave the guide below the loop: send the microcatheter (X) out early and steer it through the coil.'},
+    blurb:'In some older people the neck part of the internal carotid is so long that it coils into a loop. The stiff guide catheter cannot follow it round, so it stays below the loop.',
+    tip:'Only the thin tube goes on from below the loop: push slowly and keep the X-ray on as it follows the coil round.'},
   {id:'fetal',name:'Fetal posterior cerebral',short:'The back brain artery is fed from the internal carotid',
     blurb:'In about one person in five the posterior cerebral artery on one side is fed mainly from the internal carotid, through a large posterior communicating artery, as it is before birth. A carotid film then fills the back of the brain too.',
     tip:'Do not mistake the extra artery running back from the carotid for a clot or a wrong branch: it is normal for this patient.'},
   {id:'basilar',name:'Basilar occlusion',short:'A clot at the base of the brain, reached through the vertebral artery',
     blurb:'A blocked basilar artery cuts blood to the brainstem: the patient is drowsy with double vision and weakness on both sides.',
-    tip:'The guide starts in the left vertebral artery. Take the microcatheter up into the head and on into the basilar.'},
+    tip:'The tube starts in the left vertebral artery. Push it up into the head; the vertebral runs on into the basilar.'},
 ];
 function skPatient(seed){
   const R=mulberry32((seed*2654435761+12345)>>>0),rnd=(a,b)=>a+(b-a)*R(),pick=a=>a[Math.floor(R()*a.length)];R();R();

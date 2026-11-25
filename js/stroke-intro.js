@@ -50,7 +50,7 @@ const SK_SCENES=[
      if(flow>0){g.fillStyle=RED_;for(let k=0;k<14;k++){const x=x0+((time*140+k*43)%(x1-x0));if(x<clx+60&&clx>x0)continue;g.beginPath();g.arc(x,y0+((k*7)%9-4)*3,3.6,0,7);g.fill()}}
      const lab=t<0.2?'1  a thin tube crosses the clot':t<0.36?'2  the mesh stent opens inside it':t<0.6?'3  wait a few seconds: it grips the clot':t<0.86?'4  pull back with suction':'5  blood flows again';label(g,lab,360,300,t>=0.86?RED_:INK_,'center')}},
   {title:'Your job in the stroke room',cap:'Same keys as the heart room. Speed matters, but so does care: pushing too far in the brain’s small arteries can make them bleed.',
-   draw(g,t){const steps=['The tube starts up in the neck artery','Film with dye: find where it stops','Send the thin tube (X) on into the head','Pull the clot out, and fast'];
+   draw(g,t){const steps=['The tube starts up in the neck artery','Film with dye: find where it stops','Steer the thin tube on into the head','Pull the clot out, and fast'];
      steps.forEach((s,i)=>{const a=iseg(t,0.05+i*0.14,0.18+i*0.14);if(!a)return;g.globalAlpha=a;const y=86+i*64;g.strokeStyle=INK_;g.lineWidth=1.4;g.beginPath();g.arc(190,y,19,0,7);g.stroke();label(g,String(i+1),190,y+1,INK_,'center');
        g.font='italic 24px "IM Fell English", Georgia, serif';g.fillStyle=INK_;g.textAlign='left';g.fillText(s,228,y+1);g.globalAlpha=1})}},
 ];

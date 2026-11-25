@@ -368,11 +368,15 @@ test('Stroke room: a case starts with the guide up the right neck artery, in vie
     const pat={site,side,m2:'s'},A=skAnatomy(pat),c=skStartCath(A,pat),y=skPt(A.V[c.vid],c.s)[1];
     ok(c.vid===vid&&y>=130&&y<=186,site+' starts in '+c.vid+' at y '+y.toFixed(0));ok(skCathPath(A,c).length>10,'path from the groin for drawing');
     for(let i=0;i<400;i++)skMove(A,c,-1,'medium',null);ok(c.vid===vid&&c.s===c.floor.s,'stops at the floor: '+c.vid+' '+c.s);
-    c.rot=0;for(let i=0;i<400;i++)skMove(A,c,1,'medium',null);ok(c.vid===vid,'guide stays in '+vid)}
+    ok(c.deep,'the microcatheter is already out');const g={...c,deep:false,stack:c.stack.slice()};g.rot=0;for(let i=0;i<400;i++)skMove(A,g,1,'medium',null);ok(g.vid===vid,'a guide alone stays in '+vid)}
   // a coiled carotid: the guide stops below the loop, the microcatheter goes through it
   const pat={site:'M1',side:'R',m2:'s',loop:true},A=skAnatomy(pat),c=skStartCath(A,pat);ok(A.V.RICA.len>A.V.LICA.len+20,'the loop makes the artery longer');
-  for(let i=0;i<300;i++)skMove(A,c,1,'medium',null);ok(skPt(A.V.RICA,c.s)[1]<=152,'guide parked below the loop');
+  c.deep=false;for(let i=0;i<300;i++)skMove(A,c,1,'medium',null);ok(skPt(A.V.RICA,c.s)[1]<=152,'a guide alone stops below the loop');
   c.deep=true;for(let i=0;i<300&&c.vid==='RICA';i++){c.rot=skPt(A.V.RICA,c.s)[1]>245?270:0;skMove(A,c,1,'medium',null)}ok(c.vid==='RM1','microcatheter through the loop into the M1: '+c.vid);
+  // forks in the head: the tip always takes the branch it is turned most nearly towards, on every difficulty
+  for(const dk of ['easy','hard']){const P={site:'M1',side:'L',m2:'s'},A2=skAnatomy(P);
+    for(const [rot,want] of [[100,'LM1'],[250,'LA1']]){const c=skStartCath(A2,P);c.rot=rot;for(let i=0;i<400&&c.vid==='LICA';i++)skMove(A2,c,1,dk,null);ok(c.vid===want,dk+' ICA fork, turned '+rot+': '+c.vid)}
+    for(const [rot,want] of [[30,'LM2s'],[150,'LM2i']]){const c=skStartCath(A2,P);c.rot=90;for(let i=0;i<400&&c.vid!=='LM1';i++)skMove(A2,c,1,dk,null);c.rot=rot;for(let i=0;i<200&&c.vid==='LM1';i++)skMove(A2,c,1,dk,null);ok(c.vid===want,dk+' M1 fork, turned '+rot+': '+c.vid)}}
   // a fetal PCA fills from a carotid injection
   const F={site:'M1',side:'L',m2:'s',fetal:true},AF=skAnatomy(F),cf=skStartCath(AF,F),D=skDyeDist(AF,cf,null);ok(D.LFPCA&&D.LFPCA.some(x=>x<Infinity),'fetal PCA fills from the carotid');
 });
