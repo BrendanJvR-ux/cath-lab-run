@@ -1,7 +1,7 @@
 /* Cath Lab Run: the stroke room. Mechanical thrombectomy for a large-vessel stroke, using the shared monitor, controls,
    pop-up styles, sound, settings, plain words and progression. The anatomy, steering and dye are in js/stroke-sim.js.
-   A case: steer up over the arch into the right neck artery, film with dye to find where the dye column stops (the
-   clot), mark it, take the microcatheter (X) into the head, then pull the clot out with a stent retriever (open it,
+   A case: the guide starts up the neck artery that leads to the clot (the X-ray shows only the head and upper neck);
+   film with dye to find where the dye column stops (the clot), mark it, take the microcatheter (X) into the head, then pull the clot out with a stent retriever (open it,
    let it grip, pull back with suction) or suck it out with an aspiration catheter. The stroke clock runs throughout:
    every minute costs brain. */
 "use strict";
@@ -18,6 +18,8 @@ const skProj=(p,pane)=>pane===0?[128+p[0],400-p[1]]:[384-p[2]*1.05,400-p[1]];
    how much bone each ray crossed, green the ink contours (cortex seen edge-on), blue the soft tissue. Here it is
    laid on paper as a graphite wash and engraved: line screens whose lines thicken with density, crossed where it
    is denser, as the heart room's X-ray. */
+/* the picture shows only the head and upper neck: frame rows SK_VY to SK_VY+256 (skull top to C2), two square views */
+const SK_VY=14,SK_VH=256;
 let skBgCanvas=null;const skBgCache={};let skSkullData=null;
 const skSkull=new Image();
 skSkull.onload=()=>{try{const c=document.createElement('canvas');c.width=c.height=1024;const x=c.getContext('2d');x.drawImage(skSkull,0,0);skSkullData=x.getImageData(0,0,1024,1024).data}catch(e){skSkullData='img'}
@@ -48,9 +50,9 @@ function skBg(S=2){
     g.putImageData(im,0,0);
   }
   // the X-ray field's dark rim, then the divider and labels
-  for(const ox of [0,256]){const gr=g.createRadialGradient(ox+128,256,150,ox+128,256,300);gr.addColorStop(0,'rgba(60,45,25,0)');gr.addColorStop(1,'rgba(60,45,25,0.22)');g.fillStyle=gr;g.fillRect(ox,0,256,512)}
+  for(const ox of [0,256]){const cy=SK_VY+128,gr=g.createRadialGradient(ox+128,cy,95,ox+128,cy,190);gr.addColorStop(0,'rgba(60,45,25,0)');gr.addColorStop(1,'rgba(60,45,25,0.22)');g.fillStyle=gr;g.fillRect(ox,0,256,512)}
   g.strokeStyle='#1d1b19';g.lineWidth=1.4;g.beginPath();g.moveTo(256,0);g.lineTo(256,512);g.stroke();
-  g.font='italic 14px "IM Fell English", Georgia, serif';g.fillStyle='rgba(29,27,25,0.7)';g.textAlign='right';g.fillText('front (AP)',250,16);g.textAlign='left';g.fillText('side (lateral)',262,16);
+  g.font='italic 14px "IM Fell English", Georgia, serif';g.fillStyle='rgba(29,27,25,0.7)';g.textAlign='right';g.fillText('front (AP)',250,SK_VY+16);g.textAlign='left';g.fillText('side (lateral)',262,SK_VY+16);
   if(skSkullData){skBgCache[S]=c;if(S===2)skBgCanvas=c}
   return c;
 }
@@ -58,21 +60,21 @@ const SK_FLOW=200,SK_VEIN_DELAY=3; // mm of artery per second of dye travel; sec
 const skHist=(h,t)=>{if(t<0||!h.length)return 0;const i=Math.floor(t/0.02);return i<h.length?h[i]:h[h.length-1]};
 /* draw the scene into any canvas: dye from a distance map up to a front, a faint roadmap, the catheter and devices */
 let skVL=null;
-const SK_ZOOM=1.8,SK_ZCY=150; // zoomed on the head: both views magnified about this height
+const SK_ZOOM=1.6,SK_ZCY=150; // zoomed in: both views magnified about this height (the circle of Willis)
 function skRender(ctx,o){
-  const sc=ctx.canvas.width/512;ctx.setTransform(sc,0,0,sc,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
-  const Z=o.zoom?SK_ZOOM:1,zt=pane=>[sc*Z,0,0,sc*Z,sc*(pane*256+128)*(1-Z),sc*SK_ZCY*(1-Z)];
+  const sc=ctx.canvas.width/512,base=[sc,0,0,sc,0,-SK_VY*sc];ctx.setTransform(...base);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+  const Z=o.zoom?SK_ZOOM:1,zt=pane=>[sc*Z,0,0,sc*Z,sc*(pane*256+128)*(1-Z),sc*(SK_ZCY*(1-Z)-SK_VY)];
   // draw into one view: clipped to it, with the zoom applied
-  const inPane=(k,pane,fn)=>{k.save();k.setTransform(sc,0,0,sc,0,0);k.beginPath();k.rect(pane*256,0,256,512);k.clip();if(Z!==1)k.setTransform(...zt(pane));fn();k.restore()};
+  const inPane=(k,pane,fn)=>{k.save();k.setTransform(...base);k.beginPath();k.rect(pane*256,SK_VY,256,SK_VH);k.clip();if(Z!==1)k.setTransform(...zt(pane));fn();k.restore()};
   if(Z===1)ctx.drawImage(skBg(),0,0,512,512);
   else{const hi=skBg(4);for(const pane of [0,1])inPane(ctx,pane,()=>ctx.drawImage(hi,0,0,512,512));
     ctx.strokeStyle='#1d1b19';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(256,0);ctx.lineTo(256,512);ctx.stroke();
-    ctx.font='italic 14px "IM Fell English", Georgia, serif';ctx.fillStyle='rgba(29,27,25,0.75)';ctx.textAlign='right';ctx.fillText(`front ×${SK_ZOOM}`,250,16);ctx.textAlign='left';ctx.fillText(`side ×${SK_ZOOM}`,262,16)}
+    ctx.font='italic 14px "IM Fell English", Georgia, serif';ctx.fillStyle='rgba(29,27,25,0.75)';ctx.textAlign='right';ctx.fillText(`front ×${SK_ZOOM}`,250,SK_VY+16);ctx.textAlign='left';ctx.fillText(`side ×${SK_ZOOM}`,262,SK_VY+16)}
   if(!o.image){ctx.fillStyle='rgba(239,233,220,0.55)';ctx.fillRect(0,0,512,512);return}
   const A=o.A,lineFor=v=>Math.max(1.4,v.r*2.4);
   // vessels, catheter and any bleed go on their own layer, then multiply over the bone (as on the heart room's X-ray)
-  if(!skVL||skVL.width!==ctx.canvas.width){skVL=document.createElement('canvas');skVL.width=skVL.height=ctx.canvas.width}
-  const L=skVL.getContext('2d');L.setTransform(1,0,0,1,0,0);L.globalAlpha=1;L.fillStyle='#fff';L.fillRect(0,0,skVL.width,skVL.height);L.setTransform(sc,0,0,sc,0,0);L.lineCap='round';L.lineJoin='round';
+  if(!skVL||skVL.width!==ctx.canvas.width||skVL.height!==ctx.canvas.height){skVL=document.createElement('canvas');skVL.width=ctx.canvas.width;skVL.height=ctx.canvas.height}
+  const L=skVL.getContext('2d');L.setTransform(1,0,0,1,0,0);L.globalAlpha=1;L.fillStyle='#fff';L.fillRect(0,0,skVL.width,skVL.height);L.setTransform(...base);L.lineCap='round';L.lineJoin='round';
   const clip=(pane,fn)=>inPane(L,pane,fn);
   // the dye concentration varies along each vessel, so it is drawn in short runs of similar strength
   const tube=(pts,cs,w,road,venous)=>{for(const pane of [0,1])clip(pane,()=>{let i=0;
@@ -100,18 +102,18 @@ function skRender(ctx,o){
       L.fillStyle='rgb(30,27,24)';L.beginPath();L.arc(q[0]+dx*8,q[1]+dy*8,o.cath.deep?1.1:1.6,0,7);L.fill()})}  // radio-opaque tip marker
   if(o.device==='sr'&&o.clot){const v=A.V[o.clot.vid];for(const pane of [0,1])clip(pane,()=>{L.strokeStyle='rgb(40,36,32)';L.lineWidth=0.8;L.beginPath();for(let s=o.clot.s-o.clot.len/2-3,k=0;s<=o.clot.s+o.clot.len/2+4;s+=1.5,k++){const p=skPt(v,s),q=skProj(p,pane);L.lineTo(q[0]+(k%2?2.4:-2.4),q[1]+(k%2?-1.2:1.2))}L.stroke();
     for(const e of [o.clot.s-o.clot.len/2-3,o.clot.s+o.clot.len/2+4]){const q=skProj(skPt(v,e),pane);L.fillStyle='rgb(30,27,24)';L.beginPath();L.arc(q[0],q[1],1.4,0,7);L.fill()}})} // stent end markers
-  ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation='multiply';ctx.drawImage(skVL,0,0);ctx.setTransform(sc,0,0,sc,0,0);
+  ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation='multiply';ctx.drawImage(skVL,0,0);ctx.setTransform(...base);
   // film grain and the dark rim of the image intensifier, as on the heart room's monitor
   if(typeof noise!=='undefined'&&noise.length){ctx.globalCompositeOperation='overlay';ctx.globalAlpha=o.cine?0.07:0.15;ctx.drawImage(noise[Math.floor(performance.now()/66)%noise.length],0,0,512,512);ctx.globalAlpha=1}
   ctx.globalCompositeOperation='source-over';
-  if(typeof vign!=='undefined'){ctx.drawImage(vign,0,0,256,512);ctx.drawImage(vign,256,0,256,512)}
+  if(typeof vign!=='undefined'){ctx.drawImage(vign,0,SK_VY,256,SK_VH);ctx.drawImage(vign,256,SK_VY,256,SK_VH)}
   // the clot, once marked: a double ring in oxblood ink
   if(o.mark&&o.clot){const v=A.V[o.clot.vid],p=skPt(v,o.clot.s-o.clot.len/2);for(const pane of [0,1])inPane(ctx,pane,()=>{const q=skProj(p,pane);ctx.strokeStyle='#8A2D1F';ctx.lineWidth=1.4/Z;ctx.beginPath();ctx.arc(q[0],q[1],10/Z,0,7);ctx.stroke();ctx.lineWidth=0.6/Z;ctx.beginPath();ctx.arc(q[0],q[1],13/Z,0,7);ctx.stroke()})}
 }
 /* a small picture for the casebook: the arteries the rare patient is known for */
 function skThumb(cv,seed){
   try{const pat=skPatient(seed),A=skAnatomy(pat),cat=skNewCath();let clot=skClot(A,pat);
-    if(pat.rare==='basilar'){cat.vid='LVA';cat.s=30}else{cat.s=A.V.AO.len*0.35}
+    Object.assign(cat,skStartCath(A,pat));
     const dist=skDyeDist(A,cat,clot);skRender(cv.getContext('2d'),{A,image:true,dist,front:1e9,fade:1,cath:cat,clot,mark:pat.rare==='basilar'})}catch(e){}
 }
 
@@ -128,7 +130,8 @@ function skStart(seed,opt={}){
   S=null;skEl();
   const tut=!!opt.tut;if(tut)seed=skTutSeed();
   const dk=tut?'easy':(profile.diff||'easy'),pat=skPatient(seed==null?Math.floor(Math.random()*CODE_SPACE):seed),A=skAnatomy(pat);
-  SK={dk,D:DIFFICULTY[dk],W:SK_DIFF[dk]||SK_DIFF.medium,pat,A,cat:skNewCath(),clot:null,t:0,cine:false,runs:[],review:null,inj:null,road:null,roadOn:DIFFICULTY[dk].level===1,
+  skCanvas(true);
+  SK={dk,D:DIFFICULTY[dk],W:SK_DIFF[dk]||SK_DIFF.medium,pat,A,cat:skStartCath(A,pat),clot:null,t:0,cine:false,runs:[],review:null,inj:null,road:null,roadOn:DIFFICULTY[dk].level===1,
     found:false,gradeOk:null,pending:false,tx:null,passes:0,tici:0,reperfAt:null,emboli:false,sah:null,contrast:0,ak:0,ftime:0,guide:null,done:false,
     ecaInj:0,zoom:false,zoomSet:false,maxFront:0,hist:[],vhist:[],src:0,dist:null,injOn:false,autoInj:0,toBrain:false,prevB:false,beatT:0,blockedT:0,popKey:'',ctrlT:0,firstPassTici:null,tut:tut?{i:0}:null};
   SK.clot=skClot(A,pat);
@@ -139,10 +142,12 @@ function skStart(seed,opt={}){
   $('caseHead').innerHTML=`<h2>Stroke room · ${pat.code} · ${SK.D.label}</h2>${pat.rare&&RARE_BY[pat.rare]?`<p class="task">Rare patient: ${RARE_BY[pat.rare].name}. ${RARE_BY[pat.rare].short}.</p>`:''}<b>${pat.title}</b><p>${pat.pt}. ${pat.hx}</p>
     <p class="task">${SK.D.level>=3?pw('Find the occlusion on angiography and remove the clot.','Find the blocked brain artery with dye and pull the clot out.'):pw(`CT angiogram: occlusion of the ${pat.where}. Confirm it on angiography and remove the clot.`,`The CT scan shows a clot in the ${pat.where}. Find it with dye and pull it out.`)} ${pw('Every minute counts.','Every minute costs brain cells.')}</p>`;
   skPanel(true);skCoach();
-  toast(pw('Groin access done: the guide catheter is in the descending aorta. Advance over the arch.','The tube is in, through the top of the leg, and waiting in the main artery. Push it up over the arch.'));
+  toast(pw(`Groin access done: the guide catheter is already up the ${skName(SK.cat.vid)}, in the upper neck. Film to find the occlusion.`,`The tube is already up in the ${skName(SK.cat.vid)}, in the upper neck. Film with dye to find where it is blocked.`));
   requestAnimationFrame(skLoop);
 }
-function skStop(){if(SK){SK.done=true;SK=null}document.body.classList.remove('stroke');const p=$('skPop');if(p)p.hidden=true;const g=$('skGuide');if(g)g.hidden=true}
+/* the stroke room's X-ray is twice as wide as it is tall (two square views); the heart room's is square */
+function skCanvas(on){const h=on?img.width/2:img.width;if(img.height!==h){img.height=h;if(!on&&typeof ictx!=='undefined'&&typeof W!=='undefined')ictx.setTransform(img.width/W,0,0,img.width/W,0,0)}}
+function skStop(){if(SK){SK.done=true;SK=null}skCanvas(false);document.body.classList.remove('stroke');const p=$('skPop');if(p)p.hidden=true;const g=$('skGuide');if(g)g.hidden=true}
 const skMinutes=()=>SK.pat.door+SK.t*SK.W.rate;
 const skSinceGroin=()=>skMinutes()-SK.pat.door;
 function skBrainSaved(){const m=(SK.reperfAt??skMinutes())-SK.pat.door;return Math.max(5,Math.round(100-m*1.15))}
@@ -166,6 +171,7 @@ function skTick(dt){
       if(r.entered){if(typeof sfx==='function')sfx('engage');const v=A.V[r.entered];
         toast(r.trap?pw(`That is the ${skName(r.entered)}: it goes to the face, not the brain. Pull back and keep the tip pointing up.`,`Careful: that is the ${skName(r.entered)}, which goes to the face, not the brain. Pull back and keep the tip pointing up.`):`${pw('Into the','Into the')} ${skName(r.entered)}.`,!!r.trap);if(r.trap)s.ecaIn=true}
       if(r.blocked==='deep'&&s.blockedT<=0){s.blockedT=4;toast(pw(`The guide stays in the neck. Press ${shortKey('KeyX')} for the microcatheter to go further.`,`The big tube has to stay in the neck. Press ${shortKey('KeyX')} to send the thin tube (microcatheter) on into the head.`))}
+      if(r.floor&&s.blockedT<=0){s.blockedT=4;toast(pw('The guide stays in this neck artery: there is no need to come further back.','The big tube stays in this neck artery: no need to pull it back any further.'))}
       if(r.retracted)toast(pw('Microcatheter back in the guide.','The thin tube is back inside the big one.'));
       if(!imaging&&Math.abs(ds)>0){s.blind=(s.blind||0)+dt;if(s.blind>1.5&&Math.floor((s.blind-dt)/3)!==Math.floor(s.blind/3))toast(pw('Moving without fluoro. Hold the X-ray on.','Moving the tube without X-ray: hold the X-ray on so you can see it.'),true)}
       // pushing a microcatheter against the end of a small artery can go through the wall
@@ -232,12 +238,12 @@ function skDeeper(){
   const s=SK,c=s.cat,v=s.A.V[c.vid];
   if(c.deep){if(v.intra){toast(pw('Pull the microcatheter back into the neck first.','Pull the thin tube back down into the neck first.'));return}c.deep=false;s.guide=null;toast(pw('Microcatheter back in the guide.','The thin tube is back inside the big one.'));return}
   if(!/ICA|VA|CCA/.test(c.vid)){toast(pw('Park the guide in a neck artery (carotid or vertebral) first.','First bring the big tube up into a neck artery (carotid or vertebral).'));return}
-  c.deep=true;s.guide=skCathPath(s.A,c);if(!s.zoomSet&&!s.zoom){s.zoom=true;setTimeout(()=>toast(`Zoomed in on the head. ${shortKey('KeyZ')} to zoom out.`),1600)}toast(pw('Microcatheter and wire out of the guide: you can go into the head now.','The thin tube (microcatheter) is out of the big one: you can now steer into the head.'));if(typeof sfx==='function')sfx('engage');skPanel(true);
+  c.deep=true;s.guide=skCathPath(s.A,c);toast(pw('Microcatheter and wire out of the guide: you can go into the head now.','The thin tube (microcatheter) is out of the big one: you can now steer into the head.'));if(typeof sfx==='function')sfx('engage');skPanel(true);
 }
 /* marking the clot on a film */
 img.addEventListener('click',e=>{
   if(!SK||SK.done||!SK.review)return;
-  const r=img.getBoundingClientRect();let x=(e.clientX-r.left)/r.width*512,y=(e.clientY-r.top)/r.height*512;const cl=SK.clot;
+  const r=img.getBoundingClientRect();let x=(e.clientX-r.left)/r.width*512,y=SK_VY+(e.clientY-r.top)/r.height*SK_VH;const cl=SK.clot;
   if(SK.zoom){const pane=x<256?0:1,cx=pane*256+128;x=cx+(x-cx)/SK_ZOOM;y=SK_ZCY+(y-SK_ZCY)/SK_ZOOM}
   if(!cl){toast(pw('There is no clot left to mark.','Nothing is blocked any more.'));return}
   const p=skPt(SK.A.V[cl.vid],cl.s-cl.len/2),near=[0,1].some(pane=>{const q=skProj(p,pane);return Math.hypot(q[0]-x,q[1]-y)<20});
@@ -397,12 +403,10 @@ function skFinish(){
   const seed=s.pat.seed;$('skNew').onclick=()=>skStart(null);if(s.tut)$('skNew').textContent=pw('Your first real stroke patient','Your first real stroke patient');$('skAgain').onclick=()=>skStart(seed);$('skMenu').onclick=()=>showMenu('home');
 }
 /* ---------- the stroke tutorial: one patient, a coach card, one step at a time ---------- */
-function skTutSeed(){for(let i=1;i<20000;i++){const sd=(i*7919)%CODE_SPACE,p=skPatient(sd);if(p.site==='M1'&&p.side==='L'&&p.arch==='I'&&!p.bovine)return sd}return 1}
+function skTutSeed(){for(let i=1;i<20000;i++){const sd=(i*7919)%CODE_SPACE,p=skPatient(sd);if(p.site==='M1'&&p.side==='L'&&!p.rare)return sd}return 1}
 const skReached=id=>SK.cat.vid===id||SK.cat.stack.some(x=>x.vid===id);
 const SK_TUT=[
-  {title:'X-ray on',text:()=>`Hold ${kk('Space')} (or the X-ray button) to switch the X-ray on. You see two views at once: the front on the left, the side on the right. The tube is waiting in the main artery from the heart (the aorta), at the bottom.`,done:s=>s.ftime>0.6},
-  {title:'Into the left neck artery',text:()=>`Keep the X-ray on and hold ${kk('ArrowUp')} to push the tube up and over the arch. The left neck artery (left common carotid) is the second branch. The guide under the X-ray says when to turn the tip up into it.`,done:()=>skReached('LCCA')},
-  {title:'Up the neck',text:()=>`Push on up the neck. At the fork, keep the tip pointing up to go into the internal carotid (to the brain), not the external carotid (to the face).`,done:()=>skReached('LICA')},
+  {title:'X-ray on',text:()=>`Hold ${kk('Space')} (or the X-ray button) to switch the X-ray on. You see two views of the head at once: the front on the left, the side on the right. The tube is already up the left artery into the brain (internal carotid), at the bottom of the picture.`,done:s=>s.ftime>0.6},
   {title:'Film it',text:()=>`Press ${kk('KeyC')} to record, hold ${kk('KeyJ')} for about two seconds to inject dye, then press ${kk('KeyC')} to stop. The dye fills the brain's arteries, except beyond the clot.`,done:s=>s.runs.some(r=>r.showsClot)},
   {title:'Find the clot',text:()=>`Open Film 1 under Films. Click where the dye column suddenly stops, then say which artery it is: the main middle brain artery (M1).`,done:s=>s.found},
   {title:'Go deeper',text:()=>`The big tube cannot go into the skull. Push up to the top of the neck, then press ${kk('KeyX')}: a thin tube (microcatheter) comes out of it and can go into the head.`,done:s=>s.cat.deep},
@@ -427,7 +431,7 @@ function skTutorial(){if(profile&&!profile.skIntroSeen&&typeof openStrokeIntro==
 /* ---------- menu: the stroke room folder and chart ---------- */
 function skChart(D){
   return `<div class="chead"><h2>${pw('Stroke room','Stroke room')}</h2><span class="meta">${pw('Mechanical thrombectomy','Pulling a clot out of a brain artery')} · ${D.label}</span></div>
-    <dl><dt>${pw('The job','The job')}</dt><dd>${pw('A large-vessel stroke: a clot is blocking an artery in the brain. Steer up over the arch into the right neck artery, film to find where the dye stops, take the microcatheter into the head and pull the clot out.','A clot is blocking an artery in the brain. Steer the tube up into the neck, film with dye to find where it stops, send the thin tube into the head and pull the clot out.')}</dd>
+    <dl><dt>${pw('The job','The job')}</dt><dd>${pw('A large-vessel stroke: a clot is blocking an artery in the brain. The guide catheter is already up the neck artery that leads to it: film to find where the dye stops, take the microcatheter into the head and pull the clot out.','A clot is blocking an artery in the brain. The tube is already up in the neck: film with dye to find where it stops, send the thin tube into the head and pull the clot out.')}</dd>
     <dt>${pw('New here','New here')}</dt><dd>${pw('Two views at once (front and side), a roadmap ghost of your last film, the microcatheter (X), the stent retriever and aspiration, and the stroke clock: every minute costs brain.','Two X-ray views at once (front and side), a faint ghost of your last film to steer by, a thin tube for the head (X), a mesh stent or a suction tube, and a clock: every minute costs brain cells.')}</dd>
     <dt>${pw('Controls','Controls')}</dt><dd>${pw('The same keys as the heart room. B opens and pulls the stent retriever, or holds suction.','The same keys as the heart room. B opens and pulls the mesh stent, or holds suction.')}</dd></dl>
     ${profile.skTutDone?`<button class="btn primary go" data-act="stroke">Start a stroke case</button><div class="row"><button class="btn" data-act="sktut">Tutorial again</button><button class="btn" data-act="skintro">How a thrombectomy works (1 min)</button></div>`

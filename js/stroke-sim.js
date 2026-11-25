@@ -25,9 +25,13 @@ const SK_NAMES={
   RVA:['right vertebral artery','right back-of-neck artery (vertebral)'],LVA:['left vertebral artery','left back-of-neck artery (vertebral)'],
   RM3a:['right frontal branch (M3)','right front branch (M3)'],RM3b:['right parietal branch (M3)','right top branch (M3)'],RM3c:['right temporal branch (M3)','right side branch (M3)'],RM3d:['right angular branch (M3)','right back branch (M3)'],
   LM3a:['left frontal branch (M3)','left front branch (M3)'],LM3b:['left parietal branch (M3)','left top branch (M3)'],LM3c:['left temporal branch (M3)','left side branch (M3)'],LM3d:['left angular branch (M3)','left back branch (M3)'],
-  BA:['basilar artery','artery at the base of the brain (basilar)'],RPCA:['right posterior cerebral','right back brain artery (posterior cerebral)'],LPCA:['left posterior cerebral','left back brain artery (posterior cerebral)'],
+  BA:['basilar artery','artery at the base of the brain (basilar)'],
+  RFPCA:['right fetal posterior cerebral','right back brain artery, fed from the carotid'],LFPCA:['left fetal posterior cerebral','left back brain artery, fed from the carotid'],RPCA:['right posterior cerebral','right back brain artery (posterior cerebral)'],LPCA:['left posterior cerebral','left back brain artery (posterior cerebral)'],
 };
-/* build the arch, neck and brain arteries (and the veins that drain the brain). spec: {arch:'I'|'II'|'III', bovine} */
+/* build the arch, neck and brain arteries (and the veins that drain the brain). spec: {arch:'I'|'II'|'III', bovine, side,
+   loop (a coiled internal carotid on that side), fetal (that side's posterior cerebral fed from the internal carotid)}.
+   The arch and lower neck are still built (the catheter's path runs through them) but cases start in the upper neck
+   and the X-ray only shows the head and upper neck. */
 function skAnatomy(spec={}){
   const d={I:0,II:-14,III:-30}[spec.arch||'I'],bov=!!spec.bovine;
   const V={},order=[];
@@ -48,7 +52,8 @@ function skAnatomy(spec={}){
   for(const S of ['R','L']){const sx=S==='R'?-1:1,lat=S==='R'?270:90,med=S==='R'?90:270;
     // internal carotid: straight up the neck, then through the skull base (petrous part, bending forwards), up through the
     // cavernous sinus in an S-shaped siphon, and on to its end where it splits into the middle and anterior cerebrals
-    add(S+'ICA',S+'CCA',[[sx*27,138,8],[sx*30,175,0],[sx*31,198,-4],[sx*29,206,4],[sx*25,210,14],[sx*21,220,21],[sx*20,233,18],[sx*21,240,7],[sx*22,250,4]],2.4,0,{atEnd:true,guideMaxY:200});
+    const loop=spec.loop&&spec.side===S;
+    add(S+'ICA',S+'CCA',[[sx*27,138,8],...(loop?[[sx*29,148,6],[sx*36,158,14],[sx*35,170,22],[sx*27,172,14],[sx*25,162,4],[sx*29,156,-4],[sx*34,166,-6],[sx*33,180,-4]]:[[sx*30,175,0]]),[sx*31,198,-4],[sx*29,206,4],[sx*25,210,14],[sx*21,220,21],[sx*20,233,18],[sx*21,240,7],[sx*22,250,4]],2.4,0,{atEnd:true,guideMaxY:loop?150:200});
     add(S+'OPH',S+'ICA',[[sx*20,234,17],[sx*25,238,36],[sx*29,234,58],[sx*30,230,70]],0.7,0,{noEntry:true,intra:true,end:true});
     // external carotid and its branches (to the face and scalp): a wrong turn for this job
     add(S+'ECA',S+'CCA',[[sx*27,138,8],[sx*22,160,22],[sx*30,185,30],[sx*38,205,34]],2.1,S==='R'?55:305,{atEnd:true,trap:true});
@@ -74,10 +79,12 @@ function skAnatomy(spec={}){
   add('LVA','LSCA',[[30,24,-8],[23,90,-20],[18,150,-24],[17,186,-26],[24,198,-30],[30,206,-40],[18,212,-40],[8,218,-34],[4,222,-32]],1.8,0,{guideMaxY:186});
   add('RVA','RSCA',[[-32,44,-2],[-23,90,-20],[-18,150,-24],[-17,186,-26],[-24,198,-30],[-30,206,-40],[-18,212,-40],[-8,218,-34],[-4,222,-32]],1.7,0,{guideMaxY:186,link:'BA'});
   add('BA','LVA',[[4,222,-32],[1,236,-28],[0,252,-24],[0,268,-20]],1.8,0,{atEnd:true,intra:true});
-  for(const S of ['L','R']){const sx=S==='R'?-1:1;
-    add(S+'PCA','BA',[[0,268,-20],[sx*14,270,-28],[sx*28,268,-44],[sx*34,262,-64],[sx*30,256,-84]],1.2,S==='R'?270:90,{atEnd:true,intra:true,end:true});
+  for(const S of ['L','R']){const sx=S==='R'?-1:1,fetal=spec.fetal&&spec.side===S;
+    // a fetal posterior cerebral: fed from the internal carotid through a large posterior communicating artery
+    if(fetal)add(S+'FPCA',S+'ICA',[[sx*20,238,12],[sx*19,244,-4],[sx*20,258,-22],[sx*28,266,-44],[sx*34,262,-64],[sx*30,256,-84]],1.15,0,{noEntry:true,intra:true,end:true});
+    add(S+'PCA','BA',[[0,268,-20],[sx*14,270,-28],[sx*28,268,-44],[sx*34,262,-64],[sx*30,256,-84]],fetal?0.5:1.2,S==='R'?270:90,{atEnd:true,intra:true,end:true});
     add(S+'CALC',S+'PCA',[[sx*30,256,-84],[sx*22,266,-94],[sx*14,276,-98]],0.7,0,{noEntry:true,intra:true,end:true,atEnd:true});
-    add(S+'SCA','BA',[[0,264,-21],[sx*16,262,-30],[sx*28,256,-46]],0.6,0,{noEntry:true,intra:true,end:true})}
+    add(S+'SCB','BA',[[0,264,-21],[sx*16,262,-30],[sx*28,256,-46]],0.6,0,{noEntry:true,intra:true,end:true})}
   // the veins and sinuses that drain the brain (filled late, in the venous phase); not for the catheter
   const veins=[];const vein=(ctrl,r,delay)=>{const pts=skCurve(ctrl,3),cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1],pts[i][2]-pts[i-1][2]));veins.push({pts,cum,n:pts.length,r,delay})};
   for(const sx of [-1,1]){vein([[sx*62,300,24],[sx*36,326,30],[sx*4,342,24]],0.9,0);vein([[sx*66,292,-40],[sx*36,320,-56],[sx*4,328,-62]],0.9,0.1);vein([[sx*64,262,-20],[sx*58,258,-58],[sx*52,258,-82]],0.8,0.1)}
@@ -85,7 +92,7 @@ function skAnatomy(spec={}){
   vein([[0,300,14],[0,292,-28],[0,274,-70],[0,262,-100]],1.8,0.5);                                  // inferior sagittal and straight sinus
   for(const sx of [-1,1]){vein([[0,262,-100],[sx*30,260,-98],[sx*54,250,-80],[sx*60,232,-60],[sx*56,214,-44],[sx*48,200,-34]],2.6,0.9); // transverse and sigmoid sinus
     vein([[sx*48,200,-34],[sx*42,170,-12],[sx*36,120,-2],[sx*32,60,0],[sx*30,0,2]],3.6,1.4)}         // internal jugular vein
-  return {V,order,veins,spec:{arch:spec.arch||'I',bovine:bov}};
+  return {V,order,veins,spec:{arch:spec.arch||'I',bovine:bov,loop:!!spec.loop,fetal:!!spec.fetal,side:spec.side}};
 }
 const skPt=(v,s)=>{let i=0;while(i<v.n-1&&v.cum[i+1]<s)i++;const t=v.cum[i+1]>v.cum[i]?Math.min(1,Math.max(0,(s-v.cum[i])/(v.cum[i+1]-v.cum[i]))):0,a=v.pts[i],b=v.pts[Math.min(v.n-1,i+1)];return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t]};
 const skAngDiff=(a,b)=>Math.abs(((a-b)%360+540)%360-180);
@@ -95,6 +102,15 @@ const SK_DIFF={story:{win:70,seek:90,adv:48,micro:22,rate:1/10},easy:{win:55,see
 function skWindow(A,c,dk){const w=SK_DIFF[dk]||SK_DIFF.medium;let win=w.win;if(c.parent==='AO')win-= {I:0,II:5,III:12}[A.spec.arch];return Math.max(12,win)}
 /* the catheter: {vid, s, rot, stack:[{vid,s}], deep (microcatheter out)} */
 function skNewCath(){return {vid:'AO',s:0,rot:180,stack:[],deep:false,push:0}}
+/* where a case starts: the guide already up the neck artery that leads to the clot (the internal carotid on the clot's
+   side, or the left vertebral for the basilar), its tip in the upper neck pointing up. The way back down is closed at
+   the floor, the bottom of the picture. */
+function skStartCath(A,pat){
+  const vid=pat.site==='BA'?'LVA':pat.side+'ICA',v=A.V[vid],at=y=>{let s=0;while(s<v.len&&skPt(v,s)[1]<y)s+=0.5;return s};
+  const stack=[];let ch=v;while(ch.parent){stack.unshift({vid:ch.parent,s:ch.os});ch=A.V[ch.parent]}
+  const loop=A.spec.loop&&vid===A.spec.side+'ICA',s=at(vid==='LVA'?158:loop?142:162),floor=Math.min(s,at(vid==='LVA'?148:141));
+  return {vid,s,rot:0,stack,deep:false,push:0,floor:{vid,s:floor}};
+}
 /* move the tip by ds millimetres; returns what happened */
 function skMove(A,cat,ds,dk,clot){
   const v=A.V[cat.vid];let out={};
@@ -114,6 +130,7 @@ function skMove(A,cat,ds,dk,clot){
     cat.s=ns;cat.push=0;return out;
   }
   if(ds<0){cat.push=0;let ns=cat.s+ds;
+    if(cat.floor&&cat.vid===cat.floor.vid&&ns<cat.floor.s){cat.s=cat.floor.s;return {floor:true}}
     while(ns<0&&cat.stack.length){const st=cat.stack.pop();cat.vid=st.vid;ns=st.s+ns}
     if(ns<0)ns=0;cat.s=ns;
     // the microcatheter goes back into the guide once the tip is back in the neck
@@ -153,15 +170,15 @@ function skClot(A,pat){
 }
 /* the patient, fixed by a seed (so a code always gives the same patient) */
 const SK_RARE=[
-  {id:'bovine',name:'Bovine arch',short:'The left neck artery starts from the first arch branch',
-    blurb:'In about one person in eight the left common carotid shares its origin with the brachiocephalic trunk (a "bovine" arch). The left carotid is not where you expect it on the arch.',
-    tip:'Go into the first branch, then turn towards the patient’s left just above its origin to find the left carotid.'},
-  {id:'type3',name:'Type III arch',short:'A deep arch with steep branch origins',
-    blurb:'With age the arch elongates and sinks, so the neck arteries leave it far above its top. The catheter has to reach up into them.',
-    tip:'Line up exactly under each opening and turn the tip up before you push: the window to engage is narrow.'},
+  {id:'loop',name:'Coiled carotid',short:'The internal carotid makes a full loop in the neck',
+    blurb:'In some older people the neck part of the internal carotid is so long that it coils into a loop. The stiff guide catheter cannot follow it round.',
+    tip:'Leave the guide below the loop: send the microcatheter (X) out early and steer it through the coil.'},
+  {id:'fetal',name:'Fetal posterior cerebral',short:'The back brain artery is fed from the internal carotid',
+    blurb:'In about one person in five the posterior cerebral artery on one side is fed mainly from the internal carotid, through a large posterior communicating artery, as it is before birth. A carotid film then fills the back of the brain too.',
+    tip:'Do not mistake the extra artery running back from the carotid for a clot or a wrong branch: it is normal for this patient.'},
   {id:'basilar',name:'Basilar occlusion',short:'A clot at the base of the brain, reached through the vertebral artery',
     blurb:'A blocked basilar artery cuts blood to the brainstem: the patient is drowsy with double vision and weakness on both sides.',
-    tip:'Go into the left subclavian, turn up into the left vertebral, then take the microcatheter up into the basilar.'},
+    tip:'The guide starts in the left vertebral artery. Take the microcatheter up into the head and on into the basilar.'},
 ];
 function skPatient(seed){
   const R=mulberry32((seed*2654435761+12345)>>>0),rnd=(a,b)=>a+(b-a)*R(),pick=a=>a[Math.floor(R()*a.length)];R();R();
@@ -172,10 +189,11 @@ function skPatient(seed){
   const weak=side==='L'?'right':'left',left=side==='L';
   const sx=site==='BA'?'Drowsy, double vision and weakness on both sides':left?`Sudden ${weak}-sided weakness and cannot find words (aphasia)`:`Sudden ${weak}-sided weakness, ignores the left side, eyes turned to the right`;
   const where=site==='BA'?'basilar artery':`${left?'left':'right'} ${site==='ICA-T'?'internal carotid terminus':site==='M1'?'middle cerebral (M1)':'middle cerebral branch (M2)'}`;
-  const rare=bovine?'bovine':site==='BA'?'basilar':arch==='III'?'type3':null;
+  const w=R(),loop=site!=='BA'&&w<0.06,fetal=site!=='BA'&&!loop&&w<0.12;
+  const rare=site==='BA'?'basilar':loop?'loop':fetal?'fetal':null;
   const title=site==='BA'?'Basilar stroke':`${left?'Left':'Right'} hemisphere stroke`;
   const hx=`${sx}. Last seen well ${Math.floor(onset/60)} h ${onset%60} min ago. NIHSS ${nihss}. CT: no bleed.`;
-  return {seed,code:'STK-'+seedToCode(seed).slice(4),title,pt:(male?'M':'F')+', '+age,hx,where,arch,bovine,site,side,m2,nihss,onset,door,rare};
+  return {seed,code:'STK-'+seedToCode(seed).slice(4),title,pt:(male?'M':'F')+', '+age,hx,where,arch,bovine,loop,fetal,site,side,m2,nihss,onset,door,rare};
 }
 /* TICI 0-3 in words */
 const TICI_TXT={0:'no flow past the clot',1:'a trickle past the clot',2:'part of the territory flowing (TICI 2a)',2.5:'most of the territory flowing (TICI 2b)',3:'complete flow (TICI 3)'};

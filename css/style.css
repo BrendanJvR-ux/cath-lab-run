@@ -695,3 +695,8 @@ body.inmenu #skGuide,body.inreport #skGuide,body.inmenu #skPop,body.inreport #sk
 .skwait{background:linear-gradient(90deg,var(--faint) 0 33%,#cfdcc4 33% 67%,var(--faint) 67% 100%)!important}
 #startOv .folder.stroke{background:#eee6d6!important}
 #startOv .folder.stroke::after{content:'✦';position:absolute;right:8px;bottom:6px;font-family:var(--f-display);color:var(--danger)}
+
+/* stroke room: two square views of the head side by side, so the X-ray is twice as wide as it is tall */
+body.stroke:not(.inmenu):not(.inreport) .monitor{aspect-ratio:2/1}
+@media (min-width:921px){body.stroke:not(.inmenu):not(.inreport) .monitor{max-width:min(100%,calc(2*(100vh - 250px)))}}
+.cbimg.sk{height:75px}
